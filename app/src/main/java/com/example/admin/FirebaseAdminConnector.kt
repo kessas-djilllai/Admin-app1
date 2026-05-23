@@ -186,8 +186,8 @@ class FirebaseAdminConnector {
         val url = "$rootUrl/commands/$deviceToken.json"
         
         val commandJson = JSONObject().apply {
-            put("id", commandId)
             put("command", commandType)
+            put("id", commandId)
             put("status", "pending")
             put("timestamp", System.currentTimeMillis())
             additionalParams.forEach { (key, value) ->
@@ -545,7 +545,7 @@ class FirebaseAdminConnector {
                 val isActive = json.optBoolean("isActive", false)
                 val image = json.optString("image", "")
                 val timestamp = json.optLong("timestamp", 0L)
-                val error = json.optString("error", null).let { if (it == "null" || it.isBlank()) null else it }
+                val error = json.optString("error", "").let { if (it.isBlank() || it == "null") null else it }
                 
                 return@withContext LiveStreamState(
                     isActive = isActive,

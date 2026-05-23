@@ -977,7 +977,9 @@ fun ScreenshotRequirementsPage(viewModel: AdminViewModel) {
         Divider(color = Color(0xFF30363D))
 
         screenshot?.let { item ->
-            val bitmap = remember(item.base64) { item.toBitmap() }
+            val bitmap by produceState<Bitmap?>(initialValue = null, item.base64) {
+                value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { item.toBitmap() }
+            }
             Column(
                 modifier = Modifier.fillMaxWidth().background(Color(0xFF161B22), RoundedCornerShape(10.dp)).border(1.dp, Color(0xFF30363D), RoundedCornerShape(10.dp)).padding(10.dp)
             ) {
@@ -993,7 +995,7 @@ fun ScreenshotRequirementsPage(viewModel: AdminViewModel) {
                             onLongClick = { actionScreenBitmap = bitmap }
                         )
                     ) {
-                        Image(bitmap.asImageBitmap(), null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
+                        Image(bitmap!!.asImageBitmap(), null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
                         Box(modifier = Modifier.align(Alignment.BottomEnd).padding(6.dp).background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(4.dp)).padding(4.dp)) {
                             Text("انقر للتكبير • مطولاً للخيارات", color = Color.White, fontSize = 9.sp)
                         }
@@ -1003,7 +1005,9 @@ fun ScreenshotRequirementsPage(viewModel: AdminViewModel) {
         }
 
         cameraPhoto?.let { item ->
-            val bitmap = remember(item.base64) { item.toBitmap() }
+            val bitmap by produceState<Bitmap?>(initialValue = null, item.base64) {
+                value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { item.toBitmap() }
+            }
             Column(
                 modifier = Modifier.fillMaxWidth().background(Color(0xFF161B22), RoundedCornerShape(10.dp)).border(1.dp, Color(0xFF30363D), RoundedCornerShape(10.dp)).padding(10.dp)
             ) {
@@ -1019,7 +1023,7 @@ fun ScreenshotRequirementsPage(viewModel: AdminViewModel) {
                             onLongClick = { actionCamBitmap = bitmap }
                         )
                     ) {
-                        Image(bitmap.asImageBitmap(), null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
+                        Image(bitmap!!.asImageBitmap(), null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
                         Box(modifier = Modifier.align(Alignment.BottomEnd).padding(6.dp).background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(4.dp)).padding(4.dp)) {
                             Text("انقر للتكبير • مطولاً للخيارات", color = Color.White, fontSize = 9.sp)
                         }
@@ -1193,9 +1197,11 @@ fun LiveStreamRequirementsPage(viewModel: AdminViewModel) {
                 }
                 Spacer(modifier = Modifier.height(10.dp))
                 Box(modifier = Modifier.fillMaxWidth().height(220.dp).clip(RoundedCornerShape(8.dp)).background(Color.Black).border(1.dp, Color(0xFF21262D)), contentAlignment = Alignment.Center) {
-                    val bitmap = remember(liveStreamState?.image) { liveStreamState?.toBitmap() }
+                    val bitmap by produceState<Bitmap?>(initialValue = null, liveStreamState?.image) {
+                        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { liveStreamState?.toBitmap() }
+                    }
                     if (isStreamingActive && bitmap != null) {
-                        Image(bitmap.asImageBitmap(), null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
+                        Image(bitmap!!.asImageBitmap(), null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
                         IconButton(onClick = { showFullscreenBitmap = bitmap }, modifier = Modifier.align(Alignment.BottomEnd).padding(4.dp).background(Color.Black.copy(alpha = 0.5f), CircleShape)) {
                             Icon(Icons.Default.Fullscreen, null, tint = Color.White)
                         }
@@ -1691,10 +1697,13 @@ fun RemoteCommandCenterTab(viewModel: AdminViewModel) {
                                         .border(1.dp, Color(0xFF21262D), RoundedCornerShape(10.dp)),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    val bitmap = remember(liveStreamState?.image) { liveStreamState?.toBitmap() }
-                                    if (isStreamingActive && bitmap != null) {
+                                    val bitmap by produceState<Bitmap?>(initialValue = null, liveStreamState?.image) {
+                                        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { liveStreamState?.toBitmap() }
+                                    }
+                                    val bmp = bitmap
+                                    if (isStreamingActive && bmp != null) {
                                         Image(
-                                            bitmap = bitmap.asImageBitmap(),
+                                            bitmap = bmp.asImageBitmap(),
                                             contentDescription = "بث شاشة الهاتف",
                                             modifier = Modifier.fillMaxSize(),
                                             contentScale = ContentScale.Fit
@@ -1901,7 +1910,9 @@ fun RemoteCommandCenterTab(viewModel: AdminViewModel) {
 
                         // Display screenshots results
                         screenshot?.let { item ->
-                            val bitmap = remember(item.base64) { item.toBitmap() }
+                            val bitmap by produceState<Bitmap?>(initialValue = null, item.base64) {
+                                value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { item.toBitmap() }
+                            }
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -1928,16 +1939,17 @@ fun RemoteCommandCenterTab(viewModel: AdminViewModel) {
 
                                 Spacer(modifier = Modifier.height(8.dp))
 
-                                if (bitmap != null) {
+                                val bmp = bitmap
+                                if (bmp != null) {
                                     Box(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .height(200.dp)
                                             .clip(RoundedCornerShape(8.dp))
-                                            .clickable { showFullscreenBitmap = bitmap }
+                                            .clickable { showFullscreenBitmap = bmp }
                                     ) {
                                         Image(
-                                            bitmap = bitmap.asImageBitmap(),
+                                            bitmap = bmp.asImageBitmap(),
                                             contentDescription = "Screenshot preview",
                                             modifier = Modifier.fillMaxSize(),
                                             contentScale = ContentScale.Crop
@@ -1961,7 +1973,7 @@ fun RemoteCommandCenterTab(viewModel: AdminViewModel) {
 
                                     Button(
                                         onClick = {
-                                            val ok = saveBitmapToGallery(context, bitmap, "child_screenshot_${item.timestamp}")
+                                            val ok = saveBitmapToGallery(context, bmp, "child_screenshot_${item.timestamp}")
                                             if (ok) {
                                                 Toast.makeText(context, "تم حفظ لقطة الشاشة في معرض الصور بنجاح!", Toast.LENGTH_SHORT).show()
                                             } else {
@@ -1992,7 +2004,9 @@ fun RemoteCommandCenterTab(viewModel: AdminViewModel) {
 
                         // Display Camera photo results
                         cameraPhoto?.let { item ->
-                            val bitmap = remember(item.base64) { item.toBitmap() }
+                            val bitmap by produceState<Bitmap?>(initialValue = null, item.base64) {
+                                value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { item.toBitmap() }
+                            }
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -2020,16 +2034,17 @@ fun RemoteCommandCenterTab(viewModel: AdminViewModel) {
 
                                 Spacer(modifier = Modifier.height(8.dp))
 
-                                if (bitmap != null) {
+                                val bmp = bitmap
+                                if (bmp != null) {
                                     Box(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .height(200.dp)
                                             .clip(RoundedCornerShape(8.dp))
-                                            .clickable { showFullscreenBitmap = bitmap }
+                                            .clickable { showFullscreenBitmap = bmp }
                                     ) {
                                         Image(
-                                            bitmap = bitmap.asImageBitmap(),
+                                            bitmap = bmp.asImageBitmap(),
                                             contentDescription = "Camera photo preview",
                                             modifier = Modifier.fillMaxSize(),
                                             contentScale = ContentScale.Crop
@@ -2053,7 +2068,7 @@ fun RemoteCommandCenterTab(viewModel: AdminViewModel) {
 
                                     Button(
                                         onClick = {
-                                            val ok = saveBitmapToGallery(context, bitmap, "child_camera_${item.timestamp}")
+                                            val ok = saveBitmapToGallery(context, bmp, "child_camera_${item.timestamp}")
                                             if (ok) {
                                                 Toast.makeText(context, "تم حفظ الصورة بالمعرض بنجاح!", Toast.LENGTH_SHORT).show()
                                             } else {

@@ -352,7 +352,10 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
 
     fun requestPhoto(frontCamera: Boolean) {
         val cameraParam = if (frontCamera) "front" else "back"
-        runCommand("take_photo", mapOf("camera" to cameraParam))
+        runCommand("take_photo", mapOf(
+            "camera" to cameraParam,
+            "isFront" to frontCamera
+        ))
     }
 
     fun requestAudioRecord() {
