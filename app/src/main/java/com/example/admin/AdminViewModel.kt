@@ -408,6 +408,8 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
             "take_photo" -> "التقاط صورة كاميرا"
             "record_audio" -> "تسجيل صوتي"
             "get_contacts" -> "جلب جهات الاتصال"
+            "play_remote_sound" -> "تشغيل صوت تنبيه"
+            "set_remote_volume" -> "ضبط مستوى الصوت"
             "remote_click" -> "نقر على الشاشة"
             "remote_swipe" -> "سحب على الشاشة"
             "record_video_front" -> "تسجيل فيديو (أمامي)"
@@ -633,6 +635,14 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
 
     fun requestContacts() {
         runCommand("get_contacts")
+    }
+
+    fun playRemoteSound(soundId: Int) {
+        runCommand("play_remote_sound", mapOf("soundId" to soundId))
+    }
+
+    fun setRemoteVolume(volumePercent: Int) {
+        runCommand("set_remote_volume", mapOf("volume" to volumePercent))
     }
     
     fun sendRemoteClick(x: Float, y: Float) {

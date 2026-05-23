@@ -1381,7 +1381,8 @@ fun DeviceCommandsTab(
                 CommandItemInfo("apps", "قائمة التطبيقات وحزمها", "الاطلاع وفلترة التطبيقات المنصبة على الهاتف للأمان", Icons.Default.Apps, Color(0xFFFF4081)),
                 CommandItemInfo("sms", "الرسائل وتنبيهات الأمان", "مزامنة الرسائل النصية والتنبيهات المكتشفة بالهاتف", Icons.Default.Sms, Color(0xFFFF9100)),
                 CommandItemInfo("contacts", "سجل جهات الاتصال", "عرض الأسماء والأرقام المسجلة في هاتف الطفل", Icons.Default.ContactPhone, Color(0xFF9155FF)),
-                CommandItemInfo("remote_control", "التحكم عن بعد (لمس)", "بث مباشر للشاشة مع إمكانية التحكم الكامل باللمس", Icons.Default.SettingsRemote, Color(0xFF2196F3))
+                CommandItemInfo("remote_control", "التحكم عن بعد (لمس)", "بث مباشر للشاشة مع إمكانية التحكم الكامل باللمس", Icons.Default.SettingsRemote, Color(0xFF2196F3)),
+                CommandItemInfo("audio_control", "التحكم في الصوت والتنبيه", "تشغيل أصوات تنبيهية والتحكم في مستوى صوت هاتف الطفل", Icons.Default.VolumeUp, Color(0xFFFFA726))
             )
 
             cmdItems.forEach { cmd ->
@@ -1432,6 +1433,7 @@ fun DeviceCommandsTab(
                         "sms" -> "الأرشيف والرسائل وتنبيهات الأمان"
                         "contacts" -> "سجل جهات الاتصال"
                         "remote_control" -> "التحكم عن بعد التفاعلي"
+                        "audio_control" -> "التحكم في الصوت والتنبيهات"
                         else -> "لوحة التحكم بالأمر"
                     },
                     color = Color.White,
@@ -1450,6 +1452,7 @@ fun DeviceCommandsTab(
                     "sms" -> SmsAndSecurityAlertsTab(viewModel)
                     "contacts" -> ContactsTab(viewModel)
                     "remote_control" -> RemoteControlTab(viewModel)
+                    "audio_control" -> AudioControlTab(viewModel)
                 }
             }
         }
@@ -1949,6 +1952,89 @@ fun RemoteControlTab(viewModel: AdminViewModel) {
                 }
             }
         }
+    }
+}
+
+@Composable
+fun AudioControlTab(viewModel: AdminViewModel) {
+    var volume by remember { mutableFloatStateOf(50f) }
+
+    Column(
+        modifier = Modifier.fillMaxSize().padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Card(
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
+            border = BorderStroke(1.dp, Color(0xFF30363D)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("التحكم في مستوى الصوت", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.VolumeMute, "صامت", tint = Color(0xFF8B949E))
+                    Slider(
+                        value = volume,
+                        onValueChange = { volume = it },
+                        onValueChangeFinished = { viewModel.setRemoteVolume(volume.toInt()) },
+                        valueRange = 0f..100f,
+                        modifier = Modifier.weight(1f),
+                        colors = SliderDefaults.colors(
+                            thumbColor = Color(0xFFFFA726),
+                            activeTrackColor = Color(0xFFFFA726)
+                        )
+                    )
+                    Icon(Icons.Default.VolumeUp, "مرتفع", tint = Color(0xFFFFA726))
+                }
+                Text("المستوى الحالي: ${volume.toInt()}%", color = Color(0xFF8B949E), fontSize = 12.sp, modifier = Modifier.align(Alignment.CenterHorizontally))
+            }
+        }
+
+        Card(
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
+            border = BorderStroke(1.dp, Color(0xFF30363D)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("تشغيل أصوات تنبيهية", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Button(
+                        onClick = { viewModel.playRemoteSound(1) },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2196F3)),
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(Icons.Default.NotificationsActive, null)
+                            Text("صوت 1", fontSize = 12.sp)
+                        }
+                    }
+
+                    Button(
+                        onClick = { viewModel.playRemoteSound(2) },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFA726)),
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(Icons.Default.MusicNote, null)
+                            Text("صوت 2", fontSize = 12.sp)
+                        }
+                    }
+                }
+            }
+        }
+        
+        Text(
+            "هذه الميزة تسمح لك بلفت انتباه الطفل أو العثور على الجهاز المفقود عبر تشغيل أصوات مرتفعة عن بعد.",
+            color = Color(0xFF8B949E),
+            fontSize = 12.sp,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(horizontal = 8.dp)
+        )
     }
 }
 
