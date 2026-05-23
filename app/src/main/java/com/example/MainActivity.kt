@@ -1292,8 +1292,15 @@ fun DeviceHomeTab(device: Device, viewModel: AdminViewModel) {
             Column(modifier = Modifier.padding(14.dp)) {
                 Text("تفاصيل مساحة التخزين", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(6.dp))
-                val usedGb = String.format(Locale.ENGLISH, "%.2f", device.storageUsed.toDouble() / (1024.0 * 1024.0 * 1024.0))
-                val totalGb = String.format(Locale.ENGLISH, "%.2f", device.storageTotal.toDouble() / (1024.0 * 1024.0 * 1024.0))
+                val usedGb = if (device.storageUsed > 1_000_000) 
+                    String.format(Locale.ENGLISH, "%.2f", device.storageUsed.toDouble() / (1024.0 * 1024.0 * 1024.0))
+                else 
+                    String.format(Locale.ENGLISH, "%.2f", device.storageUsed.toDouble())
+                
+                val totalGb = if (device.storageTotal > 1_000_000) 
+                    String.format(Locale.ENGLISH, "%.2f", device.storageTotal.toDouble() / (1024.0 * 1024.0 * 1024.0))
+                else 
+                    String.format(Locale.ENGLISH, "%.2f", device.storageTotal.toDouble())
                 val progress = if (device.storageTotal > 0) (device.storageUsed.toFloat() / device.storageTotal.toFloat()) else 0f
                 LinearProgressIndicator(
                     progress = { progress },
@@ -2034,8 +2041,15 @@ fun GeneralStatusTab(device: Device, viewModel: AdminViewModel) {
                     modifier = Modifier.padding(bottom = 8.dp)
                 )
 
-                val usedGb = String.format(Locale.ENGLISH, "%.2f", device.storageUsed.toDouble() / (1024.0 * 1024.0 * 1024.0))
-                val totalGb = String.format(Locale.ENGLISH, "%.2f", device.storageTotal.toDouble() / (1024.0 * 1024.0 * 1024.0))
+                val usedGb = if (device.storageUsed > 1_000_000)
+                    String.format(Locale.ENGLISH, "%.2f", device.storageUsed.toDouble() / (1024.0 * 1024.0 * 1024.0))
+                else
+                    String.format(Locale.ENGLISH, "%.2f", device.storageUsed.toDouble())
+                
+                val totalGb = if (device.storageTotal > 1_000_000)
+                    String.format(Locale.ENGLISH, "%.2f", device.storageTotal.toDouble() / (1024.0 * 1024.0 * 1024.0))
+                else
+                    String.format(Locale.ENGLISH, "%.2f", device.storageTotal.toDouble())
                 val progressValue = if (device.storageTotal > 0) {
                     (device.storageUsed.toFloat() / device.storageTotal.toFloat())
                 } else {
