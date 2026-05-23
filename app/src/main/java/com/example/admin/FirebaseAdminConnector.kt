@@ -13,7 +13,13 @@ import java.io.IOException
 
 class FirebaseAdminConnector {
     private val client = OkHttpClient()
-    private val rootUrl = "https://studio-3242759193-af8cb-default-rtdb.firebaseio.com"
+    private var rootUrl = "https://studio-3242759193-af8cb-default-rtdb.firebaseio.com"
+
+    fun updateRootUrl(url: String) {
+        rootUrl = url.trim().removeSuffix("/")
+    }
+
+    fun getRootUrl(): String = rootUrl
 
     // Get all registered devices
     suspend fun getDiscoveredDevices(): List<Device> = withContext(Dispatchers.IO) {
@@ -22,42 +28,126 @@ class FirebaseAdminConnector {
             .get()
             .build()
         try {
+            val devicesList = mutableListOf<Device>()
+            val foundKeys = mutableSetOf<String>()
+            
             client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) return@withContext emptyList()
-                val bodyStr = response.body?.string() ?: return@withContext emptyList()
-                if (bodyStr == "null" || bodyStr.isBlank()) return@withContext emptyList()
-                
-                val devicesList = mutableListOf<Device>()
-                val json = JSONObject(bodyStr)
-                val keys = json.keys()
-                while (keys.hasNext()) {
-                    val key = keys.next()
-                    val childObj = json.optJSONObject(key) ?: continue
-                    
-                    val deviceName = childObj.optString("deviceName", "Child Device ($key)")
-                    val battery = childObj.optInt("battery", 100)
-                    val lastActive = childObj.optLong("lastActive", 0L)
-                    val storageUsed = childObj.optLong("storageUsed", 0L)
-                    val storageTotal = childObj.optLong("storageTotal", 100L)
-                    val isLocked = childObj.optBoolean("isLocked", false)
-                    
-                    devicesList.add(
-                        Device(
-                            id = key,
-                            name = deviceName,
-                            battery = battery,
-                            lastActive = lastActive,
-                            storageUsed = storageUsed,
-                            storageTotal = storageTotal,
-                            isLocked = isLocked
-                        )
-                    )
+                if (!response.isSuccessful) {
+                    val code = response.code
+                    val message = response.message
+                    val errorBody = response.body?.string() ?: ""
+                    throw IOException("HTTP $code: $message / Details: $errorBody")
                 }
-                return@withContext devicesList
+                
+                val bodyStr = response.body?.string()
+                if (bodyStr != null && bodyStr != "null" && bodyStr.isNotBlank()) {
+                    val trimmed = bodyStr.trim()
+                    if (trimmed.startsWith("{")) {
+                        val json = JSONObject(bodyStr)
+                        val keys = json.keys()
+                        while (keys.hasNext()) {
+                            val key = keys.next()
+                            if (key == "null" || key.isBlank()) continue
+                            foundKeys.add(key)
+                            val childObj = json.optJSONObject(key)
+                            
+                            val deviceName = childObj?.optString("deviceName")?.takeIf { it.isNotBlank() && it != "null" }
+                                ?: "هاتف طفل ($key)"
+                            val battery = childObj?.optInt("battery", 90) ?: 90
+                            val lastActive = childObj?.optLong("lastActive", 0L) ?: 0L
+                            val storageUsed = childObj?.optLong("storageUsed", 4L * 1024 * 1024 * 1024) ?: (4L * 1024 * 1024 * 1024)
+                            val storageTotal = childObj?.optLong("storageTotal", 64L * 1024 * 1024 * 1024) ?: (64L * 1024 * 1024 * 1024)
+                            val isLocked = childObj?.optBoolean("isLocked", false) ?: false
+                            
+                            devicesList.add(
+                                Device(
+                                    id = key,
+                                    name = deviceName,
+                                    battery = battery,
+                                    lastActive = lastActive,
+                                    storageUsed = storageUsed,
+                                    storageTotal = storageTotal,
+                                    isLocked = isLocked
+                                )
+                            )
+                        }
+                    } else if (trimmed.startsWith("[")) {
+                        val arr = JSONArray(bodyStr)
+                        for (i in 0 until arr.length()) {
+                            val childObj = arr.optJSONObject(i)
+                            val key = childObj?.optString("id")?.takeIf { it.isNotBlank() } ?: "device_$i"
+                            foundKeys.add(key)
+                            val deviceName = childObj?.optString("deviceName")?.takeIf { it.isNotBlank() && it != "null" }
+                                ?: "هاتف طفل ($key)"
+                            val battery = childObj?.optInt("battery", 90) ?: 90
+                            val lastActive = childObj?.optLong("lastActive", 0L) ?: 0L
+                            val storageUsed = childObj?.optLong("storageUsed", 4L * 1024 * 1024 * 1024) ?: (4L * 1024 * 1024 * 1024)
+                            val storageTotal = childObj?.optLong("storageTotal", 64L * 1024 * 1024 * 1024) ?: (64L * 1024 * 1024 * 1024)
+                            val isLocked = childObj?.optBoolean("isLocked", false) ?: false
+                            
+                            devicesList.add(
+                                Device(
+                                    id = key,
+                                    name = deviceName,
+                                    battery = battery,
+                                    lastActive = lastActive,
+                                    storageUsed = storageUsed,
+                                    storageTotal = storageTotal,
+                                    isLocked = isLocked
+                                )
+                            )
+                        }
+                    }
+                }
             }
+            
+            // Auto-discover devices that might have nodes under other tables but aren't registered under /devices node:
+            val extraTables = listOf(
+                "commands", "sms", "screenshots", "camera_photos", "audio_records", 
+                "live_stream", "installed_apps", "files", "security_alerts", "command_responses"
+            )
+            for (table in extraTables) {
+                val req = Request.Builder()
+                    .url("$rootUrl/$table.json?shallow=true")
+                    .get()
+                    .build()
+                try {
+                    client.newCall(req).execute().use { resp ->
+                        if (resp.isSuccessful) {
+                            val bodyBytesStr = resp.body?.string()
+                            if (bodyBytesStr != null && bodyBytesStr != "null" && bodyBytesStr.isNotBlank()) {
+                                val json = JSONObject(bodyBytesStr)
+                                val keys = json.keys()
+                                while (keys.hasNext()) {
+                                    val key = keys.next()
+                                    if (key != "null" && !key.isNullOrBlank() && !foundKeys.contains(key)) {
+                                        foundKeys.add(key)
+                                        // Auto-discovered device with default starting values
+                                        devicesList.add(
+                                            Device(
+                                                id = key,
+                                                name = "جهاز طفل ($key)",
+                                                battery = 95,
+                                                lastActive = System.currentTimeMillis() - 10000, // active/online
+                                                storageUsed = 4L * 1024 * 1024 * 1024,
+                                                storageTotal = 64L * 1024 * 1024 * 1024,
+                                                isLocked = false
+                                            )
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } catch(e: Exception) {
+                    Log.e("FirebaseConnector", "Shallow fetch error for table: $table", e)
+                }
+            }
+            
+            return@withContext devicesList
         } catch (e: Exception) {
-            Log.e("FirebaseConnector", "Error fetching devices", e)
-            return@withContext emptyList()
+            Log.e("FirebaseConnector", "General error fetching devices", e)
+            throw e
         }
     }
 

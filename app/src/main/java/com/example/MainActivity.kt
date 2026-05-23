@@ -282,8 +282,11 @@ fun AdminDashboard(viewModel: AdminViewModel) {
     val selectedToken by viewModel.selectedDeviceToken.collectAsState()
     val statusMessage by viewModel.statusMessage.collectAsState()
     val commandResponse by viewModel.commandResponse.collectAsState()
+    val currentDbUrl by viewModel.currentDatabaseUrl.collectAsState()
+    val connectionError by viewModel.connectionError.collectAsState()
 
     var showAddDeviceDialog by remember { mutableStateOf(false) }
+    var showEditDbDialog by remember { mutableStateOf(false) }
     var deviceListTabSelected by remember { mutableIntStateOf(0) } // 0: Active, 1: Inactive
     var bottomNavSelectedTab by remember { mutableIntStateOf(0) } // 0: Home, 1: Commands
     var openCommandDetails by remember { mutableStateOf<String?>(null) } // null = commands index list
@@ -361,9 +364,9 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                     onClick = { deviceListTabSelected = 0 },
                     text = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Color(0xFF39D353)))
+                            Icon(Icons.Default.PhoneAndroid, null, tint = Color.White, modifier = Modifier.size(14.dp))
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("الأجهزة النشطة", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Text("جميع الأجهزة", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 )
@@ -372,30 +375,173 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                     onClick = { deviceListTabSelected = 1 },
                     text = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Color(0xFF39D353)))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("الأجهزة النشطة", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                )
+                Tab(
+                    selected = deviceListTabSelected == 2,
+                    onClick = { deviceListTabSelected = 2 },
+                    text = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
                             Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Color(0xFF8B949E)))
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("الأجهزة غير النشطة", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Text("الأجهزة غير النشطة", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 )
             }
 
-            val filteredDevices = if (deviceListTabSelected == 0) {
-                devices.filter { it.isOnline }
-            } else {
-                devices.filter { !it.isOnline }
-            }
+            val filteredDevices = when (deviceListTabSelected) {
+                0 -> devices
+                1 -> devices.filter { it.isOnline }
+                else -> devices.filter { !it.isOnline }
+            }.sortedByDescending { it.isOnline }
 
             if (filteredDevices.isEmpty()) {
-                Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(Icons.Default.HourglassEmpty, null, tint = Color(0xFF8B949E).copy(alpha = 0.5f), modifier = Modifier.size(48.dp))
+                Box(modifier = Modifier.weight(1f).fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.HourglassEmpty,
+                            contentDescription = null,
+                            tint = Color(0xFF8B949E).copy(alpha = 0.5f),
+                            modifier = Modifier.size(48.dp)
+                        )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = if (deviceListTabSelected == 0) "لا توجد أجهزة نشطة حالياً" else "لا توجد أجهزة غير نشطة حالياً",
+                            text = when (deviceListTabSelected) {
+                                0 -> "لا توجد أجهزة متصلة بقاعدة البيانات حالياً"
+                                1 -> "لا توجد أجهزة نشطة حالياً (نشط خلال 15 دقيقة)"
+                                else -> "لا توجد أجهزة غير نشطة حالياً"
+                            },
                             color = Color(0xFF8B949E),
-                            fontSize = 13.sp
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            textAlign = TextAlign.Center
                         )
+                        
+                        Spacer(modifier = Modifier.height(20.dp))
+                        
+                        // Diagnostics Panel
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
+                            border = BorderStroke(1.dp, Color(0xFF30363D)),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.Cloud,
+                                        contentDescription = null,
+                                        tint = Color(0xFF9155FF),
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "معلومات الاتصال بالخادم والتشخيص",
+                                        color = Color.White,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                                
+                                Spacer(modifier = Modifier.height(10.dp))
+                                
+                                Text(
+                                    text = "الرابط الحالي المستخدم لقاعدة البيانات:",
+                                    color = Color(0xFF8B949E),
+                                    fontSize = 11.sp
+                                )
+                                Text(
+                                    text = currentDbUrl,
+                                    color = Color(0xFF58A6FF),
+                                    fontSize = 10.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    modifier = Modifier.padding(vertical = 2.dp)
+                                )
+                                
+                                if (connectionError != null) {
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(Color(0xFFFF3366).copy(alpha = 0.08f))
+                                            .border(1.dp, Color(0xFFFF3366).copy(alpha = 0.25f), RoundedCornerShape(8.dp))
+                                            .padding(8.dp),
+                                        verticalAlignment = Alignment.Top
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Warning,
+                                            contentDescription = null,
+                                            tint = Color(0xFFFF3366),
+                                            modifier = Modifier.size(14.dp).padding(top = 2.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Column {
+                                            Text(
+                                                text = "حالة الاتصال: فشل الاتصال",
+                                                color = Color(0xFFFF3366),
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Text(
+                                                text = connectionError ?: "",
+                                                color = Color(0xFFCE93D8),
+                                                fontSize = 10.sp,
+                                                fontFamily = FontFamily.Monospace
+                                            )
+                                        }
+                                    }
+                                } else {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(Color(0xFF39D353)))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = "الاتصال بالخادم نجح (أو بانتظار تحديث البيانات)",
+                                            color = Color(0xFF39D353),
+                                            fontSize = 11.sp
+                                        )
+                                    }
+                                }
+                                
+                                Spacer(modifier = Modifier.height(14.dp))
+                                
+                                Button(
+                                    onClick = { showEditDbDialog = true },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF21262D)),
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier.fillMaxWidth(),
+                                    border = BorderStroke(1.dp, Color(0xFF30363D)),
+                                    contentPadding = PaddingValues(vertical = 8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Edit,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(12.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "تغيير رابط قاعدة البيانات يدوياً",
+                                        color = Color.White,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             } else {
@@ -459,6 +605,17 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                     onAddDevice = { tok, name ->
                         viewModel.registerDeviceManually(tok, name)
                         showAddDeviceDialog = false
+                    }
+                )
+            }
+
+            if (showEditDbDialog) {
+                EditDatabaseUrlDialog(
+                    currentUrl = currentDbUrl,
+                    onClose = { showEditDbDialog = false },
+                    onSave = { newUrl ->
+                        viewModel.updateDatabaseUrl(newUrl)
+                        showEditDbDialog = false
                     }
                 )
             }
@@ -2773,6 +2930,132 @@ fun EmptyDevicesScreen(viewModel: AdminViewModel) {
                         CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
                     } else {
                         Text("مزامنة وإقتران في قاعدة البيانات", fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun EditDatabaseUrlDialog(
+    currentUrl: String,
+    onClose: () -> Unit,
+    onSave: (String) -> Unit
+) {
+    var urlText by remember { mutableStateOf(currentUrl) }
+    
+    Dialog(onDismissRequest = onClose) {
+        Card(
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.fillMaxWidth().padding(8.dp),
+            border = BorderStroke(1.dp, Color(0xFF30363D))
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "تعديل رابط قاعدة البيانات",
+                        color = Color.White,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    IconButton(onClick = onClose) {
+                        Icon(Icons.Default.Close, contentDescription = "اغلاق", tint = Color(0xFF8B949E))
+                    }
+                }
+                
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color(0xFF30363D))
+                
+                Text(
+                    text = "أدخل الرابط الكامل لقاعدة بيانات Firebase Realtime المخصصة لك:",
+                    color = Color(0xFF8B949E),
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(bottom = 12.dp)
+                )
+                
+                OutlinedTextField(
+                    value = urlText,
+                    onValueChange = { urlText = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    textStyle = androidx.compose.ui.text.TextStyle(color = Color.White, fontFamily = FontFamily.Monospace, fontSize = 12.sp),
+                    placeholder = { Text("https://example-default-rtdb.firebaseio.com", color = Color(0xFF8B949E)) },
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color(0xFF9155FF),
+                        unfocusedBorderColor = Color(0xFF30363D),
+                        focusedLabelColor = Color(0xFF9155FF),
+                        unfocusedLabelColor = Color(0xFF8B949E)
+                    )
+                )
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                Text(
+                    text = "خوادم ومناطق مقترحة (اضغط للتحديد):",
+                    color = Color.White,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                
+                // Suggestions List
+                val suggestions = listOf(
+                    "https://studio-3242759193-af8cb-default-rtdb.europe-west1.firebasedatabase.app" to "أوروبا (طبيعي)",
+                    "https://studio-3242759193-af8cb-default-rtdb.firebaseio.com" to "الولايات المتحدة (رسمي)",
+                    "https://studio-3242759193-af8cb-default-rtdb.asia-southeast1.firebasedatabase.app" to "آسيا (تجريبي)"
+                )
+                
+                suggestions.forEach { (url, label) ->
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFF21262D))
+                            .clickable { urlText = url }
+                            .padding(horizontal = 12.dp, vertical = 8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(text = label, color = Color(0xFF9155FF), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Text(
+                                text = if (url.length > 35) url.take(25) + "..." else url,
+                                color = Color(0xFF8B949E),
+                                fontSize = 10.sp,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(20.dp))
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(onClick = onClose) {
+                        Text("إلغاء", color = Color(0xFF8B949E))
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = {
+                            if (urlText.isNotBlank()) {
+                                onSave(urlText)
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9155FF))
+                    ) {
+                        Text("حفظ وتحديث", color = Color.White)
                     }
                 }
             }

@@ -16,7 +16,7 @@ data class Device(
     val isLocked: Boolean
 ) {
     val isOnline: Boolean
-        get() = (System.currentTimeMillis() - lastActive) < 3 * 60 * 1000 // 3 minutes threshold
+        get() = lastActive == 0L || (System.currentTimeMillis() - lastActive) < 15 * 60 * 1000 // 15 mins threshold or 0L fallback
 }
 
 data class SmsLog(

