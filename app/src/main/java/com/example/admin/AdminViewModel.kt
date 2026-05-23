@@ -149,20 +149,20 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private suspend fun testUrlReachable(url: String): Boolean = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-        val client = okhttp3.OkHttpClient.Builder()
-            .connectTimeout(3, java.util.concurrent.TimeUnit.SECONDS)
-            .readTimeout(3, java.util.concurrent.TimeUnit.SECONDS)
-            .build()
-        val req = okhttp3.Request.Builder()
-            .url("$url/.json?shallow=true")
-            .get()
-            .build()
         try {
+            val client = okhttp3.OkHttpClient.Builder()
+                .connectTimeout(3, java.util.concurrent.TimeUnit.SECONDS)
+                .readTimeout(3, java.util.concurrent.TimeUnit.SECONDS)
+                .build()
+            val req = okhttp3.Request.Builder()
+                .url("$url/.json?shallow=true")
+                .get()
+                .build()
             client.newCall(req).execute().use { resp ->
                 // As long as the request resolved (even if permission denied / 401 / 403), it means the URL is reachable
                 return@withContext true
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.e("AdminViewModel", "Database URL $url is not reachable", e)
             return@withContext false
         }
@@ -308,14 +308,8 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                 .startTone(ToneGenerator.TONE_PROP_BEEP, 150)
 
             // 2. Vibrate
-            val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                val vibratorManager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
-                vibratorManager?.defaultVibrator
-            } else {
-                @Suppress("DEPRECATION")
-                context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
-            }
-
+            @Suppress("DEPRECATION")
+            val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
             vibrator?.let {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     it.vibrate(VibrationEffect.createOneShot(450, VibrationEffect.DEFAULT_AMPLITUDE))
@@ -324,7 +318,7 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                     it.vibrate(450)
                 }
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.e("AdminViewModel", "Error sounding alert feedback", e)
         }
     }

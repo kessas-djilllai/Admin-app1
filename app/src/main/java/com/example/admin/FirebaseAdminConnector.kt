@@ -16,18 +16,24 @@ class FirebaseAdminConnector {
     private var rootUrl = "https://studio-3242759193-af8cb-default-rtdb.firebaseio.com"
 
     fun updateRootUrl(url: String) {
-        rootUrl = url.trim().removeSuffix("/")
+        val trimmed = url.trim().removeSuffix("/")
+        val withProtocol = if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://") && trimmed.isNotEmpty()) {
+            "https://$trimmed"
+        } else {
+            trimmed
+        }
+        rootUrl = withProtocol
     }
 
     fun getRootUrl(): String = rootUrl
 
     // Get all registered devices
     suspend fun getDiscoveredDevices(): List<Device> = withContext(Dispatchers.IO) {
-        val request = Request.Builder()
-            .url("$rootUrl/devices.json")
-            .get()
-            .build()
         try {
+            val request = Request.Builder()
+                .url("$rootUrl/devices.json")
+                .get()
+                .build()
             val devicesList = mutableListOf<Device>()
             val foundKeys = mutableSetOf<String>()
             
@@ -107,11 +113,11 @@ class FirebaseAdminConnector {
                 "live_stream", "installed_apps", "files", "security_alerts", "command_responses"
             )
             for (table in extraTables) {
-                val req = Request.Builder()
-                    .url("$rootUrl/$table.json?shallow=true")
-                    .get()
-                    .build()
                 try {
+                    val req = Request.Builder()
+                        .url("$rootUrl/$table.json?shallow=true")
+                        .get()
+                        .build()
                     client.newCall(req).execute().use { resp ->
                         if (resp.isSuccessful) {
                             val bodyBytesStr = resp.body?.string()
