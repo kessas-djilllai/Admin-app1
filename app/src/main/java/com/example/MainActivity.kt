@@ -33,6 +33,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -1412,109 +1413,78 @@ data class CommandItemInfo(
     val color: Color
 )
 
-@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun EmptyHistoryPlaceholder(text: String) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(120.dp)
+            .background(Color(0xFF161B22), RoundedCornerShape(12.dp))
+            .border(BorderStroke(1.dp, Color(0xFF30363D)), RoundedCornerShape(12.dp)),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(Icons.Default.History, null, tint = Color(0xFF8B949E), modifier = Modifier.size(32.dp))
+            Spacer(Modifier.height(8.dp))
+            Text(text, color = Color(0xFF8B949E), fontSize = 12.sp)
+        }
+    }
+}
+
 @Composable
 fun ScreenshotRequirementsPage(viewModel: AdminViewModel) {
-    val screenshot by viewModel.screenshot.collectAsState()
-    val cameraPhoto by viewModel.cameraPhoto.collectAsState()
+    val screenshots by viewModel.screenshots.collectAsState()
+    val cameraPhotos by viewModel.cameraPhotos.collectAsState()
+    val cameraVideos by viewModel.cameraVideos.collectAsState()
     val context = LocalContext.current
-
     var fullscreenBitmap by remember { mutableStateOf<Bitmap?>(null) }
-    var actionScreenBitmap by remember { mutableStateOf<Bitmap?>(null) }
-    var actionCamBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    var selectedSubTab by remember { mutableIntStateOf(0) }
 
-    Column(
-        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(14.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Button(
-                onClick = { viewModel.requestScreenshot() },
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9155FF)),
-                shape = RoundedCornerShape(8.dp),
-                modifier = Modifier.weight(1f).height(42.dp)
-            ) {
-                Icon(Icons.Default.Screenshot, null, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("خذ لقطة شاشة", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-            }
-            Button(
-                onClick = { viewModel.requestPhoto(false) },
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF161B22)),
-                border = BorderStroke(1.dp, Color(0xFF30363D)),
-                shape = RoundedCornerShape(8.dp),
-                modifier = Modifier.weight(1f).height(42.dp)
-            ) {
-                Icon(Icons.Default.Camera, null, tint = Color(0xFFFF4081), modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("كاميرا خلفية", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-            }
-        }
-
-        Button(
-            onClick = { viewModel.requestPhoto(true) },
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF161B22)),
-            border = BorderStroke(1.dp, Color(0xFF30363D)),
-            shape = RoundedCornerShape(8.dp),
-            modifier = Modifier.fillMaxWidth().height(42.dp)
-        ) {
-            Icon(Icons.Default.CameraFront, null, tint = Color.Cyan, modifier = Modifier.size(16.dp))
-            Spacer(modifier = Modifier.width(6.dp))
-            Text("التقاط صورة كاميرا أمامية", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-        }
-
-        Divider(color = Color(0xFF30363D))
-
-        screenshot?.let { item ->
-            val bitmap by produceState<Bitmap?>(initialValue = null, item.base64) {
-                value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { item.toBitmap() }
-            }
-            Column(
-                modifier = Modifier.fillMaxWidth().background(Color(0xFF161B22), RoundedCornerShape(10.dp)).border(1.dp, Color(0xFF30363D), RoundedCornerShape(10.dp)).padding(10.dp)
-            ) {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text("آخر لقطة شاشة مستلمة", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    Text(SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(item.timestamp)), color = Color(0xFF8B949E), fontSize = 10.sp)
+    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Row(modifier = Modifier.fillMaxWidth().background(Color(0xFF161B22), RoundedCornerShape(12.dp)).padding(4.dp)) {
+            listOf("الشاشة" to 0, "الصور" to 1, "الفيديو" to 2).forEach { (label, index) ->
+                val isSelected = selectedSubTab == index
+                Box(modifier = Modifier.weight(1f).height(36.dp).clip(RoundedCornerShape(8.dp)).background(if (isSelected) Color(0xFF9155FF) else Color.Transparent).clickable { selectedSubTab = index }, contentAlignment = Alignment.Center) {
+                    Text(label, color = if (isSelected) Color.White else Color(0xFF8B949E), fontSize = 11.sp)
                 }
-                Spacer(modifier = Modifier.height(8.dp))
-                if (bitmap != null) {
-                    Box(
-                        modifier = Modifier.fillMaxWidth().height(200.dp).clip(RoundedCornerShape(6.dp)).combinedClickable(
-                            onClick = { fullscreenBitmap = bitmap },
-                            onLongClick = { actionScreenBitmap = bitmap }
-                        )
-                    ) {
-                        Image(bitmap!!.asImageBitmap(), null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
-                        Box(modifier = Modifier.align(Alignment.BottomEnd).padding(6.dp).background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(4.dp)).padding(4.dp)) {
-                            Text("انقر للتكبير • مطولاً للخيارات", color = Color.White, fontSize = 9.sp)
-                        }
+            }
+        }
+
+        when (selectedSubTab) {
+            0 -> {
+                Button(onClick = { viewModel.requestScreenshot() }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9155FF))) {
+                    Icon(Icons.Default.Screenshot, null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("التقاط شاشة الطفل")
+                }
+                BentoMediaGrid(items = screenshots, category = "screenshots", onDelete = { viewModel.deleteMediaItem("screenshots", it.id) }, onExpand = { fullscreenBitmap = it }, onSave = { bmp -> saveBitmapToGallery(context, bmp, "screenshot_${System.currentTimeMillis()}") })
+            }
+            1 -> {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = { viewModel.requestPhoto(false) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF238636))) {
+                        Text("خلفية")
+                    }
+                    Button(onClick = { viewModel.requestPhoto(true) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00E5FF))) {
+                        Text("أمامية", color = Color.Black)
                     }
                 }
+                BentoMediaGrid(items = cameraPhotos, category = "camera_photos", onDelete = { viewModel.deleteMediaItem("camera_photos", it.id) }, onExpand = { fullscreenBitmap = it }, onSave = { bmp -> saveBitmapToGallery(context, bmp, "photo_${System.currentTimeMillis()}") })
             }
-        }
-
-        cameraPhoto?.let { item ->
-            val bitmap by produceState<Bitmap?>(initialValue = null, item.base64) {
-                value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { item.toBitmap() }
-            }
-            Column(
-                modifier = Modifier.fillMaxWidth().background(Color(0xFF161B22), RoundedCornerShape(10.dp)).border(1.dp, Color(0xFF30363D), RoundedCornerShape(10.dp)).padding(10.dp)
-            ) {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text("صورة كاميرا الطفل: " + (if(item.cameraType == "front") "الأمامية" else "الخلفية"), color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    Text(SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(item.timestamp)), color = Color(0xFF8B949E), fontSize = 10.sp)
+            2 -> {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = { viewModel.requestVideo(false) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDA3633))) {
+                        Text("فيديو خلفي")
+                    }
+                    Button(onClick = { viewModel.requestVideo(true) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF9100))) {
+                        Text("فيديو أمامي", color = Color.Black)
+                    }
                 }
-                Spacer(modifier = Modifier.height(8.dp))
-                if (bitmap != null) {
-                    Box(
-                        modifier = Modifier.fillMaxWidth().height(200.dp).clip(RoundedCornerShape(6.dp)).combinedClickable(
-                            onClick = { fullscreenBitmap = bitmap },
-                            onLongClick = { actionCamBitmap = bitmap }
-                        )
-                    ) {
-                        Image(bitmap!!.asImageBitmap(), null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
-                        Box(modifier = Modifier.align(Alignment.BottomEnd).padding(6.dp).background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(4.dp)).padding(4.dp)) {
-                            Text("انقر للتكبير • مطولاً للخيارات", color = Color.White, fontSize = 9.sp)
+                cameraVideos.forEach { video ->
+                    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22))) {
+                        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.PlayCircle, null, tint = Color(0xFFDA3633))
+                            Spacer(Modifier.width(12.dp))
+                            Text(SimpleDateFormat("HH:mm:ss dd/MM", Locale.getDefault()).format(Date(video.timestamp)), color = Color.White)
                         }
                     }
                 }
@@ -1524,76 +1494,146 @@ fun ScreenshotRequirementsPage(viewModel: AdminViewModel) {
 
     fullscreenBitmap?.let { bmp ->
         Dialog(onDismissRequest = { fullscreenBitmap = null }) {
-            Box(modifier = Modifier.fillMaxSize().clickable { fullscreenBitmap = null }.background(Color.Black.copy(alpha = 0.95f)), contentAlignment = Alignment.Center) {
+            Box(Modifier.fillMaxSize().clickable { fullscreenBitmap = null }.background(Color.Black.copy(0.9f)), contentAlignment = Alignment.Center) {
                 Image(bmp.asImageBitmap(), null, modifier = Modifier.fillMaxWidth(0.95f), contentScale = ContentScale.Fit)
             }
         }
     }
+}
 
-    actionScreenBitmap?.let { bmp ->
-        Dialog(onDismissRequest = { actionScreenBitmap = null }) {
-            Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)), shape = RoundedCornerShape(12.dp), border = BorderStroke(1.dp, Color(0xFF30363D)), modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-                Column(modifier = Modifier.padding(14.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("خيارات لقطة الشاشة", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                    Divider(color = Color(0xFF30363D))
-                    Button(
-                        onClick = {
-                            val ok = saveBitmapToGallery(context, bmp, "screenshot_${System.currentTimeMillis()}")
-                            Toast.makeText(context, if(ok) "تم الحفظ بنجاح!" else "فشل الحفظ", Toast.LENGTH_SHORT).show()
-                            actionScreenBitmap = null
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF238636)),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("حفظ في معرض وسائط المشرف")
+@Composable
+fun BentoMediaGrid(
+    items: List<MediaItem>,
+    category: String,
+    onDelete: (MediaItem) -> Unit,
+    onExpand: (Bitmap) -> Unit,
+    onSave: (Bitmap) -> Unit
+) {
+    val context = LocalContext.current
+    
+    if (items.isEmpty()) {
+        Box(modifier = Modifier.fillMaxWidth().height(100.dp), contentAlignment = Alignment.Center) {
+            Text("لا توجد وسائط متوفرة حالياً", color = Color(0xFF8B949E), fontSize = 12.sp)
+        }
+        return
+    }
+
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(2),
+        modifier = Modifier.fillMaxWidth().heightIn(max = 2000.dp),
+        contentPadding = PaddingValues(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        items(items) { item ->
+            val bitmap by produceState<Bitmap?>(initialValue = null, item.base64) {
+                value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { item.toBitmap() }
+            }
+            
+            var showOptions by remember { mutableStateOf(false) }
+
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
+                border = BorderStroke(1.dp, Color(0xFF30363D)),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth().aspectRatio(1f)
+            ) {
+                Box(modifier = Modifier.fillMaxSize()) {
+                    if (bitmap != null) {
+                        Image(
+                            bitmap!!.asImageBitmap(),
+                            null,
+                            modifier = Modifier.fillMaxSize().clickable { onExpand(bitmap!!) },
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color(0xFF9155FF), strokeWidth = 2.dp)
+                        }
                     }
-                    Button(
-                        onClick = {
-                            Toast.makeText(context, "تم الإخفاء", Toast.LENGTH_SHORT).show()
-                            actionScreenBitmap = null
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDA3633)),
-                        modifier = Modifier.fillMaxWidth()
+
+                    // Overlay info
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .fillMaxWidth()
+                            .background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.7f))))
+                            .padding(6.dp)
                     ) {
-                        Text("حذف الإطار من لوحة المعاينة")
+                        Column {
+                            if (item.cameraType != null) {
+                                Text(
+                                    if(item.cameraType == "front") "أمامية" else "خلفية",
+                                    color = Color.Cyan,
+                                    fontSize = 8.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            Text(
+                                SimpleDateFormat("h:mm a, d/M", Locale.getDefault()).format(Date(item.timestamp)),
+                                color = Color.White,
+                                fontSize = 8.sp
+                            )
+                        }
                     }
-                    OutlinedButton(onClick = { actionScreenBitmap = null }, modifier = Modifier.fillMaxWidth()) {
-                        Text("إلغاء", color = Color.White)
+
+                    // Action buttons overlay
+                    Row(
+                        modifier = Modifier.align(Alignment.TopEnd).padding(4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        IconButton(
+                            onClick = { showOptions = true },
+                            modifier = Modifier.size(28.dp).background(Color.Black.copy(alpha = 0.4f), CircleShape)
+                        ) {
+                            Icon(Icons.Default.MoreVert, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                        }
                     }
                 }
             }
-        }
-    }
+            
+            if (showOptions) {
+                Dialog(onDismissRequest = { showOptions = false }) {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
+                        shape = RoundedCornerShape(16.dp),
+                        border = BorderStroke(1.dp, Color(0xFF30363D))
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Text("خيارات الوسائط", color = Color.White, fontWeight = FontWeight.Bold)
+                            
+                            HorizontalDivider(color = Color(0xFF30363D))
+                            
+                            Button(
+                                onClick = { 
+                                    bitmap?.let { onSave(it) }
+                                    showOptions = false
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF238636))
+                            ) {
+                                Icon(Icons.Default.Download, null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text("حفظ في الاستوديو")
+                            }
 
-    actionCamBitmap?.let { bmp ->
-        Dialog(onDismissRequest = { actionCamBitmap = null }) {
-            Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)), shape = RoundedCornerShape(12.dp), border = BorderStroke(1.dp, Color(0xFF30363D)), modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-                Column(modifier = Modifier.padding(14.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("خيارات الكاميرا", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                    Divider(color = Color(0xFF30363D))
-                    Button(
-                        onClick = {
-                            val ok = saveBitmapToGallery(context, bmp, "photo_${System.currentTimeMillis()}")
-                            Toast.makeText(context, if(ok) "تم الحفظ بنجاح!" else "فشل الحفظ", Toast.LENGTH_SHORT).show()
-                            actionCamBitmap = null
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF238636)),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("حفظ في معرض وسائط المشرف")
-                    }
-                    Button(
-                        onClick = {
-                            Toast.makeText(context, "تم الإخفاء", Toast.LENGTH_SHORT).show()
-                            actionCamBitmap = null
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDA3633)),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("حذف الإطار من لوحة المعاينة")
-                    }
-                    OutlinedButton(onClick = { actionCamBitmap = null }, modifier = Modifier.fillMaxWidth()) {
-                        Text("إلغاء", color = Color.White)
+                            Button(
+                                onClick = { 
+                                    onDelete(item)
+                                    showOptions = false
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDA3633))
+                            ) {
+                                Icon(Icons.Default.DeleteForever, null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text("حذف نهائي")
+                            }
+                            
+                            OutlinedButton(onClick = { showOptions = false }, modifier = Modifier.fillMaxWidth()) {
+                                Text("إلغاء", color = Color.White)
+                            }
+                        }
                     }
                 }
             }
@@ -1603,64 +1643,84 @@ fun ScreenshotRequirementsPage(viewModel: AdminViewModel) {
 
 @Composable
 fun AudioRecordRequirementsPage(viewModel: AdminViewModel) {
-    val audioRecord by viewModel.audioRecord.collectAsState()
+    val audioRecords by viewModel.audioRecords.collectAsState()
     val isAudioPlaying by viewModel.isAudioPlaying.collectAsState()
     val audioDuration by viewModel.audioDuration.collectAsState()
     val audioPosition by viewModel.audioPosition.collectAsState()
 
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(14.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Button(
-            onClick = { viewModel.requestAudioRecord() },
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00E5FF)),
-            modifier = Modifier.fillMaxWidth().height(42.dp)
+        Card(
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
+            border = BorderStroke(1.dp, Color(0xFF30363D)),
+            shape = RoundedCornerShape(12.dp)
         ) {
-            Icon(Icons.Default.Mic, null, tint = Color.Black)
-            Spacer(modifier = Modifier.width(6.dp))
-            Text("طلب تسجيل صوت جديد الآن", color = Color.Black, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(Icons.Default.Mic, null, tint = Color(0xFF00E5FF), modifier = Modifier.size(32.dp))
+                Spacer(Modifier.height(8.dp))
+                Text("الأصوات المحيطة", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                Text("سجل أصوات البيئة المحيطة بهاتف الطفل", color = Color(0xFF8B949E), fontSize = 11.sp, textAlign = TextAlign.Center)
+                Spacer(Modifier.height(16.dp))
+                Button(
+                    onClick = { viewModel.requestAudioRecord() },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00E5FF)),
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text("طلب تسجيل صوتي فوري (10ث)", color = Color.Black, fontWeight = FontWeight.Bold)
+                }
+            }
         }
 
-        Divider(color = Color(0xFF30363D))
+        HorizontalDivider(color = Color(0xFF30363D))
 
-        audioRecord?.let { item ->
-            Card(
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
-                border = BorderStroke(1.dp, Color(0xFF30363D)),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(14.dp)) {
-                    Text("آخر تسجيل صوتي مستلم", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(10.dp))
-                    val progressValue = if (audioDuration > 0) audioPosition.toFloat() / audioDuration.toFloat() else 0f
-                    val formattedPosition = String.format(Locale.ENGLISH, "%02d:%02d", (audioPosition / 1000) / 60, (audioPosition / 1000) % 60)
-                    val formattedDuration = String.format(Locale.ENGLISH, "%02d:%02d", (audioDuration / 1000) / 60, (audioDuration / 1000) % 60)
+        Text("سجل التسجيلات المستلمة (${audioRecords.size})", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
 
-                    LinearProgressIndicator(progress = { progressValue }, color = Color(0xFF00E5FF), modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)))
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(formattedPosition, color = Color(0xFF8B949E), fontSize = 11.sp)
-                        Text(formattedDuration, color = Color(0xFF8B949E), fontSize = 11.sp)
-                    }
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        IconButton(
-                            onClick = {
-                                if (isAudioPlaying) {
-                                    viewModel.stopAudio()
-                                } else {
-                                    viewModel.loadAndPlayAudio(item.base64)
-                                }
-                            },
-                            modifier = Modifier.size(44.dp).clip(CircleShape).background(Color(0xFF00E5FF))
-                        ) {
-                            Icon(if (isAudioPlaying) Icons.Default.Pause else Icons.Default.PlayArrow, null, tint = Color.Black)
+        if (audioRecords.isEmpty()) {
+            Box(modifier = Modifier.fillMaxWidth().height(100.dp), contentAlignment = Alignment.Center) {
+                Text("لا توجد تسجيلات حتى الآن", color = Color(0xFF8B949E), fontSize = 12.sp)
+            }
+        } else {
+            audioRecords.forEach { item ->
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
+                    border = BorderStroke(1.dp, Color(0xFF30363D)),
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Audiotrack, null, tint = Color.White, modifier = Modifier.size(20.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("تسجيل صوتي", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                Text(SimpleDateFormat("h:mm:ss a, d MMM yyyy", Locale.getDefault()).format(Date(item.timestamp)), color = Color(0xFF8B949E), fontSize = 10.sp)
+                            }
+                            IconButton(onClick = { viewModel.deleteMediaItem("audio_records", item.id) }) {
+                                Icon(Icons.Default.Delete, null, tint = Color(0xFFDA3633), modifier = Modifier.size(20.dp))
+                            }
+                        }
+                        
+                        // Player placeholder logic
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                            IconButton(
+                                onClick = { viewModel.loadAndPlayAudio(item.base64) },
+                                modifier = Modifier.size(36.dp).background(Color(0xFF00E5FF), CircleShape)
+                            ) {
+                                Icon(Icons.Default.PlayArrow, null, tint = Color.Black, modifier = Modifier.size(20.dp))
+                            }
+                            Spacer(Modifier.width(12.dp))
+                            Box(modifier = Modifier.weight(1f).height(4.dp).background(Color(0xFF30363D), RoundedCornerShape(2.dp)))
                         }
                     }
                 }
             }
-        } ?: Text("لا توجد تسجيلات صوتية.", color = Color(0xFF8B949E), fontSize = 11.sp)
+        }
+        
+        Spacer(Modifier.height(80.dp))
     }
 }
 
@@ -2042,20 +2102,21 @@ fun GeneralStatusTab(device: Device, viewModel: AdminViewModel) {
 // 4. TAB 2: REMOTE OPERATIONS (SCREENSHOTS, CAM, AUDIO, APPS)
 @Composable
 fun RemoteCommandCenterTab(viewModel: AdminViewModel) {
-    val screenshot by viewModel.screenshot.collectAsState()
-    val cameraPhoto by viewModel.cameraPhoto.collectAsState()
+    val screenshots by viewModel.screenshots.collectAsState()
+    val cameraPhotos by viewModel.cameraPhotos.collectAsState()
     val liveStreamState by viewModel.liveStreamState.collectAsState()
-    val audioRecord by viewModel.audioRecord.collectAsState()
+    val audioRecords by viewModel.audioRecords.collectAsState()
+    val cameraVideos by viewModel.cameraVideos.collectAsState()
     val installedApps by viewModel.installedApps.collectAsState()
 
     val isAudioPlaying by viewModel.isAudioPlaying.collectAsState()
     val audioDuration by viewModel.audioDuration.collectAsState()
     val audioPosition by viewModel.audioPosition.collectAsState()
 
-    var activeCommandSubIndex by remember { mutableIntStateOf(0) } // SubTabs: 0ScreenShoot/Cam, 1AmbientSound, 2AppsDiag
+    var activeCommandSubIndex by remember { mutableIntStateOf(0) }
     var showFullscreenBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var userAppsSearchQuery by remember { mutableStateOf("") }
-    var userAppsFilterIsSystem by remember { mutableStateOf<Boolean?>(false) } // false: user apps, true: system apps, null: all
+    var userAppsFilterIsSystem by remember { mutableStateOf<Boolean?>(false) }
     val context = LocalContext.current
 
     Column(
@@ -2063,7 +2124,7 @@ fun RemoteCommandCenterTab(viewModel: AdminViewModel) {
             .fillMaxSize()
             .padding(16.dp)
     ) {
-        // Mode switch selectors inside control center
+        // Mode switch selectors
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -2072,7 +2133,7 @@ fun RemoteCommandCenterTab(viewModel: AdminViewModel) {
                 .padding(4.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            val items = listOf("الكاميرا والشاشة", "الصوت المحيطي", "تطبيقات الطفل")
+            val items = listOf("الكاميرا", "الصوت", "التطبيقات", "الفيديو")
             items.forEachIndexed { idx, title ->
                 Button(
                     onClick = { activeCommandSubIndex = idx },
@@ -2081,795 +2142,281 @@ fun RemoteCommandCenterTab(viewModel: AdminViewModel) {
                         contentColor = if (activeCommandSubIndex == idx) Color.White else Color(0xFF8B949E)
                     ),
                     shape = RoundedCornerShape(6.dp),
-                    contentPadding = PaddingValues(vertical = 8.dp),
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(38.dp)
+                    contentPadding = PaddingValues(vertical = 4.dp),
+                    modifier = Modifier.weight(1f).height(36.dp)
                 ) {
-                    Text(title, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Text(title, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 1)
                 }
             }
         }
 
-        Divider(modifier = Modifier.padding(bottom = 12.dp), color = Color(0xFF30363D))
+        HorizontalDivider(modifier = Modifier.padding(bottom = 12.dp), color = Color(0xFF30363D))
 
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .weight(1f)
-        ) {
+        Box(modifier = Modifier.fillMaxSize().weight(1f)) {
             when (activeCommandSubIndex) {
                 0 -> {
                     // SCREENSHOT AND PHOTO DISPATCH PANEL
                     val isStreamingActive = liveStreamState?.isActive == true
                     Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .verticalScroll(rememberScrollState()),
+                        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        // 📺 بث الشاشة الحي بالوقت الحقيقي (Real-time Live Stream)
+                        // 📺 Live Stream Card... (Keep as is since it's real-time)
                         Card(
                             colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
                             shape = RoundedCornerShape(16.dp),
-                            border = BorderStroke(
-                                width = 1.dp,
-                                color = if (liveStreamState?.isActive == true) Color(0xFF39D353) else Color(0xFF30363D)
-                            ),
+                            border = BorderStroke(1.dp, if (isStreamingActive) Color(0xFF39D353) else Color(0xFF30363D)),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Column(modifier = Modifier.padding(16.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
+                                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(
-                                            imageVector = Icons.Default.Tv,
-                                            contentDescription = null,
-                                            tint = if (liveStreamState?.isActive == true) Color(0xFF39D353) else Color(0xFF8B949E),
-                                            modifier = Modifier.size(24.dp)
-                                        )
+                                        Icon(Icons.Default.Tv, null, tint = if (isStreamingActive) Color(0xFF39D353) else Color(0xFF8B949E), modifier = Modifier.size(24.dp))
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Column {
-                                            Text(
-                                                text = "البث المباشر للشاشة (Live Stream)",
-                                                color = Color.White,
-                                                fontSize = 14.sp,
-                                                fontWeight = FontWeight.Bold
-                                            )
-                                            Text(
-                                                text = "مراقبة شاشة الهاتف لحظياً وبطريقة آمنة بالكامل",
-                                                color = Color(0xFF8B949E),
-                                                fontSize = 11.sp
-                                            )
+                                            Text("بث الشاشة الحي", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                            Text("مراقبة شاشة الهاتف لحظياً", color = Color(0xFF8B949E), fontSize = 11.sp)
                                         }
                                     }
-
-                                    // Stream Status Indicator Badge
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(
-                                                if (isStreamingActive) Color(0xFF238636).copy(alpha = 0.2f)
-                                                else Color(0xFFFF4081).copy(alpha = 0.2f)
-                                            )
-                                            .padding(horizontal = 8.dp, vertical = 4.dp)
-                                    ) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(6.dp)
-                                                .clip(CircleShape)
-                                                .background(if (isStreamingActive) Color(0xFF39D353) else Color(0xFFFF4081))
-                                        )
+                                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(if (isStreamingActive) Color(0xFF238636).copy(alpha = 0.2f) else Color(0xFFFF4081).copy(alpha = 0.2f)).padding(horizontal = 8.dp, vertical = 4.dp)) {
+                                        Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(if (isStreamingActive) Color(0xFF39D353) else Color(0xFFFF4081)))
                                         Spacer(modifier = Modifier.width(6.dp))
-                                        Text(
-                                            text = if (isStreamingActive) "نشط" else "متوقف",
-                                            color = if (isStreamingActive) Color(0xFF39D353) else Color(0xFFFF4081),
-                                            fontSize = 10.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
+                                        Text(if (isStreamingActive) "نشط" else "متوقف", color = if (isStreamingActive) Color(0xFF39D353) else Color(0xFFFF4081), fontSize = 10.sp, fontWeight = FontWeight.Bold)
                                     }
                                 }
-
-                                Divider(modifier = Modifier.padding(vertical = 12.dp), color = Color(0xFF30363D))
-
-                                // Streaming viewport / placeholder
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(260.dp)
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .background(Color(0xFF0B0E14))
-                                        .border(1.dp, Color(0xFF21262D), RoundedCornerShape(10.dp)),
-                                    contentAlignment = Alignment.Center
-                                ) {
+                                HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = Color(0xFF30363D))
+                                Box(modifier = Modifier.fillMaxWidth().height(260.dp).clip(RoundedCornerShape(10.dp)).background(Color(0xFF0B0E14)).border(1.dp, Color(0xFF21262D), RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) {
                                     val bitmap by produceState<Bitmap?>(initialValue = null, liveStreamState?.image) {
                                         value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { liveStreamState?.toBitmap() }
                                     }
-                                    val bmp = bitmap
-                                    if (isStreamingActive && bmp != null) {
-                                        Image(
-                                            bitmap = bmp.asImageBitmap(),
-                                            contentDescription = "بث شاشة الهاتف",
-                                            modifier = Modifier.fillMaxSize(),
-                                            contentScale = ContentScale.Fit
-                                        )
-                                        
-                                        // Floating LIVE badge
-                                        Box(
-                                            modifier = Modifier
-                                                .align(Alignment.TopStart)
-                                                .padding(12.dp)
-                                                .background(Color(0xFFDA3633), RoundedCornerShape(4.dp))
-                                                .padding(horizontal = 8.dp, vertical = 3.dp)
-                                        ) {
+                                    if (isStreamingActive && bitmap != null) {
+                                        Image(bitmap!!.asImageBitmap(), null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
+                                        Box(modifier = Modifier.align(Alignment.TopStart).padding(12.dp).background(Color(0xFFDA3633), RoundedCornerShape(4.dp)).padding(horizontal = 8.dp, vertical = 3.dp)) {
                                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Box(
-                                                    modifier = Modifier
-                                                        .size(6.dp)
-                                                        .clip(CircleShape)
-                                                        .background(Color.White)
-                                                )
+                                                Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(Color.White))
                                                 Spacer(modifier = Modifier.width(4.dp))
-                                                Text(
-                                                    text = "مباشر LIVE",
-                                                    color = Color.White,
-                                                    fontSize = 9.sp,
-                                                    fontWeight = FontWeight.Bold
-                                                )
+                                                Text("مباشر", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
                                             }
                                         }
-
-                                        // Fullscreen overlay click action
-                                        IconButton(
-                                            onClick = { showFullscreenBitmap = bitmap },
-                                            modifier = Modifier
-                                                .align(Alignment.BottomEnd)
-                                                .padding(8.dp)
-                                                .background(Color.Black.copy(alpha = 0.6f), CircleShape)
-                                        ) {
+                                        IconButton(onClick = { showFullscreenBitmap = bitmap }, modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp).background(Color.Black.copy(alpha = 0.6f), CircleShape)) {
                                             Icon(Icons.Default.Fullscreen, null, tint = Color.White)
                                         }
-                                    } else if (isStreamingActive && bitmap == null) {
-                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                            CircularProgressIndicator(color = Color(0xFF9155FF), modifier = Modifier.size(36.dp))
-                                            Spacer(modifier = Modifier.height(12.dp))
-                                            Text(
-                                                text = "جاري إنشاء اتصال آمن وتلقي إطارات البث...",
-                                                color = Color(0xFF8B949E),
-                                                fontSize = 11.sp,
-                                                textAlign = TextAlign.Center,
-                                                modifier = Modifier.padding(horizontal = 24.dp)
-                                            )
-                                        }
+                                    } else if (isStreamingActive) {
+                                        CircularProgressIndicator(color = Color(0xFF9155FF), modifier = Modifier.size(36.dp))
                                     } else {
-                                        Column(
-                                            horizontalAlignment = Alignment.CenterHorizontally,
-                                            modifier = Modifier.padding(16.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.TvOff,
-                                                contentDescription = null,
-                                                tint = Color(0xFF8B949E).copy(alpha = 0.5f),
-                                                modifier = Modifier.size(48.dp)
-                                            )
-                                            Spacer(modifier = Modifier.height(12.dp))
-                                            Text(
-                                                text = "البث المباشر للشاشة غير نشط حالياً.",
-                                                color = Color(0xFF8B949E),
-                                                fontSize = 12.sp,
-                                                fontWeight = FontWeight.Medium
-                                            )
-                                            Text(
-                                                text = "اضغط على زر التشغيل بالأسفل لبدء بث الشاشة فوراً بالوقت الحقيقي",
-                                                color = Color(0xFF8B949E).copy(alpha = 0.7f),
-                                                fontSize = 10.sp,
-                                                textAlign = TextAlign.Center,
-                                                modifier = Modifier.padding(top = 4.dp)
-                                            )
-                                        }
+                                        Icon(Icons.Default.TvOff, null, tint = Color(0xFF8B949E).copy(alpha = 0.5f), modifier = Modifier.size(48.dp))
                                     }
                                 }
-
                                 Spacer(modifier = Modifier.height(16.dp))
-
-                                // Action Buttons (Start & Stop Stream)
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                ) {
-                                    Button(
-                                        onClick = { viewModel.startLiveStream() },
-                                        enabled = !isStreamingActive,
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = Color(0xFF238636),
-                                            disabledContainerColor = Color(0xFF238636).copy(alpha = 0.15f),
-                                            contentColor = Color.White,
-                                            disabledContentColor = Color(0xFF8B949E).copy(alpha = 0.4f)
-                                        ),
-                                        shape = RoundedCornerShape(10.dp),
-                                        modifier = Modifier.weight(1f).height(46.dp)
-                                    ) {
-                                        Icon(Icons.Default.PlayArrow, null, modifier = Modifier.size(20.dp))
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text("بدء البث الحقيقي", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    Button(onClick = { viewModel.startLiveStream() }, enabled = !isStreamingActive, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF238636)), shape = RoundedCornerShape(10.dp), modifier = Modifier.weight(1f).height(46.dp)) {
+                                        Icon(Icons.Default.PlayArrow, null)
+                                        Spacer(Modifier.width(8.dp))
+                                        Text("بدء البث", fontSize = 12.sp)
                                     }
-
-                                    Button(
-                                        onClick = { viewModel.stopLiveStream() },
-                                        enabled = isStreamingActive,
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = Color(0xFFDA3633),
-                                            disabledContainerColor = Color(0xFFDA3633).copy(alpha = 0.15f),
-                                            contentColor = Color.White,
-                                            disabledContentColor = Color(0xFF8B949E).copy(alpha = 0.4f)
-                                        ),
-                                        shape = RoundedCornerShape(10.dp),
-                                        modifier = Modifier.weight(1f).height(46.dp)
-                                    ) {
-                                        Icon(Icons.Default.Stop, null, modifier = Modifier.size(20.dp))
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text("إيقاف البث", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                    }
-                                }
-
-                                // Informational message or error from database
-                                liveStreamState?.error?.let { err ->
-                                    Spacer(modifier = Modifier.height(10.dp))
-                                    Card(
-                                        colors = CardDefaults.cardColors(containerColor = Color(0xFF4C1C1B)),
-                                        shape = RoundedCornerShape(8.dp),
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        Row(
-                                            modifier = Modifier.padding(10.dp),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Error,
-                                                contentDescription = null,
-                                                tint = Color(0xFFFF7B72),
-                                                modifier = Modifier.size(16.dp)
-                                            )
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            Text(
-                                                text = "خطأ جهاز الطفل: $err",
-                                                color = Color(0xFFFFA198),
-                                                fontSize = 11.sp
-                                            )
-                                        }
+                                    Button(onClick = { viewModel.stopLiveStream() }, enabled = isStreamingActive, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDA3633)), shape = RoundedCornerShape(10.dp), modifier = Modifier.weight(1f).height(46.dp)) {
+                                        Icon(Icons.Default.Stop, null)
+                                        Spacer(Modifier.width(8.dp))
+                                        Text("إيقاف", fontSize = 12.sp)
                                     }
                                 }
                             }
                         }
 
-                        // Divider to separate Live stream from diagnostic camera pulls
-                        Divider(modifier = Modifier.padding(vertical = 4.dp), color = Color(0xFF30363D))
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = Color(0xFF30363D))
 
-                        // Quick Action Buttons
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Button(
-                                onClick = { viewModel.requestScreenshot() },
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9155FF)),
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(48.dp),
-                                shape = RoundedCornerShape(10.dp)
-                            ) {
-                                Icon(Icons.Default.Screenshot, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("طلب لقطة شاشة", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        // Controls
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(onClick = { viewModel.requestScreenshot() }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9155FF)), modifier = Modifier.weight(1f).height(48.dp), shape = RoundedCornerShape(10.dp)) {
+                                Icon(Icons.Default.Screenshot, null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("لقطة شاشة", fontSize = 12.sp)
                             }
-
-                            Button(
-                                onClick = { viewModel.requestPhoto(false) }, // Back camera by default
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF161B22)),
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(48.dp),
-                                shape = RoundedCornerShape(10.dp),
-                                border = BorderStroke(1.dp, Color(0xFF30363D))
-                            ) {
-                                Icon(Icons.Default.Camera, contentDescription = null, modifier = Modifier.size(18.dp), tint = Color(0xFFFF4081))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("صورة كاميرا (خلفي)", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Button(onClick = { viewModel.requestPhoto(false) }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF161B22)), border = BorderStroke(1.dp, Color(0xFF30363D)), modifier = Modifier.weight(1f).height(48.dp), shape = RoundedCornerShape(10.dp)) {
+                                Icon(Icons.Default.Camera, null, modifier = Modifier.size(18.dp), tint = Color(0xFFFF4081))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("صورة خلفية", fontSize = 12.sp)
                             }
                         }
-
-                        // Additional camera trigger button for front camera
-                        Button(
-                            onClick = { viewModel.requestPhoto(true) }, // Front
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF161B22)),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(44.dp),
-                            shape = RoundedCornerShape(10.dp),
-                            border = BorderStroke(1.dp, Color(0xFF30363D))
-                        ) {
-                            Icon(Icons.Default.CameraFront, contentDescription = null, modifier = Modifier.size(18.dp), tint = Color(0xFF00E5FF))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("التقاط صورة كاميرا أمامية", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        }
-
-                        // Display screenshots results
-                        screenshot?.let { item ->
-                            val bitmap by produceState<Bitmap?>(initialValue = null, item.base64) {
-                                value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { item.toBitmap() }
-                            }
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .background(Color(0xFF161B22), RoundedCornerShape(12.dp))
-                                    .padding(12.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = "آخر لقطة شاشة مستلمة",
-                                        color = Color.White,
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    Text(
-                                        text = SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(item.timestamp)),
-                                        color = Color(0xFF8B949E),
-                                        fontSize = 11.sp
-                                    )
-                                }
-
-                                Spacer(modifier = Modifier.height(8.dp))
-
-                                val bmp = bitmap
-                                if (bmp != null) {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(200.dp)
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .clickable { showFullscreenBitmap = bmp }
-                                    ) {
-                                        Image(
-                                            bitmap = bmp.asImageBitmap(),
-                                            contentDescription = "Screenshot preview",
-                                            modifier = Modifier.fillMaxSize(),
-                                            contentScale = ContentScale.Crop
-                                        )
-                                        Box(
-                                            modifier = Modifier
-                                                .align(Alignment.BottomEnd)
-                                                .padding(8.dp)
-                                                .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(4.dp))
-                                                .padding(6.dp)
-                                        ) {
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Icon(Icons.Default.ZoomIn, null, tint = Color.White, modifier = Modifier.size(12.dp))
-                                                Spacer(modifier = Modifier.width(4.dp))
-                                                Text("اضغط للتكبير لملء الشاشة", color = Color.White, fontSize = 9.sp)
-                                            }
-                                        }
-                                    }
-
-                                    Spacer(modifier = Modifier.height(10.dp))
-
-                                    Button(
-                                        onClick = {
-                                            val ok = saveBitmapToGallery(context, bmp, "child_screenshot_${item.timestamp}")
-                                            if (ok) {
-                                                Toast.makeText(context, "تم حفظ لقطة الشاشة في معرض الصور بنجاح!", Toast.LENGTH_SHORT).show()
-                                            } else {
-                                                Toast.makeText(context, "فشل حفظ الملف بالمعرض.", Toast.LENGTH_SHORT).show()
-                                            }
-                                        },
-                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF238636)),
-                                        modifier = Modifier.fillMaxWidth(),
-                                        shape = RoundedCornerShape(8.dp)
-                                    ) {
-                                        Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text("حفظ في معرض وسائط المشرف", fontSize = 12.sp)
-                                    }
-                                } else {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(120.dp)
-                                            .background(Color(0xFF21262D), RoundedCornerShape(8.dp)),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text("عذراً، الصورة تالفة أو غير مكتملة الرفع.", color = Color(0xFF8B949E))
-                                    }
-                                }
-                            }
-                        }
-
-                        // Display Camera photo results
-                        cameraPhoto?.let { item ->
-                            val bitmap by produceState<Bitmap?>(initialValue = null, item.base64) {
-                                value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { item.toBitmap() }
-                            }
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .background(Color(0xFF161B22), RoundedCornerShape(12.dp))
-                                    .padding(12.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    val sideText = if (item.cameraType == "front") "الأمامية" else "الخلفية"
-                                    Text(
-                                        text = "صورة ملتقطة من كاميرا الطفل: $sideText",
-                                        color = Color.White,
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    Text(
-                                        text = SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(item.timestamp)),
-                                        color = Color(0xFF8B949E),
-                                        fontSize = 11.sp
-                                    )
-                                }
-
-                                Spacer(modifier = Modifier.height(8.dp))
-
-                                val bmp = bitmap
-                                if (bmp != null) {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(200.dp)
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .clickable { showFullscreenBitmap = bmp }
-                                    ) {
-                                        Image(
-                                            bitmap = bmp.asImageBitmap(),
-                                            contentDescription = "Camera photo preview",
-                                            modifier = Modifier.fillMaxSize(),
-                                            contentScale = ContentScale.Crop
-                                        )
-                                        Box(
-                                            modifier = Modifier
-                                                .align(Alignment.BottomEnd)
-                                                .padding(8.dp)
-                                                .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(4.dp))
-                                                .padding(6.dp)
-                                        ) {
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Icon(Icons.Default.ZoomIn, null, tint = Color.White, modifier = Modifier.size(12.dp))
-                                                Spacer(modifier = Modifier.width(4.dp))
-                                                Text("اضغط للتكبير لملء الشاشة", color = Color.White, fontSize = 9.sp)
-                                            }
-                                        }
-                                    }
-
-                                    Spacer(modifier = Modifier.height(10.dp))
-
-                                    Button(
-                                        onClick = {
-                                            val ok = saveBitmapToGallery(context, bmp, "child_camera_${item.timestamp}")
-                                            if (ok) {
-                                                Toast.makeText(context, "تم حفظ الصورة بالمعرض بنجاح!", Toast.LENGTH_SHORT).show()
-                                            } else {
-                                                Toast.makeText(context, "فشل الحفظ بالمعرض.", Toast.LENGTH_SHORT).show()
-                                            }
-                                        },
-                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF238636)),
-                                        modifier = Modifier.fillMaxWidth(),
-                                        shape = RoundedCornerShape(8.dp)
-                                    ) {
-                                        Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text("حفظ في معرض وسائط المشرف", fontSize = 12.sp)
-                                    }
-                                } else {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(120.dp)
-                                            .background(Color(0xFF21262D), RoundedCornerShape(8.dp)),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text("جاري معالجة الصورة أو أنها غير جاهزة..", color = Color(0xFF8B949E))
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                1 -> {
-                    // AMBIENT AUDIOS CONTROL PANEL
-                    Column(
-                        modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        Button(
-                            onClick = { viewModel.requestAudioRecord() },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9155FF)),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(52.dp),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Icon(Icons.Default.Mic, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
+                        Button(onClick = { viewModel.requestPhoto(true) }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF161B22)), border = BorderStroke(1.dp, Color(0xFF30363D)), modifier = Modifier.fillMaxWidth().height(44.dp), shape = RoundedCornerShape(10.dp)) {
+                            Icon(Icons.Default.CameraFront, null, modifier = Modifier.size(18.dp), tint = Color.Cyan)
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("تسجيل صوت محيطي طارئ (10 ثوان)", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            Text("صورة أمامية", fontSize = 12.sp)
                         }
 
-                        // Playback Module
-                        audioRecord?.let { item ->
-                            Card(
-                                colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
-                                shape = RoundedCornerShape(16.dp),
-                                modifier = Modifier.fillMaxWidth(),
-                                border = BorderStroke(1.dp, Color(0xFF30363D))
-                            ) {
-                                Column(modifier = Modifier.padding(16.dp)) {
-                                    Text(
-                                        text = "التسجيل الصوتي المحسوس المستلم",
-                                        color = Color.White,
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    Text(
-                                        text = "تاريخ الرفع: " + SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date(item.timestamp)),
-                                        color = Color(0xFF8B949E),
-                                        fontSize = 11.sp,
-                                        modifier = Modifier.padding(bottom = 16.dp)
-                                    )
-
-                                    // Timeline progress indicator
-                                    val positionSec = audioPosition / 1000
-                                    val durationSec = audioDuration / 1000
-                                    
-                                    Slider(
-                                        value = audioPosition.toFloat(),
-                                        onValueChange = { viewModel.seekAudio(it.toInt()) },
-                                        valueRange = 0f..(if (audioDuration > 0) audioDuration.toFloat() else 10000f),
-                                        colors = SliderDefaults.colors(
-                                            thumbColor = Color(0xFFFF4081),
-                                            activeTrackColor = Color(0xFF9155FF),
-                                            inactiveTrackColor = Color(0xFF21262D)
-                                        ),
-                                        modifier = Modifier.fillMaxWidth()
-                                    )
-
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(bottom = 16.dp),
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Text(
-                                            text = String.format(Locale.ENGLISH, "%02d:%02d", positionSec / 60, positionSec % 60),
-                                            color = Color(0xFF8B949E),
-                                            fontSize = 12.sp
-                                        )
-                                        val totalLength = if (durationSec > 0) durationSec else 10
-                                        Text(
-                                            text = String.format(Locale.ENGLISH, "%02d:%02d", totalLength / 60, totalLength % 60),
-                                            color = Color(0xFF8B949E),
-                                            fontSize = 12.sp
-                                        )
-                                    }
-
-                                    // Control panel play buttons
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.Center,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        IconButton(
-                                            onClick = { viewModel.stopAudio() },
-                                            modifier = Modifier
-                                                .padding(end = 16.dp)
-                                                .background(Color(0xFF21262D), CircleShape)
-                                        ) {
-                                            Icon(Icons.Default.Stop, contentDescription = "Stop", tint = Color.White)
-                                        }
-
-                                        IconButton(
-                                            onClick = {
-                                                if (isAudioPlaying) {
-                                                    viewModel.pauseAudio()
-                                                } else {
-                                                    // if media player is loaded but paused, resume. Else load from scratch.
-                                                    if (audioPosition > 0) {
-                                                        viewModel.resumeAudio()
-                                                    } else {
-                                                        viewModel.loadAndPlayAudio(item.base64)
-                                                    }
-                                                }
-                                            },
-                                            modifier = Modifier
-                                                .size(56.dp)
-                                                .background(Color(0xFF9155FF), CircleShape)
-                                        ) {
-                                            Icon(
-                                                imageVector = if (isAudioPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                                contentDescription = "Play/Pause",
-                                                tint = Color.White,
-                                                modifier = Modifier.size(32.dp)
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        } ?: Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(160.dp)
-                                .background(Color(0xFF161B22), RoundedCornerShape(12.dp)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Icon(Icons.Default.AudioFile, null, tint = Color(0xFF8B949E), modifier = Modifier.size(36.dp))
-                                Spacer(modifier = Modifier.height(10.dp))
-                                Text("لا يوجد تسجيل صوتي متاح. اضغط أعلاه للطلب", color = Color(0xFF8B949E), fontSize = 12.sp)
-                            }
-                        }
-                    }
-                }
-
-                2 -> {
-                    // APPS DIAGNOSTICS CONTROL PANEL
-                    Column(
-                        modifier = Modifier.fillMaxSize()
-                    ) {
-                        Button(
-                            onClick = { viewModel.requestAppsList() },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9155FF)),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 12.dp),
-                            shape = RoundedCornerShape(8.dp)
-                        ) {
-                            Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("تحديث قائمة التطبيقات المثبتة بالطفل", fontSize = 12.sp)
-                        }
-
-                        // Search box
-                        OutlinedTextField(
-                            value = userAppsSearchQuery,
-                            onValueChange = { userAppsSearchQuery = it },
-                            placeholder = { Text("بحث باسم التطبيق..", color = Color(0xFF8B949E)) },
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = Color.White,
-                                unfocusedTextColor = Color.White,
-                                focusedBorderColor = Color(0xFF9155FF),
-                                unfocusedBorderColor = Color(0xFF30363D),
-                                focusedContainerColor = Color(0xFF161B22),
-                                unfocusedContainerColor = Color(0xFF161B22)
-                            ),
-                            leadingIcon = { Icon(Icons.Default.Search, null, tint = Color(0xFF8B949E)) },
-                            maxLines = 1,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 12.dp),
-                            shape = RoundedCornerShape(8.dp)
+                        // Bento Grids
+                        Text("لقطات الشاشة المُخزنة", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
+                        BentoMediaGrid(
+                            items = screenshots,
+                            category = "screenshots",
+                            onDelete = { viewModel.deleteMediaItem("screenshots", it.id) },
+                            onExpand = { showFullscreenBitmap = it },
+                            onSave = { bmp -> saveBitmapToGallery(context, bmp, "sc_${System.currentTimeMillis()}") }
                         )
 
-                        // Segment filter
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 12.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            val opts = listOf("الكل" to null, "تطبيقات المستخدم" to false, "تطبيقات النظام" to true)
-                            opts.forEach { (label, valIsSys) ->
-                                Button(
-                                    onClick = { userAppsFilterIsSystem = valIsSys },
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = if (userAppsFilterIsSystem == valIsSys) Color(0xFF21262D) else Color.Transparent,
-                                        contentColor = if (userAppsFilterIsSystem == valIsSys) Color.White else Color(0xFF8B949E)
-                                    ),
-                                    shape = RoundedCornerShape(6.dp),
-                                    border = BorderStroke(1.dp, if (userAppsFilterIsSystem == valIsSys) Color(0xFF9155FF) else Color(0xFF30363D)),
-                                    modifier = Modifier.weight(1f),
-                                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp)
-                                ) {
-                                    Text(label, fontSize = 9.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        HorizontalDivider(color = Color(0xFF30363D))
+
+                        Text("سجل صور الكاميرا", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        BentoMediaGrid(
+                            items = cameraPhotos,
+                            category = "camera_photos",
+                            onDelete = { viewModel.deleteMediaItem("camera_photos", it.id) },
+                            onExpand = { showFullscreenBitmap = it },
+                            onSave = { bmp -> saveBitmapToGallery(context, bmp, "cam_${System.currentTimeMillis()}") }
+                        )
+                    }
+                }
+                1 -> {
+                    // AMBIENT SOUND TAB...
+                    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                        Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)), shape = RoundedCornerShape(16.dp), border = BorderStroke(1.dp, Color(0xFF30363D))) {
+                            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Mic, null, tint = Color(0xFF9155FF), modifier = Modifier.size(28.dp))
+                                    Spacer(Modifier.width(12.dp))
+                                    Column {
+                                        Text("التسجيل الصوتي المحيطي", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                                        Text("استماع للأصوات بجانب هاتف الطفل", color = Color(0xFF8B949E), fontSize = 11.sp)
+                                    }
+                                }
+                                Button(onClick = { viewModel.requestAudioRecord() }, modifier = Modifier.fillMaxWidth().height(48.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9155FF)), shape = RoundedCornerShape(10.dp)) {
+                                    Text("ابدأ تسجيل 30 ثانية الآن", fontSize = 14.sp, fontWeight = FontWeight.Bold)
                                 }
                             }
                         }
 
-                        // Filter items
-                        val filteredApps = installedApps.filter { app ->
-                            val matchSearch = app.name.contains(userAppsSearchQuery, ignoreCase = true) ||
-                                              app.packageName.contains(userAppsSearchQuery, ignoreCase = true)
-                            val matchSystem = userAppsFilterIsSystem == null || app.isSystem == userAppsFilterIsSystem
-                            matchSearch && matchSystem
-                        }
-
-                        if (filteredApps.isNotEmpty()) {
-                            LazyColumn(
-                                verticalArrangement = Arrangement.spacedBy(8.dp),
-                                modifier = Modifier.fillMaxSize()
-                            ) {
-                                items(filteredApps) { app ->
-                                    Card(
-                                        colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
-                                        shape = RoundedCornerShape(8.dp)
-                                    ) {
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(12.dp),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(40.dp)
-                                                    .background(Color(0xFF21262D), RoundedCornerShape(6.dp)),
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                Icon(
-                                                    imageVector = if (app.isSystem) Icons.Default.SettingsSuggest else Icons.Default.Android,
-                                                    contentDescription = null,
-                                                    tint = if (app.isSystem) Color(0xFF00E5FF) else Color(0xFF39D353),
-                                                    modifier = Modifier.size(24.dp)
-                                                )
-                                            }
-
-                                            Spacer(modifier = Modifier.width(12.dp))
-
-                                            Column(modifier = Modifier.weight(1f)) {
-                                                Text(
-                                                    text = app.name,
-                                                    color = Color.White,
-                                                    fontSize = 14.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis
-                                                )
-                                                Text(
-                                                    text = app.packageName,
-                                                    color = Color(0xFF8B949E),
-                                                    fontSize = 11.sp,
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis
-                                                )
-                                            }
-
-                                            // App category flag
-                                            Box(
-                                                modifier = Modifier
-                                                    .clip(RoundedCornerShape(4.dp))
-                                                    .background(if (app.isSystem) Color(0xFF21262D) else Color(0xFF238636).copy(alpha = 0.2f))
-                                                    .padding(horizontal = 6.dp, vertical = 2.dp)
-                                            ) {
-                                                Text(
-                                                    text = if (app.isSystem) "نظامي" else "مثبت",
-                                                    color = if (app.isSystem) Color(0xFF8B949E) else Color(0xFF39D353),
-                                                    fontSize = 9.sp,
-                                                    fontWeight = FontWeight.Bold
-                                                )
-                                            }
+                        Text("التسجيلات المستلمة", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        if (audioRecords.isEmpty()) {
+                            Box(modifier = Modifier.fillMaxWidth().height(100.dp), contentAlignment = Alignment.Center) {
+                                Text("لا توجد تسجيلات صوتية", color = Color(0xFF8B949E), fontSize = 12.sp)
+                            }
+                        } else {
+                            audioRecords.forEach { item ->
+                                Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)), border = BorderStroke(1.dp, Color(0xFF30363D)), modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                                    Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        IconButton(onClick = { viewModel.loadAndPlayAudio(item.base64) }) {
+                                            Icon(Icons.Default.PlayCircle, null, tint = Color.Green, modifier = Modifier.size(32.dp))
+                                        }
+                                        Column(modifier = Modifier.weight(1f).padding(horizontal = 8.dp)) {
+                                            Text("تسجيل صوتي", color = Color.White, fontSize = 13.sp)
+                                            Text(SimpleDateFormat("h:mm a, d/M", Locale.getDefault()).format(Date(item.timestamp)), color = Color(0xFF8B949E), fontSize = 10.sp)
+                                        }
+                                        IconButton(onClick = { viewModel.deleteMediaItem("audio_records", item.id) }) {
+                                            Icon(Icons.Default.Delete, null, tint = Color(0xFFDA3633))
                                         }
                                     }
                                 }
                             }
-                        } else {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .weight(1f),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text("لا يوجد تطبيقات متطابقة أو القائمة فارغة.", color = Color(0xFF8B949E), fontSize = 12.sp)
+                        }
+                    }
+                }
+                2 -> {
+                    // APPS TAB... (existing logic is fine, maybe add search/filter if needed)
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        Button(onClick = { viewModel.requestAppsList() }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF4081))) {
+                            Text("تحديث قائمة التطبيقات")
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        // Simplified apps list
+                        LazyColumn(modifier = Modifier.weight(1f)) {
+                            items(installedApps) { app ->
+                                Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)), modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                                    Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.Apps, null, tint = Color.White)
+                                        Spacer(Modifier.width(12.dp))
+                                        Column {
+                                            Text(app.name, color = Color.White, fontWeight = FontWeight.Bold)
+                                            Text(app.packageName, color = Color(0xFF8B949E), fontSize = 10.sp)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                3 -> {
+                    // VIDEO RECORDING PANEL
+                    Column(
+                        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
+                            border = BorderStroke(1.dp, Color(0xFF30363D)),
+                            shape = RoundedCornerShape(16.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                Icon(Icons.Default.Videocam, null, tint = Color(0xFFDA3633), modifier = Modifier.size(36.dp))
+                                Spacer(Modifier.height(8.dp))
+                                Text("تسجيل فيديو عن بعد", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                                Text("سيتم تسجيل فيديو لمدة 10 ثوانٍ من كاميرا الطفل", color = Color(0xFF8B949E), fontSize = 11.sp)
+                                Spacer(Modifier.height(16.dp))
+                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    Button(
+                                        onClick = { viewModel.requestVideo(false) },
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDA3633)),
+                                        modifier = Modifier.weight(1f).height(46.dp),
+                                        shape = RoundedCornerShape(10.dp)
+                                    ) {
+                                        Icon(Icons.Default.CameraRear, null, modifier = Modifier.size(16.dp))
+                                        Spacer(Modifier.width(8.dp))
+                                        Text("خلفية", fontSize = 12.sp)
+                                    }
+                                    Button(
+                                        onClick = { viewModel.requestVideo(true) },
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00E5FF)),
+                                        modifier = Modifier.weight(1f).height(46.dp),
+                                        shape = RoundedCornerShape(10.dp)
+                                    ) {
+                                        Icon(Icons.Default.CameraFront, null, tint = Color.Black, modifier = Modifier.size(16.dp))
+                                        Spacer(Modifier.width(8.dp))
+                                        Text("أمامية", color = Color.Black, fontSize = 12.sp)
+                                    }
+                                }
+                            }
+                        }
+
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.VideoLibrary, null, tint = Color(0xFF8B949E), modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text("سجل الفيديوهات المستلمة", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                Spacer(Modifier.weight(1f))
+                                Text("${cameraVideos.size} فيديو", color = Color(0xFF8B949E), fontSize = 10.sp)
+                            }
+                            
+                            if (cameraVideos.isEmpty()) {
+                                EmptyHistoryPlaceholder("لم يتم استقبال أي فيديوهات بعد")
+                            } else {
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    cameraVideos.forEach { video ->
+                                        Card(
+                                            colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
+                                            border = BorderStroke(1.dp, Color(0xFF30363D)),
+                                            shape = RoundedCornerShape(12.dp)
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth().padding(12.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Icon(Icons.Default.PlayCircle, null, tint = Color(0xFFDA3633), modifier = Modifier.size(32.dp))
+                                                Spacer(Modifier.width(12.dp))
+                                                Column(Modifier.weight(1f)) {
+                                                    Text("فيديو مسجل", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                                    Text(
+                                                        SimpleDateFormat("HH:mm:ss dd/MM", Locale.getDefault()).format(Date(video.timestamp)),
+                                                        color = Color(0xFF8B949E),
+                                                        fontSize = 11.sp
+                                                    )
+                                                }
+                                                IconButton(onClick = { viewModel.deleteMediaItem("camera_videos", video.id) }) {
+                                                    Icon(Icons.Default.Delete, null, tint = Color(0xFFDA3633), modifier = Modifier.size(18.dp))
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -2878,32 +2425,10 @@ fun RemoteCommandCenterTab(viewModel: AdminViewModel) {
         }
     }
 
-    // Full screen bitmap visual overlay zoomable Dialog
-    showFullscreenBitmap?.let { bitmap ->
+    showFullscreenBitmap?.let { bmp ->
         Dialog(onDismissRequest = { showFullscreenBitmap = null }) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(550.dp)
-                    .background(Color.Black, RoundedCornerShape(16.dp))
-                    .padding(8.dp)
-            ) {
-                Image(
-                    bitmap = bitmap.asImageBitmap(),
-                    contentDescription = "Fullscreen",
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Fit
-                )
-
-                IconButton(
-                    onClick = { showFullscreenBitmap = null },
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(12.dp)
-                        .background(Color.Black.copy(alpha = 0.7f), CircleShape)
-                ) {
-                    Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
-                }
+            Box(modifier = Modifier.fillMaxSize().clickable { showFullscreenBitmap = null }.background(Color.Black.copy(alpha = 0.9f)), contentAlignment = Alignment.Center) {
+                Image(bmp.asImageBitmap(), null, modifier = Modifier.fillMaxWidth(0.95f), contentScale = ContentScale.Fit)
             }
         }
     }

