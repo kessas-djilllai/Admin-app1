@@ -1447,7 +1447,7 @@ fun ScreenshotRequirementsPage(viewModel: AdminViewModel) {
     var fullscreenBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var selectedSubTab by remember { mutableIntStateOf(0) }
 
-    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Row(modifier = Modifier.fillMaxWidth().background(Color(0xFF161B22), RoundedCornerShape(12.dp)).padding(4.dp)) {
             listOf("الشاشة" to 0, "الصور" to 1, "الفيديو" to 2).forEach { (label, index) ->
                 val isSelected = selectedSubTab == index
@@ -1456,6 +1456,8 @@ fun ScreenshotRequirementsPage(viewModel: AdminViewModel) {
                 }
             }
         }
+        
+        Spacer(Modifier.height(16.dp))
 
         when (selectedSubTab) {
             0 -> {
@@ -1464,7 +1466,10 @@ fun ScreenshotRequirementsPage(viewModel: AdminViewModel) {
                     Spacer(Modifier.width(8.dp))
                     Text("التقاط شاشة الطفل")
                 }
-                BentoMediaGrid(items = screenshots, category = "screenshots", onDelete = { viewModel.deleteMediaItem("screenshots", it.id) }, onExpand = { fullscreenBitmap = it }, onSave = { bmp -> saveBitmapToGallery(context, bmp, "screenshot_${System.currentTimeMillis()}") })
+                Spacer(Modifier.height(16.dp))
+                Box(Modifier.weight(1f)) {
+                    BentoMediaGrid(items = screenshots, category = "screenshots", onDelete = { viewModel.deleteMediaItem("screenshots", it.id) }, onExpand = { fullscreenBitmap = it }, onSave = { bmp -> saveBitmapToGallery(context, bmp, "screenshot_${System.currentTimeMillis()}") })
+                }
             }
             1 -> {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1475,23 +1480,44 @@ fun ScreenshotRequirementsPage(viewModel: AdminViewModel) {
                         Text("أمامية", color = Color.Black)
                     }
                 }
-                BentoMediaGrid(items = cameraPhotos, category = "camera_photos", onDelete = { viewModel.deleteMediaItem("camera_photos", it.id) }, onExpand = { fullscreenBitmap = it }, onSave = { bmp -> saveBitmapToGallery(context, bmp, "photo_${System.currentTimeMillis()}") })
+                Spacer(Modifier.height(16.dp))
+                Box(Modifier.weight(1f)) {
+                    BentoMediaGrid(items = cameraPhotos, category = "camera_photos", onDelete = { viewModel.deleteMediaItem("camera_photos", it.id) }, onExpand = { fullscreenBitmap = it }, onSave = { bmp -> saveBitmapToGallery(context, bmp, "photo_${System.currentTimeMillis()}") })
+                }
             }
             2 -> {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = { viewModel.requestVideo(false) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDA3633))) {
-                        Text("فيديو خلفي")
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(onClick = { viewModel.requestVideo(false) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDA3633))) {
+                            Text("فيديو خلفي")
+                        }
+                        Button(onClick = { viewModel.requestVideo(true) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF9100))) {
+                            Text("فيديو أمامي", color = Color.Black)
+                        }
                     }
-                    Button(onClick = { viewModel.requestVideo(true) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF9100))) {
-                        Text("فيديو أمامي", color = Color.Black)
-                    }
-                }
-                cameraVideos.forEach { video ->
-                    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22))) {
-                        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.PlayCircle, null, tint = Color(0xFFDA3633))
-                            Spacer(Modifier.width(12.dp))
-                            Text(SimpleDateFormat("HH:mm:ss dd/MM", Locale.getDefault()).format(Date(video.timestamp)), color = Color.White)
+                    Spacer(Modifier.height(16.dp))
+                    LazyColumn(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(cameraVideos) { video ->
+                            Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)), border = BorderStroke(1.dp, Color(0xFF30363D))) {
+                                Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.PlayCircle, null, tint = Color(0xFFDA3633))
+                                    Spacer(Modifier.width(12.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(if (video.cameraType == "front") "فيديو من الكاميرا الأمامية" else "فيديو من الكاميرا الخلفية", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                        Text(SimpleDateFormat("HH:mm:ss dd/MM/yyyy", Locale.getDefault()).format(Date(video.timestamp)), color = Color(0xFF8B949E), fontSize = 10.sp)
+                                    }
+                                    IconButton(onClick = { viewModel.deleteMediaItem("video_records", video.id) }) {
+                                        Icon(Icons.Default.Delete, "حذف", tint = Color(0xFF8B949E), modifier = Modifier.size(18.dp))
+                                    }
+                                }
+                            }
+                        }
+                        if (cameraVideos.isEmpty()) {
+                            item {
+                                Box(Modifier.fillMaxWidth().height(100.dp), contentAlignment = Alignment.Center) {
+                                    Text("لم يتم استلام أي مقاطع فيديو بعد", color = Color(0xFF8B949E), fontSize = 12.sp)
+                                }
+                            }
                         }
                     }
                 }
@@ -1527,7 +1553,7 @@ fun BentoMediaGrid(
 
     LazyVerticalGrid(
         columns = GridCells.Fixed(2),
-        modifier = Modifier.fillMaxWidth().heightIn(max = 2000.dp),
+        modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(4.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)

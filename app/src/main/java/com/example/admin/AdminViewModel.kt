@@ -334,18 +334,21 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
         // 5. Fetch Photos
         _cameraPhotos.value = connector.getCameraPhotos(token)
 
-        // 6. Fetch Audio Records
+        // 6. Fetch Videos
+        _cameraVideos.value = connector.getCameraVideos(token)
+
+        // 7. Fetch Audio Records
         _audioRecords.value = connector.getAudioRecords(token)
 
-        // 7. Get last command response
+        // 8. Get last command response
         _commandResponse.value = connector.getCommandResponse(token)
 
-        // 8. Fetch Alerts
+        // 9. Fetch Alerts
         val alerts = connector.getSecurityAlerts(token)
         _securityAlerts.value = alerts
         checkForNewAlert(alerts)
 
-        // 9. Fetch Live Stream state silently (if not already fast-polling)
+        // 10. Fetch Live Stream state silently (if not already fast-polling)
         if (streamPollingJob?.isActive != true) {
             _liveStreamState.value = connector.getLiveStreamState(token)
         }
@@ -786,6 +789,7 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                     "screenshots" -> _screenshots.value = connector.getScreenshots(token)
                     "camera_photos" -> _cameraPhotos.value = connector.getCameraPhotos(token)
                     "audio_records" -> _audioRecords.value = connector.getAudioRecords(token)
+                    "video_records" -> _cameraVideos.value = connector.getCameraVideos(token)
                 }
             } else {
                 _statusMessage.value = "فشل حذف الملف، حاول مرة أخرى"
