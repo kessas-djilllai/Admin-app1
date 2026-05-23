@@ -49,6 +49,14 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.admin.*
 import com.example.ui.theme.MyApplicationTheme
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.unit.Velocity
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.geometry.Offset
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -695,23 +703,34 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                 }
 
                 commandResponse?.let { resp ->
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = if (resp.first == "success") Color(0xFF1B4721) else Color(0xFF4C1C1B)),
-                        shape = RoundedCornerShape(0.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(modifier = Modifier.padding(12.dp, 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(if (resp.first == "success") Icons.Default.CheckCircle else Icons.Default.Warning, null, tint = Color.White, modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("استجابة جهاز الطفل: ${resp.second}", color = Color.White, fontSize = 11.sp)
+                    // Only show status messages if they are NOT "success" to remove top success notifications
+                    if (resp.first != "success") {
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF4C1C1B)),
+                            shape = RoundedCornerShape(0.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(modifier = Modifier.padding(12.dp, 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Warning, null, tint = Color.White, modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("تنبيه: ${resp.second}", color = Color.White, fontSize = 11.sp)
+                            }
                         }
                     }
                 }
 
-                if (bottomNavSelectedTab == 0) {
-                    DeviceHomeTab(activeDevice, viewModel)
-                } else {
-                    DeviceCommandsTab(activeDevice, viewModel, openCommandDetails, onOpenCommand = { openCommandDetails = it })
+                val isRefreshing by viewModel.isRefreshing.collectAsState()
+
+                SwipeToRefreshBox(
+                    isRefreshing = isRefreshing,
+                    onRefresh = { viewModel.refreshCurrentDevice() },
+                    modifier = Modifier.weight(1f).fillMaxWidth()
+                ) {
+                    if (bottomNavSelectedTab == 0) {
+                        DeviceHomeTab(activeDevice, viewModel)
+                    } else {
+                        DeviceCommandsTab(activeDevice, viewModel, openCommandDetails, onOpenCommand = { openCommandDetails = it })
+                    }
                 }
             }
         }
@@ -3763,5 +3782,104 @@ fun getBatteryColor(level: Int): Color {
         level >= 40 -> Color(0xFF39D353)
         level >= 15 -> Color(0xFFD29922)
         else -> Color(0xFFDA3633)
+    }
+}
+
+@Composable
+fun SwipeToRefreshBox(
+    isRefreshing: Boolean,
+    onRefresh: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
+    var dragOffsetY by remember { mutableStateOf(0f) }
+    val maxDrag = 250f
+    
+    val nestedScrollConnection = remember {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                if (dragOffsetY > 0 && available.y < 0) {
+                    val consumed = available.y
+                    dragOffsetY = (dragOffsetY + consumed).coerceAtLeast(0f)
+                    return Offset(0f, consumed)
+                }
+                return Offset.Zero
+            }
+
+            override fun onPostScroll(
+                consumed: Offset,
+                available: Offset,
+                source: NestedScrollSource
+            ): Offset {
+                if (available.y > 0) {
+                    val added = available.y * 0.5f
+                    dragOffsetY = (dragOffsetY + added).coerceAtMost(maxDrag)
+                    return Offset(0f, available.y)
+                }
+                return Offset.Zero
+            }
+
+            override suspend fun onPreFling(available: Velocity): Velocity {
+                return Velocity.Zero
+            }
+
+            override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
+                if (dragOffsetY >= maxDrag * 0.5f && !isRefreshing) {
+                    onRefresh()
+                }
+                dragOffsetY = 0f
+                return Velocity.Zero
+            }
+        }
+    }
+
+    Box(
+        modifier = modifier.nestedScroll(nestedScrollConnection)
+    ) {
+        val scaleTransition = animateFloatAsState(
+            targetValue = if (dragOffsetY > 0 || isRefreshing) 1f else 0f, 
+            label = "indicator"
+        )
+        val offsetTransition = animateDpAsState(
+            targetValue = if (isRefreshing) 50.dp else (dragOffsetY / 3).dp, 
+            label = "offset"
+        )
+
+        content()
+
+        if (isRefreshing || dragOffsetY > 0) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .offset(y = offsetTransition.value)
+                    .graphicsLayer {
+                        scaleX = scaleTransition.value
+                        scaleY = scaleTransition.value
+                        alpha = scaleTransition.value
+                    }
+                    .background(Color(0xFF1F2937), RoundedCornerShape(24.dp))
+                    .border(1.dp, Color(0xFF374151), RoundedCornerShape(24.dp))
+                    .padding(10.dp)
+            ) {
+                if (isRefreshing) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        color = Color(0xFFFF4081),
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = "جاري التحديث...",
+                        tint = Color(0xFFFF4081),
+                        modifier = Modifier
+                            .size(20.dp)
+                            .graphicsLayer {
+                                rotationZ = (dragOffsetY / maxDrag) * 360f
+                            }
+                    )
+                }
+            }
+        }
     }
 }

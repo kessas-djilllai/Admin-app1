@@ -57,8 +57,9 @@ class FirebaseAdminConnector {
                             foundKeys.add(key)
                             val childObj = json.optJSONObject(key)
                             
-                            val deviceName = childObj?.optString("deviceName")?.takeIf { it.isNotBlank() && it != "null" }
-                                ?: "هاتف طفل ($key)"
+                            val rawDeviceName = childObj?.optString("deviceName")?.takeIf { it.isNotBlank() && it != "null" }
+                                ?: key
+                            val deviceName = cleanDeviceName(rawDeviceName, key)
                             val battery = childObj?.optInt("battery", 90) ?: 90
                             val lastActive = childObj?.optLong("lastActive", 0L) ?: 0L
                             val storageUsed = childObj?.optLong("storageUsed", 4L * 1024 * 1024 * 1024) ?: (4L * 1024 * 1024 * 1024)
@@ -83,8 +84,9 @@ class FirebaseAdminConnector {
                             val childObj = arr.optJSONObject(i)
                             val key = childObj?.optString("id")?.takeIf { it.isNotBlank() } ?: "device_$i"
                             foundKeys.add(key)
-                            val deviceName = childObj?.optString("deviceName")?.takeIf { it.isNotBlank() && it != "null" }
-                                ?: "هاتف طفل ($key)"
+                            val rawDeviceName = childObj?.optString("deviceName")?.takeIf { it.isNotBlank() && it != "null" }
+                                ?: key
+                            val deviceName = cleanDeviceName(rawDeviceName, key)
                             val battery = childObj?.optInt("battery", 90) ?: 90
                             val lastActive = childObj?.optLong("lastActive", 0L) ?: 0L
                             val storageUsed = childObj?.optLong("storageUsed", 4L * 1024 * 1024 * 1024) ?: (4L * 1024 * 1024 * 1024)
@@ -132,7 +134,7 @@ class FirebaseAdminConnector {
                                         devicesList.add(
                                             Device(
                                                 id = key,
-                                                name = "جهاز طفل ($key)",
+                                                name = cleanDeviceName(key, key),
                                                 battery = 95,
                                                 lastActive = System.currentTimeMillis() - 10000, // active/online
                                                 storageUsed = 4L * 1024 * 1024 * 1024,
@@ -212,6 +214,22 @@ class FirebaseAdminConnector {
             }
         } catch (e: IOException) {
             Log.e("FirebaseConnector", "Error sending command", e)
+            return@withContext false
+        }
+    }
+
+    // Clear command execution response before sending a new command
+    suspend fun clearCommandResponse(deviceToken: String): Boolean = withContext(Dispatchers.IO) {
+        val request = Request.Builder()
+            .url("$rootUrl/command_responses/$deviceToken.json")
+            .delete()
+            .build()
+        try {
+            client.newCall(request).execute().use { response ->
+                return@withContext response.isSuccessful
+            }
+        } catch (e: Exception) {
+            Log.e("FirebaseConnector", "Error clearing command response", e)
             return@withContext false
         }
     }
@@ -585,5 +603,31 @@ class FirebaseAdminConnector {
             Log.e("FirebaseConnector", "Error manually connecting token", e)
             return@withContext false
         }
+    }
+
+    private fun cleanDeviceName(rawName: String, fallbackKey: String): String {
+        var name = rawName.trim()
+        // Remove "هاتف طفل", "جهاز طفل", "هاتف", "جهاز", "طفل"
+        name = name.replace("هاتف طفل", "")
+                   .replace("جهاز طفل", "")
+                   .replace("هاتف", "")
+                   .replace("جهاز", "")
+                   .replace("طفل", "")
+                   .trim()
+        
+        // Remove leading and trailing parentheses/brackets if they wrapping the name
+        while ((name.startsWith("(") && name.endsWith(")")) || (name.startsWith("[") && name.endsWith("]"))) {
+            name = name.substring(1, name.length - 1).trim()
+        }
+        
+        // Remove leftover parentheses and brackets
+        name = name.replace("(", "").replace(")", "").replace("[", "").replace("]", "").trim()
+        
+        if (name.isBlank() || name == "null") {
+            var cleanedKey = fallbackKey.replace("(", "").replace(")", "").replace("[", "").replace("]", "").trim()
+            if (cleanedKey.isBlank()) cleanedKey = "Device"
+            return cleanedKey
+        }
+        return name
     }
 }

@@ -101,6 +101,9 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
     private val _directPhotoToShow = MutableStateFlow<MediaItem?>(null)
     val directPhotoToShow: StateFlow<MediaItem?> = _directPhotoToShow.asStateFlow()
 
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+
     fun clearActiveCommandProgress() {
         _activeCommandProgress.value = null
     }
@@ -260,6 +263,22 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
         triggerSingleDeviceFetch(token)
     }
 
+    fun refreshCurrentDevice() {
+        val token = _selectedDeviceToken.value ?: return
+        viewModelScope.launch {
+            _isRefreshing.value = true
+            try {
+                val list = connector.getDiscoveredDevices()
+                _devices.value = list
+                syncCurrentDeviceAll(token)
+            } catch(e: Exception) {
+                Log.e("AdminViewModel", "Error refreshing", e)
+            } finally {
+                _isRefreshing.value = false
+            }
+        }
+    }
+
     fun loadAllDevicesAndStartSync() {
         syncJob?.cancel()
         syncJob = viewModelScope.launch {
@@ -402,6 +421,13 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             delay(100)
 
+            // Clear prior command response first in Firebase
+            try {
+                connector.clearCommandResponse(token)
+            } catch(e: Exception) {
+                Log.e("AdminViewModel", "Could not clear remote command response", e)
+            }
+
             // Step 1: Sending Command to child device
             val sendSuccess = try {
                 connector.sendCommandToChild(token, commandType, params)
@@ -477,10 +503,10 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                         }
                     }
                     "list_directory" -> {
-                        executedSuccessfully = true
+                        // Wait for general command response status since it updates asynchronously
                     }
                     "list_apps" -> {
-                        executedSuccessfully = true
+                        // Wait for general command response status since it updates asynchronously
                     }
                     "lock_device", "unlock_device" -> {
                         val activeDev = _devices.value.find { it.id == token }
