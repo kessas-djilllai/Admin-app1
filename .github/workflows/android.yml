@@ -27,11 +27,17 @@ jobs:
     - name: Decode Keystore
       run: base64 -d debug.keystore.base64 > debug.keystore
 
-    - name: Build Debug APK
-      run: gradle assembleDebug
+    - name: Build Debug & Release APKs
+      run: gradle assembleDebug assembleRelease
 
-    - name: Upload Built APKs
+    - name: Upload Debug APK
       uses: actions/upload-artifact@v4
       with:
         name: Android-Debug-APK
         path: app/build/outputs/apk/debug/*.apk
+
+    - name: Upload Release APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: Android-Release-APK
+        path: app/build/outputs/apk/release/*.apk

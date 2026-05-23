@@ -285,6 +285,10 @@ fun AdminDashboard(viewModel: AdminViewModel) {
     val currentDbUrl by viewModel.currentDatabaseUrl.collectAsState()
     val connectionError by viewModel.connectionError.collectAsState()
 
+    val activeCommandProgress by viewModel.activeCommandProgress.collectAsState()
+    val directScreenshotToShow by viewModel.directScreenshotToShow.collectAsState()
+    val directPhotoToShow by viewModel.directPhotoToShow.collectAsState()
+
     var showAddDeviceDialog by remember { mutableStateOf(false) }
     var showEditDbDialog by remember { mutableStateOf(false) }
     var deviceListTabSelected by remember { mutableIntStateOf(0) } // 0: Active, 1: Inactive
@@ -708,6 +712,472 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                     DeviceHomeTab(activeDevice, viewModel)
                 } else {
                     DeviceCommandsTab(activeDevice, viewModel, openCommandDetails, onOpenCommand = { openCommandDetails = it })
+                }
+            }
+        }
+    }
+
+    // Modal Progress Dialog for Two-Stage Command Execution (إرسال وتنفيذ الأوامر بمرحلتين)
+    activeCommandProgress?.let { progress ->
+        Dialog(onDismissRequest = { viewModel.clearActiveCommandProgress() }) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
+                border = BorderStroke(1.dp, Color(0xFF30363D))
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.SettingsSuggest,
+                        contentDescription = null,
+                        tint = Color(0xFF9155FF),
+                        modifier = Modifier.size(44.dp)
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "جاري تنفيذ الأمر",
+                        color = Color.White,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
+                    Text(
+                        text = progress.commandLabel,
+                        color = Color(0xFF9155FF),
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    // Stage 1: Sending Command (المرحلة الأولى: إرسال الأمر)
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    when (progress.sendStatus) {
+                                        CommandStepStatus.RUNNING -> Color(0xFF9155FF).copy(alpha = 0.2f)
+                                        CommandStepStatus.SUCCESS -> Color(0xFF238636).copy(alpha = 0.2f)
+                                        CommandStepStatus.FAILED -> Color(0xFFDA3633).copy(alpha = 0.2f)
+                                        else -> Color(0xFF21262D)
+                                    }
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            when (progress.sendStatus) {
+                                CommandStepStatus.RUNNING -> {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(16.dp),
+                                        color = Color(0xFF9155FF),
+                                        strokeWidth = 2.dp
+                                    )
+                                }
+                                CommandStepStatus.SUCCESS -> {
+                                    Icon(Icons.Default.Check, null, tint = Color(0xFF39D353), modifier = Modifier.size(18.dp))
+                                }
+                                CommandStepStatus.FAILED -> {
+                                    Icon(Icons.Default.Close, null, tint = Color(0xFFDA3633), modifier = Modifier.size(18.dp))
+                                }
+                                else -> {
+                                    Text("١", color = Color(0xFF8B949E), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "المرحلة الأولى: إرسال الأمر للجهاز",
+                                color = Color.White,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = when (progress.sendStatus) {
+                                    CommandStepStatus.IDLE -> "في الانتظار..."
+                                    CommandStepStatus.RUNNING -> "جاري برمجة وإرسال الأمر إلى شبكة التحكم..."
+                                    CommandStepStatus.SUCCESS -> "تم إرسال الأمر وتأكيده بنجاح في قاعدة البيانات!"
+                                    CommandStepStatus.FAILED -> "فشل إرسال الأمر بنجاح"
+                                },
+                                color = Color(0xFF8B949E),
+                                fontSize = 11.sp
+                            )
+                        }
+                    }
+
+                    progress.sendError?.let { err ->
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFFDA3633).copy(alpha = 0.1f)),
+                            border = BorderStroke(1.dp, Color(0xFFDA3633).copy(alpha = 0.3f)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(start = 44.dp, bottom = 10.dp)
+                        ) {
+                            Text(
+                                text = "خطأ بالتفصيل: $err",
+                                color = Color(0xFFF85149),
+                                fontSize = 11.sp,
+                                modifier = Modifier.padding(10.dp)
+                            )
+                        }
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .padding(start = 16.dp)
+                            .width(2.dp)
+                            .height(20.dp)
+                            .background(Color(0xFF30363D))
+                            .align(Alignment.Start)
+                    )
+
+                    // Stage 2: Accepting & Executing command (المرحلة الثانية: قبول وتنفيذ هاتف الطفل للأمر)
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    when (progress.executionStatus) {
+                                        CommandStepStatus.RUNNING -> Color(0xFF9155FF).copy(alpha = 0.2f)
+                                        CommandStepStatus.SUCCESS -> Color(0xFF238636).copy(alpha = 0.2f)
+                                        CommandStepStatus.FAILED -> Color(0xFFDA3633).copy(alpha = 0.2f)
+                                        else -> Color(0xFF21262D)
+                                    }
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            when (progress.executionStatus) {
+                                CommandStepStatus.RUNNING -> {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(16.dp),
+                                        color = Color(0xFF9155FF),
+                                        strokeWidth = 2.dp
+                                    )
+                                }
+                                CommandStepStatus.SUCCESS -> {
+                                    Icon(Icons.Default.Check, null, tint = Color(0xFF39D353), modifier = Modifier.size(18.dp))
+                                }
+                                CommandStepStatus.FAILED -> {
+                                    Icon(Icons.Default.Close, null, tint = Color(0xFFDA3633), modifier = Modifier.size(18.dp))
+                                }
+                                else -> {
+                                    Text("٢", color = Color(0xFF8B949E), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "المرحلة الثانية: قبول وتنفيذ هاتف الطفل للأمر",
+                                color = Color.White,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = when (progress.executionStatus) {
+                                    CommandStepStatus.IDLE -> "بانتظار اكتمال المرحلة الأولى..."
+                                    CommandStepStatus.RUNNING -> "بانتظار هاتف الطفل لتلقي وتأكيد معالجة الطلب..."
+                                    CommandStepStatus.SUCCESS -> "تمت معالجة وتنفيذ الأمر بنجاح من طرف هاتف الطفل!"
+                                    CommandStepStatus.FAILED -> "فشل هاتف الطفل في معالجة أو تنفيذ الأمر"
+                                },
+                                color = Color(0xFF8B949E),
+                                fontSize = 11.sp
+                            )
+                        }
+                    }
+
+                    progress.executionError?.let { err ->
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFFDA3633).copy(alpha = 0.1f)),
+                            border = BorderStroke(1.dp, Color(0xFFDA3633).copy(alpha = 0.3f)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(start = 44.dp, bottom = 10.dp)
+                        ) {
+                            Text(
+                                text = "تفاصيل الخطأ: $err",
+                                color = Color(0xFFF85149),
+                                fontSize = 11.sp,
+                                modifier = Modifier.padding(10.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    progress.resultMessage?.let { msg ->
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF1F242C)),
+                            border = BorderStroke(1.dp, Color(0xFF30363D)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Text(
+                                    text = "الرد المستلم:",
+                                    color = Color(0xFF9155FF),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = msg,
+                                    color = Color.White,
+                                    fontSize = 12.sp
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
+
+                    Button(
+                        onClick = { viewModel.clearActiveCommandProgress() },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (progress.executionStatus == CommandStepStatus.RUNNING || progress.sendStatus == CommandStepStatus.RUNNING) Color(0xFF21262D) else Color(0xFF9155FF)
+                        ),
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text(
+                            text = if (progress.executionStatus == CommandStepStatus.RUNNING || progress.sendStatus == CommandStepStatus.RUNNING) "إلغاء المتابعة" else "إغلاق",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    // Direct Screenshot Viewer Overlay (عرض لقطة الشاشة المستلمة مباشرة على الشاشة)
+    directScreenshotToShow?.let { item ->
+        val bitmap by produceState<Bitmap?>(initialValue = null, item.base64) {
+            value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { item.toBitmap() }
+        }
+
+        Dialog(onDismissRequest = { viewModel.clearDirectScreenshot() }) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(8.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
+                border = BorderStroke(1.dp, Color(0xFF30363D))
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(14.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "تم استلام لقطة الشاشة المطلوبة مباشرة!",
+                            color = Color.White,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        IconButton(onClick = { viewModel.clearDirectScreenshot() }) {
+                            Icon(Icons.Default.Close, null, tint = Color.White)
+                        }
+                    }
+
+                    Text(
+                        text = "تم التقاطها: " + SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date(item.timestamp)),
+                        color = Color(0xFF8B949E),
+                        fontSize = 11.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    val bmp = bitmap
+                    if (bmp != null) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(380.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color.Black),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Image(
+                                bitmap = bmp.asImageBitmap(),
+                                contentDescription = "بث مباشر شاشة",
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Fit
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Button(
+                                onClick = {
+                                    val ok = saveBitmapToGallery(context, bmp, "child_screenshot_${item.timestamp}")
+                                    if (ok) {
+                                        Toast.makeText(context, "تم حفظ لقطة الشاشة في الاستوديو!", Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        Toast.makeText(context, "فشل حفظ الملف لعدم توفر الصلاحيات", Toast.LENGTH_SHORT).show()
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9155FF)),
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Icon(Icons.Default.Download, null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("حفظ بالاستوديو", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+
+                            Button(
+                                onClick = { viewModel.clearDirectScreenshot() },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF21262D)),
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text("إغلاق", fontSize = 12.sp)
+                            }
+                        }
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(200.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(color = Color(0xFF9155FF))
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Direct Camera Photo Viewer Overlay (عرض صورة الكاميرا المستلمة مباشرة على الشاشة)
+    directPhotoToShow?.let { item ->
+        val bitmap by produceState<Bitmap?>(initialValue = null, item.base64) {
+            value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { item.toBitmap() }
+        }
+
+        Dialog(onDismissRequest = { viewModel.clearDirectPhoto() }) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(8.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
+                border = BorderStroke(1.dp, Color(0xFF30363D))
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(14.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "تم التقاط واستلام صورة الكاميرا بنجاح!",
+                            color = Color.White,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        IconButton(onClick = { viewModel.clearDirectPhoto() }) {
+                            Icon(Icons.Default.Close, null, tint = Color.White)
+                        }
+                    }
+
+                    Text(
+                        text = "الكاميرا المستعملة: " + (if (item.cameraType == "front" || item.type == "camera_front") "الأمامية" else "الخلفية") + " | " + SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date(item.timestamp)),
+                        color = Color(0xFF8B949E),
+                        fontSize = 11.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    val bmp = bitmap
+                    if (bmp != null) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(380.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color.Black),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Image(
+                                bitmap = bmp.asImageBitmap(),
+                                contentDescription = "صورة الكاميرا المستلمة",
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Fit
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Button(
+                                onClick = {
+                                    val ok = saveBitmapToGallery(context, bmp, "child_camera_${item.timestamp}")
+                                    if (ok) {
+                                        Toast.makeText(context, "تم حفظ الصورة بنجاح بالأستوديو!", Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        Toast.makeText(context, "فشل حفظ الصورة لعدم توفر الصلاحيات", Toast.LENGTH_SHORT).show()
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9155FF)),
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Icon(Icons.Default.Download, null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("حفظ بالاستوديو", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+
+                            Button(
+                                onClick = { viewModel.clearDirectPhoto() },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF21262D)),
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text("إغلاق", fontSize = 12.sp)
+                            }
+                        }
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(200.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(color = Color(0xFF9155FF))
+                        }
+                    }
                 }
             }
         }

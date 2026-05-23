@@ -21,6 +21,25 @@ import kotlinx.coroutines.launch
 import java.io.File
 import java.io.FileOutputStream
 
+enum class CommandStepStatus {
+    IDLE,
+    RUNNING,
+    SUCCESS,
+    FAILED
+}
+
+data class ActiveCommandProgress(
+    val commandType: String,
+    val commandLabel: String,
+    val sendStatus: CommandStepStatus = CommandStepStatus.IDLE,
+    val sendError: String? = null,
+    val executionStatus: CommandStepStatus = CommandStepStatus.IDLE,
+    val executionError: String? = null,
+    val resultMessage: String? = null,
+    val startTimestamp: Long = System.currentTimeMillis(),
+    val responseData: Any? = null
+)
+
 class AdminViewModel(application: Application) : AndroidViewModel(application) {
     private val connector = FirebaseAdminConnector()
 
@@ -72,6 +91,27 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _liveStreamState = MutableStateFlow<LiveStreamState?>(null)
     val liveStreamState: StateFlow<LiveStreamState?> = _liveStreamState.asStateFlow()
+
+    private val _activeCommandProgress = MutableStateFlow<ActiveCommandProgress?>(null)
+    val activeCommandProgress: StateFlow<ActiveCommandProgress?> = _activeCommandProgress.asStateFlow()
+
+    private val _directScreenshotToShow = MutableStateFlow<MediaItem?>(null)
+    val directScreenshotToShow: StateFlow<MediaItem?> = _directScreenshotToShow.asStateFlow()
+
+    private val _directPhotoToShow = MutableStateFlow<MediaItem?>(null)
+    val directPhotoToShow: StateFlow<MediaItem?> = _directPhotoToShow.asStateFlow()
+
+    fun clearActiveCommandProgress() {
+        _activeCommandProgress.value = null
+    }
+
+    fun clearDirectScreenshot() {
+        _directScreenshotToShow.value = null
+    }
+
+    fun clearDirectPhoto() {
+        _directPhotoToShow.value = null
+    }
 
     // Polling and synchronization jobs
     private var syncJob: Job? = null
@@ -323,6 +363,19 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private fun getCommandArabicLabel(commandType: String): String {
+        return when (commandType) {
+            "lock_device" -> "قفل الهاتف"
+            "unlock_device" -> "إلغاء قفل الهاتف"
+            "take_screenshot" -> "التقاط لقطة شاشة"
+            "take_photo" -> "التقاط صورة كاميرا"
+            "record_audio" -> "تسجيل صوتي"
+            "list_apps" -> "جلب قائمة التطبيقات"
+            "list_directory" -> "استعراض الملفات"
+            else -> "تنفيذ الأمر ($commandType)"
+        }
+    }
+
     // REMOTE COMMAND DISPATCHER
     fun runCommand(commandType: String, params: Map<String, Any> = emptyMap()) {
         val token = _selectedDeviceToken.value
@@ -330,13 +383,165 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
             _statusMessage.value = "الرجاء تحديد جهاز طفل أولا."
             return
         }
+
+        val label = getCommandArabicLabel(commandType)
+        val startTime = System.currentTimeMillis()
+
+        // Before sending, record pre-state
+        val preScreenshotTime = _screenshot.value?.timestamp ?: 0L
+        val prePhotoTime = _cameraPhoto.value?.timestamp ?: 0L
+        val preAudioTime = _audioRecord.value?.timestamp ?: 0L
+
+        _activeCommandProgress.value = ActiveCommandProgress(
+            commandType = commandType,
+            commandLabel = label,
+            sendStatus = CommandStepStatus.RUNNING,
+            startTimestamp = startTime
+        )
+
         viewModelScope.launch {
-            _statusMessage.value = "جاري إرسال الأمر: $commandType..."
-            val success = connector.sendCommandToChild(token, commandType, params)
-            if (success) {
-                _statusMessage.value = "تم إرسال الأمر بنجاح! في انتظار جهاز الطفل..."
+            delay(100)
+
+            // Step 1: Sending Command to child device
+            val sendSuccess = try {
+                connector.sendCommandToChild(token, commandType, params)
+            } catch (e: Exception) {
+                Log.e("AdminViewModel", "Error in sendCommandToChild", e)
+                _activeCommandProgress.value = _activeCommandProgress.value?.copy(
+                    sendStatus = CommandStepStatus.FAILED,
+                    sendError = e.localizedMessage ?: e.message ?: "فشل في إرسال الأمر عبر الشبكة بسبب مشكلة في الإرسال"
+                )
+                false
+            }
+
+            if (!sendSuccess) {
+                if (_activeCommandProgress.value?.sendError == null) {
+                    _activeCommandProgress.value = _activeCommandProgress.value?.copy(
+                        sendStatus = CommandStepStatus.FAILED,
+                        sendError = "لم يتمكن التطبيق من الكتابة بقاعدة بيانات التحكم الأبوي"
+                    )
+                }
+                return@launch
+            }
+
+            // Step 1 Success! Move to Step 2
+            _activeCommandProgress.value = _activeCommandProgress.value?.copy(
+                sendStatus = CommandStepStatus.SUCCESS,
+                executionStatus = CommandStepStatus.RUNNING
+            )
+
+            // Poll for up to 30 seconds
+            val maxSeconds = 30
+            val pollIntervalMs = 1500L
+            val maxIterations = (maxSeconds * 1000 / pollIntervalMs).toInt()
+            var executedSuccessfully = false
+            var executionErrorMessage: String? = null
+
+            for (i in 0 until maxIterations) {
+                delay(pollIntervalMs)
+
+                // Refresh states
+                try {
+                    syncCurrentDeviceAll(token)
+                } catch (e: Exception) {
+                    Log.e("AdminViewModel", "Transient sync error during command polling", e)
+                }
+
+                // Inspect if the command was executed by looking at updated states
+                when (commandType) {
+                    "take_screenshot" -> {
+                        val currentScreenshot = _screenshot.value
+                        if (currentScreenshot != null && currentScreenshot.timestamp > preScreenshotTime) {
+                            executedSuccessfully = true
+                            _activeCommandProgress.value = _activeCommandProgress.value?.copy(
+                                responseData = currentScreenshot
+                            )
+                        }
+                    }
+                    "take_photo" -> {
+                        val currentPhoto = _cameraPhoto.value
+                        if (currentPhoto != null && currentPhoto.timestamp > prePhotoTime) {
+                            executedSuccessfully = true
+                            _activeCommandProgress.value = _activeCommandProgress.value?.copy(
+                                responseData = currentPhoto
+                            )
+                        }
+                    }
+                    "record_audio" -> {
+                        val currentAudio = _audioRecord.value
+                        if (currentAudio != null && currentAudio.timestamp > preAudioTime) {
+                            executedSuccessfully = true
+                            _activeCommandProgress.value = _activeCommandProgress.value?.copy(
+                                responseData = currentAudio
+                            )
+                        }
+                    }
+                    "list_directory" -> {
+                        executedSuccessfully = true
+                    }
+                    "list_apps" -> {
+                        executedSuccessfully = true
+                    }
+                    "lock_device", "unlock_device" -> {
+                        val activeDev = _devices.value.find { it.id == token }
+                        val expectedLock = (commandType == "lock_device")
+                        if (activeDev != null && activeDev.isLocked == expectedLock) {
+                            executedSuccessfully = true
+                        }
+                    }
+                }
+
+                // Check general command responses for success/error tags as fallback or explicit replies
+                val lastResponse = _commandResponse.value
+                if (lastResponse != null) {
+                    val (status, message) = lastResponse
+                    if (status == "success" || status == "completed" || status == "done") {
+                        executedSuccessfully = true
+                        _activeCommandProgress.value = _activeCommandProgress.value?.copy(
+                            resultMessage = message
+                        )
+                    } else if (status == "error" || status == "failed") {
+                        executedSuccessfully = false
+                        executionErrorMessage = message.ifBlank { "تم رفض التنفيذ أو فشل من طرف هاتف الطفل" }
+                        break
+                    }
+                }
+
+                if (executedSuccessfully) {
+                    break
+                }
+            }
+
+            if (executedSuccessfully) {
+                val endProgress = _activeCommandProgress.value?.copy(
+                    executionStatus = CommandStepStatus.SUCCESS,
+                    resultMessage = _activeCommandProgress.value?.resultMessage ?: "تم استلام الرد وتنفيذ الأمر بنجاح!"
+                )
+                _activeCommandProgress.value = endProgress
+
+                // Play sound or show directly on screen
+                when (commandType) {
+                    "record_audio" -> {
+                        _audioRecord.value?.base64?.let { base64Audio ->
+                            loadAndPlayAudio(base64Audio)
+                        }
+                    }
+                    "take_screenshot" -> {
+                        _screenshot.value?.let { screenshotMedia ->
+                            _directScreenshotToShow.value = screenshotMedia
+                        }
+                    }
+                    "take_photo" -> {
+                        _cameraPhoto.value?.let { photoMedia ->
+                            _directPhotoToShow.value = photoMedia
+                        }
+                    }
+                }
             } else {
-                _statusMessage.value = "فشل اتصال التحكم بقاعدة البيانات."
+                _activeCommandProgress.value = _activeCommandProgress.value?.copy(
+                    executionStatus = CommandStepStatus.FAILED,
+                    executionError = executionErrorMessage ?: "انتهت مهلة الانتظار (30 ثانية) ولم يقم هاتف الطفل بالرد. تأكد من اتصال هاتفه بالإنترنت وتشغيله بالخلفية."
+                )
             }
         }
     }
