@@ -410,6 +410,7 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
             "get_contacts" -> "جلب جهات الاتصال"
             "play_remote_sound" -> "تشغيل صوت تنبيه"
             "set_remote_volume" -> "ضبط مستوى الصوت"
+            "send_notification" -> "إرسال رسالة تنبيه"
             "remote_click" -> "نقر على الشاشة"
             "remote_swipe" -> "سحب على الشاشة"
             "record_video_front" -> "تسجيل فيديو (أمامي)"
@@ -665,6 +666,10 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setRemoteVolume(volumePercent: Int) {
         runCommand("set_remote_volume", mapOf("volume" to volumePercent))
+    }
+
+    fun sendNotification(title: String, message: String) {
+        runCommand("send_notification", mapOf("title" to title, "message" to message))
     }
     
     fun sendRemoteClick(x: Float, y: Float) {
