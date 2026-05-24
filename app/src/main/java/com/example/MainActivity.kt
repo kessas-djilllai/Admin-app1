@@ -2408,11 +2408,13 @@ fun LiveStreamRequirementsPage(viewModel: AdminViewModel) {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun InstalledAppsRequirementsPage(viewModel: AdminViewModel) {
     val installedApps by viewModel.installedApps.collectAsState()
     var query by remember { mutableStateOf("") }
     var filterSystem by remember { mutableStateOf<Boolean?>(false) }
+    var selectedAppForDialog by remember { mutableStateOf<com.example.admin.InstalledApp?>(null) }
 
     Column(modifier = Modifier.fillMaxSize().padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Button(onClick = { viewModel.requestAppsList() }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF4081)), modifier = Modifier.fillMaxWidth()) {
@@ -2442,7 +2444,15 @@ fun InstalledAppsRequirementsPage(viewModel: AdminViewModel) {
 
         LazyColumn(modifier = Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             items(list) { app ->
-                Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)), modifier = Modifier.fillMaxWidth()) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)), 
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .combinedClickable(
+                            onClick = {  },
+                            onLongClick = { selectedAppForDialog = app }
+                        )
+                ) {
                     Row(modifier = Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
                         Icon(if(app.isSystem) Icons.Default.Settings else Icons.Default.PlayArrow, null, tint = if(app.isSystem) Color.Gray else Color.Green, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(10.dp))
@@ -2454,6 +2464,49 @@ fun InstalledAppsRequirementsPage(viewModel: AdminViewModel) {
                 }
             }
         }
+    }
+
+    if (selectedAppForDialog != null) {
+        AlertDialog(
+            onDismissRequest = { selectedAppForDialog = null },
+            title = { Text(selectedAppForDialog!!.name, color = Color.White) },
+            text = { Text("اختر الإجراء المطلوب لهذا التطبيق:", color = Color(0xFF8B949E)) },
+            containerColor = Color(0xFF161B22),
+            confirmButton = {
+                Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = {
+                            viewModel.runCommand("open_app", mapOf("packageName" to selectedAppForDialog!!.packageName))
+                            selectedAppForDialog = null
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF238636)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("فتح التطبيق")
+                    }
+                    Button(
+                        onClick = {
+                            viewModel.runCommand("hide_app", mapOf("packageName" to selectedAppForDialog!!.packageName, "hidden" to true))
+                            selectedAppForDialog = null
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF4081)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("إخفاء التطبيق")
+                    }
+                    Button(
+                        onClick = {
+                            viewModel.runCommand("hide_app", mapOf("packageName" to selectedAppForDialog!!.packageName, "hidden" to false))
+                            selectedAppForDialog = null
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9155FF)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("إظهار التطبيق (إلغاء الإخفاء)")
+                    }
+                }
+            }
+        )
     }
 }
 
