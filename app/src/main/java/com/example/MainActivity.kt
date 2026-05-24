@@ -1315,6 +1315,17 @@ fun DeviceHomeTab(device: Device, viewModel: AdminViewModel) {
                         Text("فك القفل", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
                 }
+                Spacer(modifier = Modifier.height(10.dp))
+                Button(
+                    onClick = { viewModel.runCommand("ACTION_LOCK_SCREEN") },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9155FF)),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth().height(38.dp)
+                ) {
+                    Icon(Icons.Default.PowerSettingsNew, null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("إطفاء شاشة الهاتف", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
             }
         }
 
