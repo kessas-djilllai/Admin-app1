@@ -59,9 +59,10 @@ data class MediaItem(
 ) {
     fun toBitmap(): Bitmap? {
         return try {
-            val decodedBytes = Base64.decode(base64, Base64.DEFAULT)
+            val cleanBase64 = if (base64.contains(",")) base64.substringAfter(",") else base64
+            val decodedBytes = Base64.decode(cleanBase64, Base64.DEFAULT)
             BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size)
-        } catch (e: Exception) {
+        } catch (t: Throwable) {
             null
         }
     }
@@ -73,6 +74,7 @@ data class MediaItem(
 
 data class LiveStreamState(
     val isActive: Boolean = false,
+    val isLoading: Boolean = false,
     val image: String? = null,
     val timestamp: Long = 0L,
     val error: String? = null
@@ -81,9 +83,10 @@ data class LiveStreamState(
         val imgStr = image ?: return null
         if (imgStr.isBlank()) return null
         return try {
-            val decodedBytes = Base64.decode(imgStr, Base64.DEFAULT)
+            val cleanBase64 = if (imgStr.contains(",")) imgStr.substringAfter(",") else imgStr
+            val decodedBytes = Base64.decode(cleanBase64, Base64.DEFAULT)
             BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size)
-        } catch (e: Exception) {
+        } catch (t: Throwable) {
             null
         }
     }
@@ -91,18 +94,21 @@ data class LiveStreamState(
 
 data class CameraStreamState(
     val isActive: Boolean = false,
+    val isLoading: Boolean = false,
     val image: String? = null,
     val cameraType: String = "back", // "front" or "back"
     val timestamp: Long = 0L,
     val error: String? = null
 ) {
+
     fun toBitmap(): Bitmap? {
         val imgStr = image ?: return null
         if (imgStr.isBlank()) return null
         return try {
-            val decodedBytes = Base64.decode(imgStr, Base64.DEFAULT)
+            val cleanBase64 = if (imgStr.contains(",")) imgStr.substringAfter(",") else imgStr
+            val decodedBytes = Base64.decode(cleanBase64, Base64.DEFAULT)
             BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size)
-        } catch (e: Exception) {
+        } catch (t: Throwable) {
             null
         }
     }

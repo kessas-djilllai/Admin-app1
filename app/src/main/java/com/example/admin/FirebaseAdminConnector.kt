@@ -192,16 +192,17 @@ class FirebaseAdminConnector {
     suspend fun sendCommandToChild(
         deviceToken: String, 
         commandType: String, 
-        additionalParams: Map<String, Any> = emptyMap()
+        additionalParams: Map<String, Any> = emptyMap(),
+        commandTimestamp: Long = System.currentTimeMillis()
     ): Boolean = withContext(Dispatchers.IO) {
-        val commandId = System.currentTimeMillis().toString()
+        val commandId = commandTimestamp.toString()
         val url = "$rootUrl/commands/$deviceToken.json"
         
         val commandJson = JSONObject().apply {
             put("command", commandType)
             put("id", commandId)
             put("status", "pending")
-            put("timestamp", System.currentTimeMillis())
+            put("timestamp", commandTimestamp)
             additionalParams.forEach { (key, value) ->
                 put(key, value)
             }
@@ -245,7 +246,7 @@ class FirebaseAdminConnector {
     }
 
     // Read the command execution response
-    suspend fun getCommandResponse(deviceToken: String): Pair<String, String>? = withContext(Dispatchers.IO) {
+    suspend fun getCommandResponse(deviceToken: String): Triple<String, String, Long>? = withContext(Dispatchers.IO) {
         val request = Request.Builder()
             .url("$rootUrl/command_responses/$deviceToken.json")
             .get()
@@ -279,7 +280,8 @@ class FirebaseAdminConnector {
 
                 val status = latestObj.optString("status", "unknown")
                 val message = latestObj.optString("message", "")
-                return@withContext Pair(status, message)
+                val cmdTs = latestObj.optLong("command_timestamp", 0L)
+                return@withContext Triple(status, message, cmdTs)
             }
         } catch (e: Exception) {
             return@withContext null
@@ -790,38 +792,72 @@ class FirebaseAdminConnector {
         }
     }
 
-    // Fetch camera stream state from camera_stream/$token
-    suspend fun getCameraStreamState(deviceToken: String): CameraStreamState? = withContext(Dispatchers.IO) {
+    // Listen to camera stream state from camera_stream/$token using Server-Sent Events (SSE) for realtime
+    suspend fun listenToCameraStream(deviceToken: String, onUpdate: (CameraStreamState?) -> Unit) = withContext(Dispatchers.IO) {
         val request = Request.Builder()
             .url("$rootUrl/camera_stream/$deviceToken.json")
+            .header("Accept", "text/event-stream")
             .get()
             .build()
         try {
             client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) return@withContext null
-                val bodyStr = response.body?.string() ?: return@withContext null
-                if (bodyStr == "null" || bodyStr.isBlank()) return@withContext null
+                if (!response.isSuccessful) return@withContext
+                val source = response.body?.source()
+                var currentEvent = ""
+                // Initial state
+                var currentState = CameraStreamState(isActive = false, image = null, cameraType = "back")
                 
-                val json = JSONObject(bodyStr)
-                val isActive = json.optBoolean("isActive", false)
-                val image = json.optString("image", "")
-                val cameraType = json.optString("cameraType", "back")
-                val timestamp = json.optLong("timestamp", 0L)
-                val error = json.optString("error", "").let { if (it.isBlank() || it == "null") null else it }
-                
-                return@withContext CameraStreamState(
-                    isActive = isActive,
-                    image = if (image.isBlank()) null else image,
-                    cameraType = cameraType,
-                    timestamp = timestamp,
-                    error = error
-                )
+                while (source != null && !source.exhausted()) {
+                    val line = source.readUtf8Line() ?: break
+                    if (line.startsWith("event: ")) {
+                        currentEvent = line.substring(7).trim()
+                    } else if (line.startsWith("data: ")) {
+                        val dataStr = line.substring(6).trim()
+                        if (dataStr == "null") continue
+                        if (currentEvent == "put" || currentEvent == "patch") {
+                            try {
+                                val json = JSONObject(dataStr)
+                                val path = json.optString("path", "/")
+                                val data = json.optJSONObject("data")
+                                
+                                if (path == "/") {
+                                    if (data != null) {
+                                        val isActive = if (data.has("isActive")) data.optBoolean("isActive", currentState.isActive) else currentState.isActive
+                                        val image = if (data.has("image")) data.optString("image", "") else currentState.image
+                                        val cameraType = if (data.has("cameraType")) data.optString("cameraType", currentState.cameraType) else currentState.cameraType
+                                        val timestamp = if (data.has("timestamp")) data.optLong("timestamp", currentState.timestamp) else currentState.timestamp
+                                        val error = if (data.has("error")) data.optString("error", "") else currentState.error
+                                        
+                                        currentState = CameraStreamState(
+                                            isActive = isActive,
+                                            image = if (image.isNullOrBlank()) null else image,
+                                            cameraType = cameraType,
+                                            timestamp = timestamp,
+                                            error = if (error.isNullOrBlank()) null else error,
+                                            isLoading = false
+                                        )
+                                        onUpdate(currentState)
+                                    }
+                                } else if (path == "/image") {
+                                    val imageStr = json.optString("data", "")
+                                    currentState = currentState.copy(image = if (imageStr.isBlank()) null else imageStr)
+                                    onUpdate(currentState)
+                                } else if (path == "/isActive") {
+                                    currentState = currentState.copy(isActive = json.optBoolean("data", currentState.isActive))
+                                    onUpdate(currentState)
+                                }
+                            } catch (e: Exception) {
+                                Log.e("FirebaseConnector", "Error parsing SSE data", e)
+                            }
+                        }
+                    }
+                }
             }
         } catch (e: Exception) {
-            Log.e("FirebaseConnector", "Error getting camera stream state", e)
-            return@withContext null
+            Log.e("FirebaseConnector", "SSE Stream Error", e)
         }
     }
+
      
     // Pairing simulation / Force pairing a simulation token
     suspend fun registerNewDeviceToken(deviceToken: String, deviceName: String): Boolean = withContext(Dispatchers.IO) {

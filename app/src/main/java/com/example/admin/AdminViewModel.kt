@@ -89,8 +89,8 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
     private val _contacts = MutableStateFlow<List<Contact>>(emptyList())
     val contacts: StateFlow<List<Contact>> = _contacts.asStateFlow()
 
-    private val _commandResponse = MutableStateFlow<Pair<String, String>?>(null)
-    val commandResponse: StateFlow<Pair<String, String>?> = _commandResponse.asStateFlow()
+    private val _commandResponse = MutableStateFlow<Triple<String, String, Long>?>(null)
+    val commandResponse: StateFlow<Triple<String, String, Long>?> = _commandResponse.asStateFlow()
 
     private val _statusMessage = MutableStateFlow<String?>(null)
     val statusMessage: StateFlow<String?> = _statusMessage.asStateFlow()
@@ -467,7 +467,7 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
 
             // Step 1: Sending Command to child device
             val sendSuccess = try {
-                connector.sendCommandToChild(token, commandType, params)
+                connector.sendCommandToChild(token, commandType, params, startTime)
             } catch (e: Exception) {
                 Log.e("AdminViewModel", "Error in sendCommandToChild", e)
                 if (!silent) {
@@ -507,93 +507,63 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
             for (i in 0 until maxIterations) {
                 delay(pollIntervalMs)
 
-                // Refresh states
+                // Refresh command response separately to avoid heavy syncing
                 try {
-                    syncCurrentDeviceAll(token)
+                    val resp = connector.getCommandResponse(token)
+                    _commandResponse.value = resp
                 } catch (e: Exception) {
-                    Log.e("AdminViewModel", "Transient sync error during command polling", e)
+                    Log.e("AdminViewModel", "Transient error during command polling", e)
                 }
 
-                // Inspect if the command was executed by looking at updated states
-                when (commandType) {
-                    "take_screenshot" -> {
-                        val currentScreenshot = _screenshots.value.firstOrNull()
-                        if (currentScreenshot != null && currentScreenshot.timestamp > preScreenshotTime) {
-                            executedSuccessfully = true
-                            if (!silent) {
-                                _activeCommandProgress.value = _activeCommandProgress.value?.copy(
-                                    responseData = currentScreenshot
-                                )
-                            }
-                        }
-                    }
-                    "take_photo" -> {
-                        val currentPhoto = _cameraPhotos.value.firstOrNull()
-                        if (currentPhoto != null && currentPhoto.timestamp > prePhotoTime) {
-                            executedSuccessfully = true
-                            if (!silent) {
-                                _activeCommandProgress.value = _activeCommandProgress.value?.copy(
-                                    responseData = currentPhoto
-                                )
-                            }
-                        }
-                    }
-                    "record_audio" -> {
-                        val currentAudio = _audioRecords.value.firstOrNull()
-                        if (currentAudio != null && currentAudio.timestamp > preAudioTime) {
-                            executedSuccessfully = true
-                            if (!silent) {
-                                _activeCommandProgress.value = _activeCommandProgress.value?.copy(
-                                    responseData = currentAudio
-                                )
-                            }
-                        }
-                    }
-                    "record_video_front", "record_video_back" -> {
-                        val currentVideo = _cameraVideos.value.firstOrNull()
-                        if (currentVideo != null && currentVideo.timestamp > preVideoTime) {
-                            executedSuccessfully = true
-                            if (!silent) {
-                                _activeCommandProgress.value = _activeCommandProgress.value?.copy(
-                                    responseData = currentVideo
-                                )
-                            }
-                        }
-                    }
-                    "list_directory" -> {
-                        // Wait for general command response status since it updates asynchronously
-                    }
-                    "list_apps" -> {
-                        // Wait for general command response status since it updates asynchronously
-                    }
-                    "lock_device", "unlock_device" -> {
-                        val activeDev = _devices.value.find { it.id == token }
-                        val expectedLock = (commandType == "lock_device")
-                        if (activeDev != null && activeDev.isLocked == expectedLock) {
-                            executedSuccessfully = true
-                        }
-                    }
-                }
-
-                // Check general command responses for success/error tags as fallback or explicit replies
+                // Check general command responses for success/error tags as explicit replies
                 val lastResponse = _commandResponse.value
                 if (lastResponse != null) {
-                    val (status, message) = lastResponse
-                    if (status == "success" || status == "completed" || status == "done") {
-                        executedSuccessfully = true
-                        if (!silent) {
-                            _activeCommandProgress.value = _activeCommandProgress.value?.copy(
-                                resultMessage = message
-                            )
+                    val (status, message, cmdTs) = lastResponse
+                    if (cmdTs == startTime) {
+                        if (status == "success" || status == "completed" || status == "done" || status == "ok") {
+                            executedSuccessfully = true
+                            if (!silent) {
+                                _activeCommandProgress.value = _activeCommandProgress.value?.copy(
+                                    resultMessage = message.ifBlank { "تم تنفيذ الأمر بنجاح" }
+                                )
+                            }
+                        } else if (status == "error" || status == "failed") {
+                            executedSuccessfully = false
+                            executionErrorMessage = message.ifBlank { "التنفيذ فشل من طرف هاتف الطفل" }
+                            break
                         }
-                    } else if (status == "error" || status == "failed") {
-                        executedSuccessfully = false
-                        executionErrorMessage = message.ifBlank { "تم رفض التنفيذ أو فشل من طرف هاتف الطفل" }
-                        break
                     }
                 }
 
                 if (executedSuccessfully) {
+                    // Sync to get the newest files (screenshot, audio, etc) since the child replied success
+                    try {
+                        syncCurrentDeviceAll(token)
+                    } catch (e: Exception) {
+                        Log.e("AdminViewModel", "Error syncing after command success", e)
+                    }
+
+                    // Attach the recently fetched media items to the command state
+                    if (!silent) {
+                        when (commandType) {
+                            "take_screenshot" -> {
+                                val currentScreenshot = _screenshots.value.firstOrNull() { it.timestamp > preScreenshotTime }
+                                _activeCommandProgress.value = _activeCommandProgress.value?.copy(responseData = currentScreenshot)
+                            }
+                            "take_photo" -> {
+                                val currentPhoto = _cameraPhotos.value.firstOrNull() { it.timestamp > prePhotoTime }
+                                _activeCommandProgress.value = _activeCommandProgress.value?.copy(responseData = currentPhoto)
+                            }
+                            "record_audio" -> {
+                                val currentAudio = _audioRecords.value.firstOrNull() { it.timestamp > preAudioTime }
+                                _activeCommandProgress.value = _activeCommandProgress.value?.copy(responseData = currentAudio)
+                            }
+                            "record_video_front", "record_video_back" -> {
+                                val currentVideo = _cameraVideos.value.firstOrNull() { it.timestamp > preVideoTime }
+                                _activeCommandProgress.value = _activeCommandProgress.value?.copy(responseData = currentVideo)
+                            }
+                        }
+                    }
                     break
                 }
             }
@@ -763,9 +733,9 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                     stopAudio()
                 }
 
-            } catch (e: Exception) {
-                Log.e("AdminViewModel", "MediaPlayer playback error", e)
-                _statusMessage.value = "فشل تشغيل ملف الصوت المرمز: ${e.localizedMessage}"
+            } catch (t: Throwable) {
+                Log.e("AdminViewModel", "MediaPlayer playback error", t)
+                _statusMessage.value = "فشل تشغيل ملف الصوت المرمز: ${t.localizedMessage}"
             }
         }
     }
@@ -826,19 +796,79 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
 
     fun startLiveStream() {
         val token = _selectedDeviceToken.value ?: return
-        runCommand("start_stream")
+        val command = "start_stream"
         
-        // Start high-frequency stream-polling
-        streamPollingJob?.cancel()
-        streamPollingJob = viewModelScope.launch {
-            while (true) {
+        // Show loading state
+        _liveStreamState.value = LiveStreamState(
+            isActive = false,
+            isLoading = true,
+            error = null
+        )
+        
+        viewModelScope.launch {
+            val startTime = System.currentTimeMillis()
+            
+            try {
+                connector.clearCommandResponse(token)
+            } catch(e: Exception) { }
+            
+            val sendSuccess = try {
+                connector.sendCommandToChild(token, command, emptyMap(), startTime)
+            } catch (e: Exception) { false }
+            
+            if (!sendSuccess) {
+                _liveStreamState.value = _liveStreamState.value?.copy(
+                    isLoading = false,
+                    error = "فشل في إرسال الأمر للطفل. تأكد من اتصاله بالإنترنت."
+                )
+                return@launch
+            }
+            
+            val maxIterations = 20
+            var success = false
+            var errorMsg: String? = null
+            
+            for (i in 0 until maxIterations) {
+                delay(1500)
                 try {
-                    val state = connector.getLiveStreamState(token)
-                    _liveStreamState.value = state
-                } catch (e: Exception) {
-                    Log.e("AdminViewModel", "Error in screen stream polling", e)
+                    val resp = connector.getCommandResponse(token)
+                    if (resp != null && resp.third == startTime) {
+                        if (resp.first == "success" || resp.first == "ok") {
+                            success = true
+                            break
+                        } else if (resp.first == "error" || resp.first == "failed") {
+                            errorMsg = resp.second.ifBlank { "التطبيق الأبوي فشل في بدء بث الشاشة." }
+                            break
+                        }
+                    }
+                } catch(e: Exception) { }
+            }
+            
+            if (success) {
+                _liveStreamState.value = _liveStreamState.value?.copy(
+                    isLoading = false,
+                    isActive = true,
+                    error = null
+                )
+                
+                // Start high-frequency stream-polling
+                streamPollingJob?.cancel()
+                streamPollingJob = viewModelScope.launch {
+                    while (true) {
+                        try {
+                            val state = connector.getLiveStreamState(token)
+                            _liveStreamState.value = state?.copy(isLoading = false) ?: _liveStreamState.value
+                        } catch (e: Exception) {
+                            Log.e("AdminViewModel", "Error in screen stream polling", e)
+                        }
+                        delay(1200) // Poll every 1.2s
+                    }
                 }
-                delay(1200) // Poll every 1.2s
+            } else {
+                _liveStreamState.value = _liveStreamState.value?.copy(
+                    isLoading = false,
+                    error = errorMsg ?: "انتهت مهلة الانتظار ولم يقم هاتف الطفل بالرد."
+                )
             }
         }
     }
@@ -853,19 +883,81 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
     fun startCameraStream(isFront: Boolean) {
         val token = _selectedDeviceToken.value ?: return
         val command = if (isFront) "start_camera_stream_front" else "start_camera_stream_back"
-        runCommand(command)
         
-        // Start high-frequency camera-stream-polling
-        streamPollingJob?.cancel()
-        streamPollingJob = viewModelScope.launch {
-            while (true) {
+        // Show loading state, reset error and active state
+        _cameraStreamState.value = CameraStreamState(
+            isActive = false, 
+            isLoading = true, 
+            error = null, 
+            cameraType = if (isFront) "front" else "back"
+        )
+        
+        viewModelScope.launch {
+            val startTime = System.currentTimeMillis()
+            
+            // clear response first
+            try {
+                connector.clearCommandResponse(token)
+            } catch(e: Exception) { }
+            
+            // Send command
+            val sendSuccess = try {
+                connector.sendCommandToChild(token, command, emptyMap(), startTime)
+            } catch (e: Exception) { false }
+            
+            if (!sendSuccess) {
+                _cameraStreamState.value = _cameraStreamState.value?.copy(
+                    isLoading = false,
+                    error = "فشل في إرسال الأمر للطفل. تأكد من اتصاله بالإنترنت."
+                )
+                return@launch
+            }
+            
+            // Poll for command response
+            val maxIterations = 20 // 30 seconds
+            var success = false
+            var errorMsg: String? = null
+            
+            for (i in 0 until maxIterations) {
+                delay(1500)
                 try {
-                    val state = connector.getCameraStreamState(token)
-                    _cameraStreamState.value = state
-                } catch (e: Exception) {
-                    Log.e("AdminViewModel", "Error in camera stream polling", e)
+                    val resp = connector.getCommandResponse(token)
+                    if (resp != null && resp.third == startTime) {
+                        if (resp.first == "success" || resp.first == "ok") {
+                            success = true
+                            break
+                        } else if (resp.first == "error" || resp.first == "failed") {
+                            errorMsg = resp.second.ifBlank { "التطبيق الأبوي للطفل فشل في تشغيل الكاميرا." }
+                            break
+                        }
+                    }
+                } catch(e: Exception) { }
+            }
+            
+            if (success) {
+                // Done loading, now stream is active
+                _cameraStreamState.value = _cameraStreamState.value?.copy(
+                    isLoading = false,
+                    isActive = true,
+                    error = null
+                )
+                
+                // Start high-frequency camera-stream-polling / SSE listener
+                streamPollingJob?.cancel()
+                streamPollingJob = viewModelScope.launch {
+                    try {
+                        connector.listenToCameraStream(token) { state ->
+                            _cameraStreamState.value = state ?: _cameraStreamState.value
+                        }
+                    } catch (e: Exception) {
+                        Log.e("AdminViewModel", "Error in camera stream listener", e)
+                    }
                 }
-                delay(1200) // Poll every 1.2s
+            } else {
+                _cameraStreamState.value = _cameraStreamState.value?.copy(
+                    isLoading = false,
+                    error = errorMsg ?: "انتهت مهلة الانتظار ولم يقم هاتف الطفل بالرد."
+                )
             }
         }
     }

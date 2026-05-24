@@ -147,7 +147,7 @@ fun saveVideoToDownloads(context: Context, base64: String, fileName: String): Bo
             }
             true
         } else false
-    } catch (e: Exception) {
+    } catch (t: Throwable) {
         false
     }
 }
@@ -2133,6 +2133,7 @@ fun NotificationTab(viewModel: AdminViewModel) {
 fun CameraLiveTab(viewModel: AdminViewModel) {
     val cameraStreamState by viewModel.cameraStreamState.collectAsState()
     val isStreamingActive = cameraStreamState?.isActive == true
+    val isLoading = cameraStreamState?.isLoading == true
     val image = cameraStreamState?.image
     val error = cameraStreamState?.error
     
@@ -2145,13 +2146,14 @@ fun CameraLiveTab(viewModel: AdminViewModel) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp),
+            .padding(16.dp)
+            .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
-            border = BorderStroke(1.dp, if(isStreamingActive) Color(0xFF39D353) else Color(0xFF30363D))
+            border = BorderStroke(1.dp, Color(0xFF30363D))
         ) {
             Column(
                 modifier = Modifier.padding(16.dp),
@@ -2171,108 +2173,137 @@ fun CameraLiveTab(viewModel: AdminViewModel) {
                             fontSize = 16.sp
                         )
                         Text(
-                            text = if (isStreamingActive) "البث المباشر قيد التشغيل..." else "جاهز لبث الكاميرا",
-                            color = if (isStreamingActive) Color(0xFF39D353) else Color(0xFF8B949E),
+                            text = "جاهز لفتح اتصال البث المباشر",
+                            color = Color(0xFF8B949E),
                             fontSize = 12.sp
                         )
                     }
-                    
-                    if (isStreamingActive) {
-                        Button(
-                            onClick = { viewModel.stopCameraStream() },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF4444)),
-                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
-                        ) {
-                            Text("إيقاف البث", color = Color.White)
-                        }
-                    }
                 }
 
-                if (!isStreamingActive) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Button(
-                            onClick = { viewModel.startCameraStream(false) },
-                            modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9155FF))
-                        ) {
-                            Icon(Icons.Default.FlipCameraAndroid, null)
-                            Spacer(Modifier.width(8.dp))
-                            Text("كاميرا خلفية")
-                        }
-                        Button(
-                            onClick = { viewModel.startCameraStream(true) },
-                            modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9155FF))
-                        ) {
-                            Icon(Icons.Default.CameraFront, null)
-                            Spacer(Modifier.width(8.dp))
-                            Text("كاميرا أمامية")
-                        }
-                    }
-                }
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(9f / 16f)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color.Black),
-                    contentAlignment = Alignment.Center
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    if (isStreamingActive) {
-                        if (bitmap != null) {
-                            Image(
-                                bitmap = bitmap!!.asImageBitmap(),
-                                contentDescription = "Camera Stream",
-                                modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Fit
-                            )
-                        } else {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                CircularProgressIndicator(color = Color(0xFF9155FF))
-                                Spacer(Modifier.height(8.dp))
-                                Text("جاري جلب البث...", color = Color.White, fontSize = 12.sp)
-                            }
-                        }
-                    } else {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(
-                                imageVector = Icons.Default.VideocamOff,
-                                contentDescription = null,
-                                tint = Color(0xFF30363D),
-                                modifier = Modifier.size(64.dp)
-                            )
-                            Spacer(Modifier.height(8.dp))
-                            Text("البث متوقف حالياً", color = Color(0xFF8B949E))
-                        }
+                    Button(
+                        onClick = { viewModel.startCameraStream(false) },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9155FF))
+                    ) {
+                        Icon(Icons.Default.FlipCameraAndroid, null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("كاميرا خلفية")
                     }
-                    
-                    if (error != null) {
-                        Surface(
-                            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(),
-                            color = Color.Black.copy(alpha = 0.7f)
-                        ) {
-                            Text(
-                                text = error!!,
-                                color = Color.Red,
-                                modifier = Modifier.padding(8.dp),
-                                fontSize = 12.sp,
-                                textAlign = TextAlign.Center
-                            )
-                        }
+                    Button(
+                        onClick = { viewModel.startCameraStream(true) },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9155FF))
+                    ) {
+                        Icon(Icons.Default.CameraFront, null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("كاميرا أمامية")
                     }
                 }
                 
-                if (isStreamingActive) {
-                    Text(
-                        "ملاحظة: البث المباشر يستهلك بيانات الإنترنت والبطارية بشكل مكثف على هاتف الطفل.",
-                        color = Color(0xFFFFA726),
-                        fontSize = 11.sp,
-                        textAlign = TextAlign.Center
-                    )
+                Text(
+                    "ملاحظة: البث المباشر يستهلك بيانات الإنترنت والبطارية، سيتم إغلاق البث تلقائياً عند إغلاق النافذة.",
+                    color = Color(0xFFFFA726),
+                    fontSize = 11.sp,
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+    }
+
+    if (isStreamingActive || isLoading) {
+        Dialog(onDismissRequest = { viewModel.stopCameraStream() }) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 400.dp, max = 600.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
+                border = BorderStroke(1.dp, if(isStreamingActive) Color(0xFF39D353) else Color(0xFF9155FF)),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (isLoading) "جاري الاتصال بـ الكاميرا..." else "البث الحي مباشر",
+                            color = if (isLoading) Color(0xFF9155FF) else Color(0xFF39D353),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp
+                        )
+                        IconButton(onClick = { viewModel.stopCameraStream() }) {
+                            Icon(Icons.Default.Close, null, tint = Color.White)
+                        }
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .background(Color.Black),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (isLoading) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                CircularProgressIndicator(color = Color(0xFF9155FF))
+                                Spacer(Modifier.height(16.dp))
+                                Text("في انتظار استجابة هاتف الطفل...", color = Color(0xFF8B949E), fontSize = 14.sp)
+                            }
+                        } else if (isStreamingActive) {
+                            if (bitmap != null) {
+                                Image(
+                                    bitmap = bitmap!!.asImageBitmap(),
+                                    contentDescription = "Camera Stream",
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Fit
+                                )
+                            } else {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    CircularProgressIndicator(color = Color(0xFF9155FF))
+                                    Spacer(Modifier.height(8.dp))
+                                    Text("جاري استقبال الإطارات...", color = Color.White, fontSize = 12.sp)
+                                }
+                            }
+                        }
+                        
+                        if (error != null) {
+                            Surface(
+                                modifier = Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .fillMaxWidth(),
+                                color = Color.Black.copy(alpha = 0.7f)
+                            ) {
+                                Text(
+                                    text = error!!,
+                                    color = Color.Red,
+                                    modifier = Modifier.padding(8.dp),
+                                    fontSize = 12.sp,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                        }
+                    }
+                    
+                    Button(
+                        onClick = { viewModel.stopCameraStream() },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF4444))
+                    ) {
+                        Icon(Icons.Default.Stop, null)
+                        Spacer(Modifier.width(8.dp))
+                        Text(if(isLoading) "إلغاء الطلب" else "إيقاف البث وإغلاق")
+                    }
                 }
             }
         }
@@ -2283,6 +2314,8 @@ fun CameraLiveTab(viewModel: AdminViewModel) {
 fun LiveStreamRequirementsPage(viewModel: AdminViewModel) {
     val liveStreamState by viewModel.liveStreamState.collectAsState()
     val isStreamingActive = liveStreamState?.isActive == true
+    val isLoading = liveStreamState?.isLoading == true
+    val error = liveStreamState?.error
     var showFullscreenBitmap by remember { mutableStateOf<Bitmap?>(null) }
 
     Column(
@@ -2291,20 +2324,42 @@ fun LiveStreamRequirementsPage(viewModel: AdminViewModel) {
     ) {
         Card(
             colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
-            border = BorderStroke(1.dp, if(isStreamingActive) Color(0xFF39D353) else Color(0xFF30363D)),
+            border = BorderStroke(1.dp, if(isStreamingActive) Color(0xFF39D353) else if (isLoading) Color(0xFF9155FF) else Color(0xFF30363D)),
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(modifier = Modifier.padding(14.dp)) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Text("البث المباشر للشاشة", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                    Text(if (isStreamingActive) "نشط" else "متوقف", color = if (isStreamingActive) Color(0xFF39D353) else Color(0xFFFF4081), fontSize = 11.sp)
+                    Text(
+                        if (isLoading) "جاري التحميل..." else if (isStreamingActive) "نشط" else "متوقف", 
+                        color = if (isLoading) Color(0xFF9155FF) else if (isStreamingActive) Color(0xFF39D353) else Color(0xFFFF4081), 
+                        fontSize = 11.sp
+                    )
                 }
+                
+                if (error != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFFDA3633).copy(alpha = 0.1f)),
+                        border = BorderStroke(1.dp, Color(0xFFDA3633).copy(alpha = 0.3f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("خطأ: $error", color = Color(0xFFF85149), fontSize = 11.sp, modifier = Modifier.padding(8.dp))
+                    }
+                }
+                
                 Spacer(modifier = Modifier.height(10.dp))
                 Box(modifier = Modifier.fillMaxWidth().height(220.dp).clip(RoundedCornerShape(8.dp)).background(Color.Black).border(1.dp, Color(0xFF21262D)), contentAlignment = Alignment.Center) {
                     val bitmap by produceState<Bitmap?>(initialValue = null, liveStreamState?.image) {
                         value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { liveStreamState?.toBitmap() }
                     }
-                    if (isStreamingActive && bitmap != null) {
+                    if (isLoading) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            CircularProgressIndicator(color = Color(0xFF9155FF))
+                            Spacer(Modifier.height(8.dp))
+                            Text("في انتظار استجابة الطفل...", color = Color(0xFF8B949E), fontSize = 12.sp)
+                        }
+                    } else if (isStreamingActive && bitmap != null) {
                         Image(bitmap!!.asImageBitmap(), null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
                         IconButton(onClick = { showFullscreenBitmap = bitmap }, modifier = Modifier.align(Alignment.BottomEnd).padding(4.dp).background(Color.Black.copy(alpha = 0.5f), CircleShape)) {
                             Icon(Icons.Default.Fullscreen, null, tint = Color.White)
@@ -2317,11 +2372,11 @@ fun LiveStreamRequirementsPage(viewModel: AdminViewModel) {
                 }
                 Spacer(modifier = Modifier.height(12.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Button(onClick = { viewModel.startLiveStream() }, enabled = !isStreamingActive, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF238636)), modifier = Modifier.weight(1f)) {
+                    Button(onClick = { viewModel.startLiveStream() }, enabled = !isStreamingActive && !isLoading, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF238636)), modifier = Modifier.weight(1f)) {
                         Text("بدء البث")
                     }
-                    Button(onClick = { viewModel.stopLiveStream() }, enabled = isStreamingActive, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDA3633)), modifier = Modifier.weight(1f)) {
-                        Text("إيقاف")
+                    Button(onClick = { viewModel.stopLiveStream() }, enabled = isStreamingActive || isLoading, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDA3633)), modifier = Modifier.weight(1f)) {
+                        Text(if(isLoading) "إلغاء الطلب" else "إيقاف")
                     }
                 }
             }
@@ -2719,6 +2774,7 @@ fun RemoteCommandCenterTab(viewModel: AdminViewModel) {
                 0 -> {
                     // SCREENSHOT AND PHOTO DISPATCH PANEL
                     val isStreamingActive = liveStreamState?.isActive == true
+                    val isLoading = liveStreamState?.isLoading == true
                     Column(
                         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -2727,7 +2783,7 @@ fun RemoteCommandCenterTab(viewModel: AdminViewModel) {
                         Card(
                             colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
                             shape = RoundedCornerShape(16.dp),
-                            border = BorderStroke(1.dp, if (isStreamingActive) Color(0xFF39D353) else Color(0xFF30363D)),
+                            border = BorderStroke(1.dp, if (isStreamingActive) Color(0xFF39D353) else if(isLoading) Color(0xFF9155FF) else Color(0xFF30363D)),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Column(modifier = Modifier.padding(16.dp)) {
@@ -2740,10 +2796,10 @@ fun RemoteCommandCenterTab(viewModel: AdminViewModel) {
                                             Text("مراقبة شاشة الهاتف لحظياً", color = Color(0xFF8B949E), fontSize = 11.sp)
                                         }
                                     }
-                                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(if (isStreamingActive) Color(0xFF238636).copy(alpha = 0.2f) else Color(0xFFFF4081).copy(alpha = 0.2f)).padding(horizontal = 8.dp, vertical = 4.dp)) {
-                                        Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(if (isStreamingActive) Color(0xFF39D353) else Color(0xFFFF4081)))
+                                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(if (isStreamingActive) Color(0xFF238636).copy(alpha = 0.2f) else if(isLoading) Color(0xFF9155FF).copy(alpha = 0.2f) else Color(0xFFFF4081).copy(alpha = 0.2f)).padding(horizontal = 8.dp, vertical = 4.dp)) {
+                                        Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(if (isStreamingActive) Color(0xFF39D353) else if(isLoading) Color(0xFF9155FF) else Color(0xFFFF4081)))
                                         Spacer(modifier = Modifier.width(6.dp))
-                                        Text(if (isStreamingActive) "نشط" else "متوقف", color = if (isStreamingActive) Color(0xFF39D353) else Color(0xFFFF4081), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                        Text(if (isLoading) "تحميل" else if (isStreamingActive) "نشط" else "متوقف", color = if (isStreamingActive) Color(0xFF39D353) else if(isLoading) Color(0xFF9155FF) else Color(0xFFFF4081), fontSize = 10.sp, fontWeight = FontWeight.Bold)
                                     }
                                 }
                                 HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = Color(0xFF30363D))
@@ -2751,7 +2807,13 @@ fun RemoteCommandCenterTab(viewModel: AdminViewModel) {
                                     val bitmap by produceState<Bitmap?>(initialValue = null, liveStreamState?.image) {
                                         value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { liveStreamState?.toBitmap() }
                                     }
-                                    if (isStreamingActive && bitmap != null) {
+                                    if (isLoading) {
+                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                            CircularProgressIndicator(color = Color(0xFF9155FF), modifier = Modifier.size(36.dp))
+                                            Spacer(Modifier.height(8.dp))
+                                            Text("جاري الاتصال بهاتف الطفل...", color = Color(0xFF8B949E), fontSize = 12.sp)
+                                        }
+                                    } else if (isStreamingActive && bitmap != null) {
                                         Image(bitmap!!.asImageBitmap(), null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
                                         Box(modifier = Modifier.align(Alignment.TopStart).padding(12.dp).background(Color(0xFFDA3633), RoundedCornerShape(4.dp)).padding(horizontal = 8.dp, vertical = 3.dp)) {
                                             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -2771,15 +2833,15 @@ fun RemoteCommandCenterTab(viewModel: AdminViewModel) {
                                 }
                                 Spacer(modifier = Modifier.height(16.dp))
                                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                    Button(onClick = { viewModel.startLiveStream() }, enabled = !isStreamingActive, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF238636)), shape = RoundedCornerShape(10.dp), modifier = Modifier.weight(1f).height(46.dp)) {
+                                    Button(onClick = { viewModel.startLiveStream() }, enabled = !isStreamingActive && !isLoading, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF238636)), shape = RoundedCornerShape(10.dp), modifier = Modifier.weight(1f).height(46.dp)) {
                                         Icon(Icons.Default.PlayArrow, null)
                                         Spacer(Modifier.width(8.dp))
                                         Text("بدء البث", fontSize = 12.sp)
                                     }
-                                    Button(onClick = { viewModel.stopLiveStream() }, enabled = isStreamingActive, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDA3633)), shape = RoundedCornerShape(10.dp), modifier = Modifier.weight(1f).height(46.dp)) {
-                                        Icon(Icons.Default.Stop, null)
+                                    Button(onClick = { viewModel.stopLiveStream() }, enabled = isStreamingActive || isLoading, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDA3633)), shape = RoundedCornerShape(10.dp), modifier = Modifier.weight(1f).height(46.dp)) {
+                                        Icon(if(isLoading) Icons.Default.Cancel else Icons.Default.Stop, null)
                                         Spacer(Modifier.width(8.dp))
-                                        Text("إيقاف", fontSize = 12.sp)
+                                        Text(if(isLoading) "إلغاء الطلب" else "إيقاف", fontSize = 12.sp)
                                     }
                                 }
                             }
@@ -4059,9 +4121,9 @@ fun VideoPlayerDialog(
                     exoPlayer.playWhenReady = true
                     isPreparing = false
                 }
-            } catch (e: Exception) {
+            } catch (t: Throwable) {
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(context, "خطأ في تجهيز الفيديو: ${e.message}", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "خطأ في تجهيز الفيديو: ${t.message}", Toast.LENGTH_SHORT).show()
                     onDismiss()
                 }
             }
