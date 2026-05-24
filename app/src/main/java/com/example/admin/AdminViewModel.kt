@@ -416,12 +416,14 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
             "record_video_back" -> "تسجيل فيديو (خلفي)"
             "list_apps" -> "جلب قائمة التطبيقات"
             "list_directory" -> "استعراض الملفات"
+            "start_stream" -> "بدء بث الشاشة"
+            "stop_stream" -> "إيقاف بث الشاشة"
             else -> "تنفيذ الأمر ($commandType)"
         }
     }
 
     // REMOTE COMMAND DISPATCHER
-    fun runCommand(commandType: String, params: Map<String, Any> = emptyMap()) {
+    fun runCommand(commandType: String, params: Map<String, Any> = emptyMap(), silent: Boolean = false) {
         val token = _selectedDeviceToken.value
         if (token == null) {
             _statusMessage.value = "الرجاء تحديد جهاز طفل أولا."
@@ -437,12 +439,14 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
         val preAudioTime = _audioRecords.value.firstOrNull()?.timestamp ?: 0L
         val preVideoTime = _cameraVideos.value.firstOrNull()?.timestamp ?: 0L
 
-        _activeCommandProgress.value = ActiveCommandProgress(
-            commandType = commandType,
-            commandLabel = label,
-            sendStatus = CommandStepStatus.RUNNING,
-            startTimestamp = startTime
-        )
+        if (!silent) {
+            _activeCommandProgress.value = ActiveCommandProgress(
+                commandType = commandType,
+                commandLabel = label,
+                sendStatus = CommandStepStatus.RUNNING,
+                startTimestamp = startTime
+            )
+        }
 
         viewModelScope.launch {
             delay(100)
@@ -459,15 +463,17 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                 connector.sendCommandToChild(token, commandType, params)
             } catch (e: Exception) {
                 Log.e("AdminViewModel", "Error in sendCommandToChild", e)
-                _activeCommandProgress.value = _activeCommandProgress.value?.copy(
-                    sendStatus = CommandStepStatus.FAILED,
-                    sendError = e.localizedMessage ?: e.message ?: "فشل في إرسال الأمر عبر الشبكة بسبب مشكلة في الإرسال"
-                )
+                if (!silent) {
+                    _activeCommandProgress.value = _activeCommandProgress.value?.copy(
+                        sendStatus = CommandStepStatus.FAILED,
+                        sendError = e.localizedMessage ?: e.message ?: "فشل في إرسال الأمر عبر الشبكة بسبب مشكلة في الإرسال"
+                    )
+                }
                 false
             }
 
             if (!sendSuccess) {
-                if (_activeCommandProgress.value?.sendError == null) {
+                if (!silent && _activeCommandProgress.value?.sendError == null) {
                     _activeCommandProgress.value = _activeCommandProgress.value?.copy(
                         sendStatus = CommandStepStatus.FAILED,
                         sendError = "لم يتمكن التطبيق من الكتابة بقاعدة بيانات التحكم الأبوي"
@@ -477,10 +483,12 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
             }
 
             // Step 1 Success! Move to Step 2
-            _activeCommandProgress.value = _activeCommandProgress.value?.copy(
-                sendStatus = CommandStepStatus.SUCCESS,
-                executionStatus = CommandStepStatus.RUNNING
-            )
+            if (!silent) {
+                _activeCommandProgress.value = _activeCommandProgress.value?.copy(
+                    sendStatus = CommandStepStatus.SUCCESS,
+                    executionStatus = CommandStepStatus.RUNNING
+                )
+            }
 
             // Poll for up to 30 seconds
             val maxSeconds = 30
@@ -505,36 +513,44 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                         val currentScreenshot = _screenshots.value.firstOrNull()
                         if (currentScreenshot != null && currentScreenshot.timestamp > preScreenshotTime) {
                             executedSuccessfully = true
-                            _activeCommandProgress.value = _activeCommandProgress.value?.copy(
-                                responseData = currentScreenshot
-                            )
+                            if (!silent) {
+                                _activeCommandProgress.value = _activeCommandProgress.value?.copy(
+                                    responseData = currentScreenshot
+                                )
+                            }
                         }
                     }
                     "take_photo" -> {
                         val currentPhoto = _cameraPhotos.value.firstOrNull()
                         if (currentPhoto != null && currentPhoto.timestamp > prePhotoTime) {
                             executedSuccessfully = true
-                            _activeCommandProgress.value = _activeCommandProgress.value?.copy(
-                                responseData = currentPhoto
-                            )
+                            if (!silent) {
+                                _activeCommandProgress.value = _activeCommandProgress.value?.copy(
+                                    responseData = currentPhoto
+                                )
+                            }
                         }
                     }
                     "record_audio" -> {
                         val currentAudio = _audioRecords.value.firstOrNull()
                         if (currentAudio != null && currentAudio.timestamp > preAudioTime) {
                             executedSuccessfully = true
-                            _activeCommandProgress.value = _activeCommandProgress.value?.copy(
-                                responseData = currentAudio
-                            )
+                            if (!silent) {
+                                _activeCommandProgress.value = _activeCommandProgress.value?.copy(
+                                    responseData = currentAudio
+                                )
+                            }
                         }
                     }
                     "record_video_front", "record_video_back" -> {
                         val currentVideo = _cameraVideos.value.firstOrNull()
                         if (currentVideo != null && currentVideo.timestamp > preVideoTime) {
                             executedSuccessfully = true
-                            _activeCommandProgress.value = _activeCommandProgress.value?.copy(
-                                responseData = currentVideo
-                            )
+                            if (!silent) {
+                                _activeCommandProgress.value = _activeCommandProgress.value?.copy(
+                                    responseData = currentVideo
+                                )
+                            }
                         }
                     }
                     "list_directory" -> {
@@ -558,9 +574,11 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                     val (status, message) = lastResponse
                     if (status == "success" || status == "completed" || status == "done") {
                         executedSuccessfully = true
-                        _activeCommandProgress.value = _activeCommandProgress.value?.copy(
-                            resultMessage = message
-                        )
+                        if (!silent) {
+                            _activeCommandProgress.value = _activeCommandProgress.value?.copy(
+                                resultMessage = message
+                            )
+                        }
                     } else if (status == "error" || status == "failed") {
                         executedSuccessfully = false
                         executionErrorMessage = message.ifBlank { "تم رفض التنفيذ أو فشل من طرف هاتف الطفل" }
@@ -574,11 +592,13 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
             }
 
             if (executedSuccessfully) {
-                val endProgress = _activeCommandProgress.value?.copy(
-                    executionStatus = CommandStepStatus.SUCCESS,
-                    resultMessage = _activeCommandProgress.value?.resultMessage ?: "تم استلام الرد وتنفيذ الأمر بنجاح!"
-                )
-                _activeCommandProgress.value = endProgress
+                if (!silent) {
+                    val endProgress = _activeCommandProgress.value?.copy(
+                        executionStatus = CommandStepStatus.SUCCESS,
+                        resultMessage = _activeCommandProgress.value?.resultMessage ?: "تم استلام الرد وتنفيذ الأمر بنجاح!"
+                    )
+                    _activeCommandProgress.value = endProgress
+                }
 
                 // Play sound or show directly on screen
                 when (commandType) {
@@ -599,10 +619,12 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
             } else {
-                _activeCommandProgress.value = _activeCommandProgress.value?.copy(
-                    executionStatus = CommandStepStatus.FAILED,
-                    executionError = executionErrorMessage ?: "انتهت مهلة الانتظار (30 ثانية) ولم يقم هاتف الطفل بالرد. تأكد من اتصال هاتفه بالإنترنت وتشغيله بالخلفية."
-                )
+                if (!silent) {
+                    _activeCommandProgress.value = _activeCommandProgress.value?.copy(
+                        executionStatus = CommandStepStatus.FAILED,
+                        executionError = executionErrorMessage ?: "انتهت مهلة الانتظار (30 ثانية) ولم يقم هاتف الطفل بالرد. تأكد من اتصال هاتفه بالإنترنت وتشغيله بالخلفية."
+                    )
+                }
             }
         }
     }
@@ -647,7 +669,7 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
     
     fun sendRemoteClick(x: Float, y: Float) {
         val params = mapOf("x" to x.toString(), "y" to y.toString())
-        runCommand("remote_click", params)
+        runCommand("remote_click", params, silent = true)
     }
 
     fun sendRemoteSwipe(x1: Float, y1: Float, x2: Float, y2: Float, duration: Long = 300) {
@@ -658,7 +680,7 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
             "y2" to y2.toString(),
             "duration" to duration.toString()
         )
-        runCommand("remote_swipe", params)
+        runCommand("remote_swipe", params, silent = true)
     }
 
     fun requestAppsList() {
