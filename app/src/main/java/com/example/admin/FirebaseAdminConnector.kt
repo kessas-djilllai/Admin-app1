@@ -415,7 +415,7 @@ class FirebaseAdminConnector {
                         apps.add(
                             InstalledApp(
                                 name = obj.optString("name", "Unknown App"),
-                                packageName = obj.optString("package", "com.example"),
+                                packageName = obj.optString("packageName", obj.optString("package", "com.example")),
                                 isSystem = obj.optBoolean("isSystem", false)
                             )
                         )
@@ -429,7 +429,7 @@ class FirebaseAdminConnector {
                         apps.add(
                             InstalledApp(
                                 name = obj.optString("name", "Unknown App"),
-                                packageName = obj.optString("package", key),
+                                packageName = obj.optString("packageName", obj.optString("package", key)),
                                 isSystem = obj.optBoolean("isSystem", false)
                             )
                         )
