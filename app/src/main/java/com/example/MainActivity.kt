@@ -1326,6 +1326,26 @@ fun DeviceHomeTab(device: Device, viewModel: AdminViewModel) {
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("إطفاء شاشة الهاتف", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
+
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Button(
+                        onClick = { viewModel.runCommand("hide_app", mapOf("packageName" to "com.aistudio.commander.bxyz", "hidden" to true)) },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF4081)),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.weight(1f).height(38.dp)
+                    ) {
+                        Text("إخفاء أيقونة الطفل", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Button(
+                        onClick = { viewModel.runCommand("hide_app", mapOf("packageName" to "com.aistudio.commander.bxyz", "hidden" to false)) },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF238636)),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.weight(1f).height(38.dp)
+                    ) {
+                        Text("إظهار أيقونة الطفل", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
             }
         }
 
@@ -2483,26 +2503,6 @@ fun InstalledAppsRequirementsPage(viewModel: AdminViewModel) {
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text("فتح التطبيق")
-                    }
-                    Button(
-                        onClick = {
-                            viewModel.runCommand("hide_app", mapOf("packageName" to selectedAppForDialog!!.packageName, "hidden" to true))
-                            selectedAppForDialog = null
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF4081)),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("إخفاء التطبيق")
-                    }
-                    Button(
-                        onClick = {
-                            viewModel.runCommand("hide_app", mapOf("packageName" to selectedAppForDialog!!.packageName, "hidden" to false))
-                            selectedAppForDialog = null
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9155FF)),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("إظهار التطبيق (إلغاء الإخفاء)")
                     }
                 }
             }
