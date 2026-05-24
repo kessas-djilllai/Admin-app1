@@ -74,6 +74,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.IntSize
 
 class MainActivity : ComponentActivity() {
@@ -189,10 +190,9 @@ fun PinLockScreen(onUnlockSuccess: (String) -> Boolean) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Icon(
-            imageVector = Icons.Default.Lock,
+        Image(
+            painter = painterResource(id = R.drawable.ic_admin_logo),
             contentDescription = "قفل المشرف",
-            tint = Color(0xFF9155FF),
             modifier = Modifier
                 .size(72.dp)
                 .padding(bottom = 16.dp)
@@ -368,18 +368,27 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Column {
-                    Text(
-                        text = "التحكم والمراقبة الأبوية",
-                        color = Color.White,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_admin_logo),
+                        contentDescription = null,
+                        modifier = Modifier
+                            .size(36.dp)
+                            .padding(end = 10.dp)
                     )
-                    Text(
-                        text = "اختر جهاز طفل للملخصات والتحكم البعيد",
-                        color = Color(0xFF8B949E),
-                        fontSize = 11.sp
-                    )
+                    Column {
+                        Text(
+                            text = "التحكم والمراقبة الأبوية",
+                            color = Color.White,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "اختر جهاز طفل للملخصات والتحكم البعيد",
+                            color = Color(0xFF8B949E),
+                            fontSize = 11.sp
+                        )
+                    }
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -675,36 +684,46 @@ fun AdminDashboard(viewModel: AdminViewModel) {
         // --- 2. DEVICE DETAIL SCREEN WITH BOTTOM NAVIGATION ---
         Scaffold(
             bottomBar = {
-                NavigationBar(containerColor = Color(0xFF161B22), contentColor = Color.White) {
-                    NavigationBarItem(
-                        selected = bottomNavSelectedTab == 0,
-                        onClick = {
-                            bottomNavSelectedTab = 0
-                            openCommandDetails = null
-                        },
-                        icon = { Icon(Icons.Default.Home, null) },
-                        label = { Text("الرئيسية", fontSize = 12.sp, fontWeight = FontWeight.Bold) },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = Color.White,
-                            selectedTextColor = Color(0xFF9155FF),
-                            indicatorColor = Color(0xFF9155FF),
-                            unselectedIconColor = Color(0xFF8B949E),
-                            unselectedTextColor = Color(0xFF8B949E)
-                        )
-                    )
-                    NavigationBarItem(
-                        selected = bottomNavSelectedTab == 1,
-                        onClick = { bottomNavSelectedTab = 1 },
-                        icon = { Icon(Icons.Default.List, null) },
-                        label = { Text("الأوامر", fontSize = 12.sp, fontWeight = FontWeight.Bold) },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = Color.White,
-                            selectedTextColor = Color(0xFF9155FF),
-                            indicatorColor = Color(0xFF9155FF),
-                            unselectedIconColor = Color(0xFF8B949E),
-                            unselectedTextColor = Color(0xFF8B949E)
-                        )
-                    )
+                Surface(
+                    color = Color(0xFF161B22),
+                    tonalElevation = 8.dp,
+                    modifier = Modifier.fillMaxWidth().height(60.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxSize(),
+                        horizontalArrangement = Arrangement.SpaceAround,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        listOf(
+                            Triple(0, Icons.Default.Home, "الرئيسية"),
+                            Triple(1, Icons.Default.List, "الأوامر")
+                        ).forEach { (index, icon, label) ->
+                            val isSelected = bottomNavSelectedTab == index
+                            Column(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable {
+                                        bottomNavSelectedTab = index
+                                        if (index == 0) openCommandDetails = null
+                                    },
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Icon(
+                                    imageVector = icon,
+                                    contentDescription = null,
+                                    tint = if (isSelected) Color(0xFF9155FF) else Color(0xFF8B949E),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Text(
+                                    text = label,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isSelected) Color(0xFF9155FF) else Color(0xFF8B949E)
+                                )
+                            }
+                        }
+                    }
                 }
             }
         ) { innerPadding ->
@@ -718,27 +737,32 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(Color(0xFF161B22))
-                        .padding(horizontal = 8.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+                        .padding(horizontal = 4.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(onClick = { viewModel.selectDevice("") }) {
-                            Icon(Icons.Default.ArrowBack, contentDescription = "رجوع", tint = Color.White)
+                    IconButton(onClick = { 
+                        if (openCommandDetails != null) {
+                            openCommandDetails = null
+                        } else {
+                            viewModel.selectDevice("")
                         }
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Column {
-                            Text(activeDevice.name, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(if (activeDevice.isOnline) Color(0xFF39D353) else Color(0xFF8B949E)))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(if (activeDevice.isOnline) "متصل الآن" else "غير متصل", color = if (activeDevice.isOnline) Color(0xFF39D353) else Color(0xFF8B949E), fontSize = 11.sp)
-                            }
+                    }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "رجوع", tint = Color.White)
+                    }
+                    
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(activeDevice.name, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(modifier = Modifier.size(5.dp).clip(CircleShape).background(if (activeDevice.isOnline) Color(0xFF39D353) else Color(0xFF8B949E)))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(if (activeDevice.isOnline) "متصل الآن" else "غير متصل", color = if (activeDevice.isOnline) Color(0xFF39D353) else Color(0xFF8B949E), fontSize = 10.sp)
                         }
                     }
-                    IconButton(onClick = { viewModel.lockPIN() }) {
-                        Icon(Icons.Default.Lock, null, tint = Color(0xFFFF4081))
-                    }
+                    
+                    Spacer(modifier = Modifier.width(48.dp)) // To center title
                 }
 
                 commandResponse?.let { resp ->
@@ -1415,33 +1439,6 @@ fun DeviceCommandsTab(
         }
     } else {
         Column(modifier = Modifier.fillMaxSize()) {
-            Row(
-                modifier = Modifier.fillMaxWidth().background(Color(0xFF21262D)).padding(horizontal = 10.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = { onOpenCommand(null) }) {
-                    Icon(Icons.Default.ArrowBack, null, tint = Color.White)
-                }
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = when (openCommandDetails) {
-                        "screenshot" -> "متطلبات لقطة الشاشة والكاميرات"
-                        "audio_record" -> "متطلبات تسجيل الصوت المحيطي"
-                        "live_stream" -> "متطلبات البث المباشر للشاشة"
-                        "file_explorer" -> "مستكشف الملفات البعيد للطفل"
-                        "apps" -> "إدارة وجرد التطبيقات المثبتة"
-                        "sms" -> "الأرشيف والرسائل وتنبيهات الأمان"
-                        "contacts" -> "سجل جهات الاتصال"
-                        "remote_control" -> "التحكم عن بعد التفاعلي"
-                        "audio_control" -> "التحكم في الصوت والتنبيهات"
-                        else -> "لوحة التحكم بالأمر"
-                    },
-                    color = Color.White,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                 when (openCommandDetails) {
                     "screenshot" -> ScreenshotRequirementsPage(viewModel)
