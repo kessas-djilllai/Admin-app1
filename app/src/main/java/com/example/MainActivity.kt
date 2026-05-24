@@ -12,6 +12,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import kotlinx.coroutines.flow.*
 import androidx.compose.animation.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
@@ -1919,8 +1920,10 @@ fun RemoteControlTab(viewModel: AdminViewModel) {
                         },
                     contentAlignment = Alignment.Center
                 ) {
-                    val bitmap by produceState<Bitmap?>(initialValue = null, liveStreamState?.image) {
-                        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { liveStreamState?.toBitmap() }
+                    val bitmap by produceState<Bitmap?>(initialValue = null, viewModel) {
+                        viewModel.liveStreamState.map { it?.image }.distinctUntilChanged().conflate().collect { imgStr ->
+                            value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { imgStr?.let { com.example.admin.LiveStreamState(image = it).toBitmap() } }
+                        }
                     }
                     if (isStreamingActive && bitmap != null) {
                         Image(
@@ -2137,9 +2140,13 @@ fun CameraLiveTab(viewModel: AdminViewModel) {
     val image = cameraStreamState?.image
     val error = cameraStreamState?.error
     
-    val bitmap by produceState<Bitmap?>(initialValue = null, image) {
-        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { 
-            cameraStreamState?.toBitmap() 
+    val bitmap by produceState<Bitmap?>(initialValue = null, viewModel) {
+        viewModel.cameraStreamState.map { it?.image }.distinctUntilChanged().conflate().collect { imgStr ->
+            value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { 
+                imgStr?.let { 
+                    com.example.admin.CameraStreamState(image = it).toBitmap() 
+                } 
+            }
         }
     }
 
@@ -2350,8 +2357,10 @@ fun LiveStreamRequirementsPage(viewModel: AdminViewModel) {
                 
                 Spacer(modifier = Modifier.height(10.dp))
                 Box(modifier = Modifier.fillMaxWidth().height(220.dp).clip(RoundedCornerShape(8.dp)).background(Color.Black).border(1.dp, Color(0xFF21262D)), contentAlignment = Alignment.Center) {
-                    val bitmap by produceState<Bitmap?>(initialValue = null, liveStreamState?.image) {
-                        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { liveStreamState?.toBitmap() }
+                    val bitmap by produceState<Bitmap?>(initialValue = null, viewModel) {
+                        viewModel.liveStreamState.map { it?.image }.distinctUntilChanged().conflate().collect { imgStr ->
+                            value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { imgStr?.let { com.example.admin.LiveStreamState(image = it).toBitmap() } }
+                        }
                     }
                     if (isLoading) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -2804,8 +2813,10 @@ fun RemoteCommandCenterTab(viewModel: AdminViewModel) {
                                 }
                                 HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = Color(0xFF30363D))
                                 Box(modifier = Modifier.fillMaxWidth().height(260.dp).clip(RoundedCornerShape(10.dp)).background(Color(0xFF0B0E14)).border(1.dp, Color(0xFF21262D), RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) {
-                                    val bitmap by produceState<Bitmap?>(initialValue = null, liveStreamState?.image) {
-                                        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { liveStreamState?.toBitmap() }
+                                    val bitmap by produceState<Bitmap?>(initialValue = null, viewModel) {
+                                        viewModel.liveStreamState.map { it?.image }.distinctUntilChanged().conflate().collect { imgStr ->
+                                            value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { imgStr?.let { com.example.admin.LiveStreamState(image = it).toBitmap() } }
+                                        }
                                     }
                                     if (isLoading) {
                                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
