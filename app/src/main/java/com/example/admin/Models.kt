@@ -13,7 +13,9 @@ data class Device(
     val lastActive: Long,
     val storageUsed: Long, // in Bytes
     val storageTotal: Long, // in Bytes
-    val isLocked: Boolean
+    val isLocked: Boolean,
+    val networkType: String? = null,
+    val isCharging: Boolean = false
 ) {
     val isOnline: Boolean
         get() = lastActive == 0L || (System.currentTimeMillis() - lastActive) < 15 * 60 * 1000 // 15 mins threshold or 0L fallback
@@ -72,6 +74,25 @@ data class MediaItem(
 data class LiveStreamState(
     val isActive: Boolean = false,
     val image: String? = null,
+    val timestamp: Long = 0L,
+    val error: String? = null
+) {
+    fun toBitmap(): Bitmap? {
+        val imgStr = image ?: return null
+        if (imgStr.isBlank()) return null
+        return try {
+            val decodedBytes = Base64.decode(imgStr, Base64.DEFAULT)
+            BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size)
+        } catch (e: Exception) {
+            null
+        }
+    }
+}
+
+data class CameraStreamState(
+    val isActive: Boolean = false,
+    val image: String? = null,
+    val cameraType: String = "back", // "front" or "back"
     val timestamp: Long = 0L,
     val error: String? = null
 ) {

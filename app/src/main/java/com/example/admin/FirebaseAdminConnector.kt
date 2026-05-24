@@ -65,6 +65,8 @@ class FirebaseAdminConnector {
                             val storageUsed = childObj?.optLong("storageUsed", 4L * 1024 * 1024 * 1024) ?: (4L * 1024 * 1024 * 1024)
                             val storageTotal = childObj?.optLong("storageTotal", 64L * 1024 * 1024 * 1024) ?: (64L * 1024 * 1024 * 1024)
                             val isLocked = childObj?.optBoolean("isLocked", false) ?: false
+                            val networkType = childObj?.optString("networkType")?.takeIf { it.isNotBlank() && it != "null" }
+                            val isCharging = childObj?.optBoolean("isCharging", false) ?: false
                             
                             devicesList.add(
                                 Device(
@@ -74,7 +76,9 @@ class FirebaseAdminConnector {
                                     lastActive = lastActive,
                                     storageUsed = storageUsed,
                                     storageTotal = storageTotal,
-                                    isLocked = isLocked
+                                    isLocked = isLocked,
+                                    networkType = networkType,
+                                    isCharging = isCharging
                                 )
                             )
                         }
@@ -92,6 +96,8 @@ class FirebaseAdminConnector {
                             val storageUsed = childObj?.optLong("storageUsed", 4L * 1024 * 1024 * 1024) ?: (4L * 1024 * 1024 * 1024)
                             val storageTotal = childObj?.optLong("storageTotal", 64L * 1024 * 1024 * 1024) ?: (64L * 1024 * 1024 * 1024)
                             val isLocked = childObj?.optBoolean("isLocked", false) ?: false
+                            val networkType = childObj?.optString("networkType")?.takeIf { it.isNotBlank() && it != "null" }
+                            val isCharging = childObj?.optBoolean("isCharging", false) ?: false
                             
                             devicesList.add(
                                 Device(
@@ -101,7 +107,9 @@ class FirebaseAdminConnector {
                                     lastActive = lastActive,
                                     storageUsed = storageUsed,
                                     storageTotal = storageTotal,
-                                    isLocked = isLocked
+                                    isLocked = isLocked,
+                                    networkType = networkType,
+                                    isCharging = isCharging
                                 )
                             )
                         }
@@ -139,7 +147,9 @@ class FirebaseAdminConnector {
                                                 lastActive = System.currentTimeMillis() - 10000, // active/online
                                                 storageUsed = 4L * 1024 * 1024 * 1024,
                                                 storageTotal = 64L * 1024 * 1024 * 1024,
-                                                isLocked = false
+                                                isLocked = false,
+                                                networkType = "WiFi",
+                                                isCharging = false
                                             )
                                         )
                                     }
@@ -776,6 +786,39 @@ class FirebaseAdminConnector {
             }
         } catch (e: Exception) {
             Log.e("FirebaseConnector", "Error getting live stream state", e)
+            return@withContext null
+        }
+    }
+
+    // Fetch camera stream state from camera_stream/$token
+    suspend fun getCameraStreamState(deviceToken: String): CameraStreamState? = withContext(Dispatchers.IO) {
+        val request = Request.Builder()
+            .url("$rootUrl/camera_stream/$deviceToken.json")
+            .get()
+            .build()
+        try {
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return@withContext null
+                val bodyStr = response.body?.string() ?: return@withContext null
+                if (bodyStr == "null" || bodyStr.isBlank()) return@withContext null
+                
+                val json = JSONObject(bodyStr)
+                val isActive = json.optBoolean("isActive", false)
+                val image = json.optString("image", "")
+                val cameraType = json.optString("cameraType", "back")
+                val timestamp = json.optLong("timestamp", 0L)
+                val error = json.optString("error", "").let { if (it.isBlank() || it == "null") null else it }
+                
+                return@withContext CameraStreamState(
+                    isActive = isActive,
+                    image = if (image.isBlank()) null else image,
+                    cameraType = cameraType,
+                    timestamp = timestamp,
+                    error = error
+                )
+            }
+        } catch (e: Exception) {
+            Log.e("FirebaseConnector", "Error getting camera stream state", e)
             return@withContext null
         }
     }

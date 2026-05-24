@@ -1324,10 +1324,34 @@ fun DeviceHomeTab(device: Device, viewModel: AdminViewModel) {
                 modifier = Modifier.weight(1f)
             ) {
                 Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(getBatteryIcon(device.battery), null, tint = getBatteryColor(device.battery), modifier = Modifier.size(32.dp))
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(getBatteryIcon(device.battery), null, tint = getBatteryColor(device.battery), modifier = Modifier.size(32.dp))
+                        if (device.isCharging) {
+                            Icon(Icons.Default.Bolt, null, tint = Color(0xFFFFEB3B), modifier = Modifier.size(18.dp).offset(y = 2.dp))
+                        }
+                    }
                     Spacer(modifier = Modifier.height(6.dp))
                     Text("البطارية", color = Color(0xFF8B949E), fontSize = 11.sp)
                     Text("${device.battery}%", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
+                border = BorderStroke(1.dp, Color(0xFF30363D)),
+                modifier = Modifier.weight(1f)
+            ) {
+                val networkIcon = when (device.networkType?.uppercase()) {
+                    "WIFI" -> Icons.Default.Wifi
+                    "5G" -> Icons.Default.SignalCellularAlt
+                    "4G", "LTE" -> Icons.Default.SignalCellular4Bar
+                    else -> Icons.Default.NetworkCell
+                }
+                Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(networkIcon, null, tint = Color(0xFF2196F3), modifier = Modifier.size(32.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text("الشبكة", color = Color(0xFF8B949E), fontSize = 11.sp)
+                    Text(device.networkType ?: "---", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 }
             }
 
@@ -1340,7 +1364,7 @@ fun DeviceHomeTab(device: Device, viewModel: AdminViewModel) {
                 Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(Icons.Default.Storage, null, tint = Color(0xFF9155FF), modifier = Modifier.size(32.dp))
                     Spacer(modifier = Modifier.height(6.dp))
-                    Text("مساحة التخزين", color = Color(0xFF8B949E), fontSize = 11.sp)
+                    Text("التخزين", color = Color(0xFF8B949E), fontSize = 11.sp)
                     Text("$usagePercentage%", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 }
             }
@@ -1407,7 +1431,8 @@ fun DeviceCommandsTab(
                 CommandItemInfo("contacts", "سجل جهات الاتصال", "عرض الأسماء والأرقام المسجلة في هاتف الطفل", Icons.Default.ContactPhone, Color(0xFF9155FF)),
                 CommandItemInfo("remote_control", "التحكم عن بعد (لمس)", "بث مباشر للشاشة مع إمكانية التحكم الكامل باللمس", Icons.Default.SettingsRemote, Color(0xFF2196F3)),
                 CommandItemInfo("audio_control", "التحكم في الصوت والتنبيه", "تشغيل أصوات تنبيهية والتحكم في مستوى صوت هاتف الطفل", Icons.Default.VolumeUp, Color(0xFFFFA726)),
-                CommandItemInfo("send_message", "إرسال رسالة فورية", "إرسال رسالة تظهر كإشعار على هاتف الطفل", Icons.Default.Chat, Color(0xFF00C853))
+                CommandItemInfo("send_message", "إرسال رسالة فورية", "إرسال رسالة تظهر كإشعار على هاتف الطفل", Icons.Default.Chat, Color(0xFF00C853)),
+                CommandItemInfo("camera_live", "بث حي للكاميرا", "فتح بث مباشر لكاميرا هاتف الطفل (أمامية أو خلفية)", Icons.Default.Videocam, Color(0xFFFF5252))
             )
 
             cmdItems.forEach { cmd ->
@@ -1452,6 +1477,7 @@ fun DeviceCommandsTab(
                     "remote_control" -> RemoteControlTab(viewModel)
                     "audio_control" -> AudioControlTab(viewModel)
                     "send_message" -> NotificationTab(viewModel)
+                    "camera_live" -> CameraLiveTab(viewModel)
                 }
             }
         }
@@ -2008,7 +2034,7 @@ fun AudioControlTab(viewModel: AdminViewModel) {
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Icon(Icons.Default.NotificationsActive, null)
-                            Text("صوت 1", fontSize = 12.sp)
+                            Text("صافرة إنذار", fontSize = 11.sp, maxLines = 1)
                         }
                     }
 
@@ -2020,7 +2046,7 @@ fun AudioControlTab(viewModel: AdminViewModel) {
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Icon(Icons.Default.MusicNote, null)
-                            Text("صوت 2", fontSize = 12.sp)
+                            Text("نغمة هادئة", fontSize = 11.sp, maxLines = 1)
                         }
                     }
                 }
@@ -2100,6 +2126,156 @@ fun NotificationTab(viewModel: AdminViewModel) {
             fontSize = 12.sp,
             textAlign = TextAlign.Center
         )
+    }
+}
+
+@Composable
+fun CameraLiveTab(viewModel: AdminViewModel) {
+    val cameraStreamState by viewModel.cameraStreamState.collectAsState()
+    val isStreamingActive = cameraStreamState?.isActive == true
+    val image = cameraStreamState?.image
+    val error = cameraStreamState?.error
+    
+    val bitmap by produceState<Bitmap?>(initialValue = null, image) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { 
+            cameraStreamState?.toBitmap() 
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
+            border = BorderStroke(1.dp, if(isStreamingActive) Color(0xFF39D353) else Color(0xFF30363D))
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column {
+                        Text(
+                            text = "بث حي للكاميرا",
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp
+                        )
+                        Text(
+                            text = if (isStreamingActive) "البث المباشر قيد التشغيل..." else "جاهز لبث الكاميرا",
+                            color = if (isStreamingActive) Color(0xFF39D353) else Color(0xFF8B949E),
+                            fontSize = 12.sp
+                        )
+                    }
+                    
+                    if (isStreamingActive) {
+                        Button(
+                            onClick = { viewModel.stopCameraStream() },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF4444)),
+                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                        ) {
+                            Text("إيقاف البث", color = Color.White)
+                        }
+                    }
+                }
+
+                if (!isStreamingActive) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Button(
+                            onClick = { viewModel.startCameraStream(false) },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9155FF))
+                        ) {
+                            Icon(Icons.Default.FlipCameraAndroid, null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("كاميرا خلفية")
+                        }
+                        Button(
+                            onClick = { viewModel.startCameraStream(true) },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9155FF))
+                        ) {
+                            Icon(Icons.Default.CameraFront, null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("كاميرا أمامية")
+                        }
+                    }
+                }
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(9f / 16f)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color.Black),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (isStreamingActive) {
+                        if (bitmap != null) {
+                            Image(
+                                bitmap = bitmap!!.asImageBitmap(),
+                                contentDescription = "Camera Stream",
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Fit
+                            )
+                        } else {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                CircularProgressIndicator(color = Color(0xFF9155FF))
+                                Spacer(Modifier.height(8.dp))
+                                Text("جاري جلب البث...", color = Color.White, fontSize = 12.sp)
+                            }
+                        }
+                    } else {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                imageVector = Icons.Default.VideocamOff,
+                                contentDescription = null,
+                                tint = Color(0xFF30363D),
+                                modifier = Modifier.size(64.dp)
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            Text("البث متوقف حالياً", color = Color(0xFF8B949E))
+                        }
+                    }
+                    
+                    if (error != null) {
+                        Surface(
+                            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(),
+                            color = Color.Black.copy(alpha = 0.7f)
+                        ) {
+                            Text(
+                                text = error!!,
+                                color = Color.Red,
+                                modifier = Modifier.padding(8.dp),
+                                fontSize = 12.sp,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+                }
+                
+                if (isStreamingActive) {
+                    Text(
+                        "ملاحظة: البث المباشر يستهلك بيانات الإنترنت والبطارية بشكل مكثف على هاتف الطفل.",
+                        color = Color(0xFFFFA726),
+                        fontSize = 11.sp,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+        }
     }
 }
 
