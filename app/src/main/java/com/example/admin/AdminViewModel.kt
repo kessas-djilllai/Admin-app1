@@ -41,7 +41,7 @@ data class ActiveCommandProgress(
 )
 
 class AdminViewModel(application: Application) : AndroidViewModel(application) {
-    private val connector = FirebaseAdminConnector()
+    private val connector = SupabaseAdminConnector()
 
     // PIN protection state
     private val _isUnlocked = MutableStateFlow(false)
@@ -155,10 +155,17 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
     private val _audioPosition = MutableStateFlow(0)
     val audioPosition: StateFlow<Int> = _audioPosition.asStateFlow()
 
+    private var anonKey = "YOUR_ANON_KEY"
+
     init {
-        connector.updateRootUrl(_currentDatabaseUrl.value)
+        val defaultSupabase = "https://qwtkuzuuskevtptetnvb.supabase.co"
+        val defaultKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF3dGt1enV1c2tldnRwdGV0bnZiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3MDU2NzUsImV4cCI6MjA5NTI4MTY3NX0.FtkcRTFxSIMgZEY0FoJ4nOwAYc0O84zeAT7vji-FHFs"
+        val fallbackUrl = prefs.getString("db_url", defaultSupabase) ?: defaultSupabase
+        // Note: For real environment, save key properly.
+        anonKey = defaultKey
+        
+        connector.updateConfig(fallbackUrl, anonKey)
         viewModelScope.launch {
-            autoDetectDatabaseUrl()
             loadAllDevicesAndStartSync()
         }
     }
@@ -167,57 +174,10 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
         val cleanedUrl = url.trim().removeSuffix("/")
         prefs.edit().putString("db_url", cleanedUrl).apply()
         _currentDatabaseUrl.value = cleanedUrl
-        connector.updateRootUrl(cleanedUrl)
+        connector.updateConfig(cleanedUrl, anonKey)
         _connectionError.value = null
         // Trigger reload
         loadAllDevicesAndStartSync()
-    }
-
-    private suspend fun autoDetectDatabaseUrl() {
-        val current = _currentDatabaseUrl.value
-        val candidates = listOf(
-            "https://studio-3242759193-af8cb-default-rtdb.firebaseio.com",
-            "https://studio-3242759193-af8cb-default-rtdb.europe-west1.firebasedatabase.app",
-            "https://studio-3242759193-af8cb.firebaseio.com",
-            "https://studio-3242759193-af8cb.europe-west1.firebasedatabase.app",
-            "https://studio-3242759193-af8cb-default-rtdb.asia-southeast1.firebasedatabase.app",
-            "https://studio-3242759193-af8cb.asia-southeast1.firebasedatabase.app"
-        )
-        
-        // Try current saved first
-        if (testUrlReachable(current)) {
-            Log.d("AdminViewModel", "Saved DB URL is working: $current")
-            return
-        }
-        
-        // Otherwise, probe candidates
-        for (candidate in candidates) {
-            if (candidate != current && testUrlReachable(candidate)) {
-                Log.d("AdminViewModel", "Found responsive candidate, auto-switching: $candidate")
-                updateDatabaseUrl(candidate)
-                return
-            }
-        }
-    }
-
-    private suspend fun testUrlReachable(url: String): Boolean = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-        try {
-            val client = okhttp3.OkHttpClient.Builder()
-                .connectTimeout(3, java.util.concurrent.TimeUnit.SECONDS)
-                .readTimeout(3, java.util.concurrent.TimeUnit.SECONDS)
-                .build()
-            val req = okhttp3.Request.Builder()
-                .url("$url/.json?shallow=true")
-                .get()
-                .build()
-            client.newCall(req).execute().use { resp ->
-                // As long as the request resolved (even if permission denied / 401 / 403), it means the URL is reachable
-                return@withContext true
-            }
-        } catch (e: Throwable) {
-            Log.e("AdminViewModel", "Database URL $url is not reachable", e)
-            return@withContext false
-        }
     }
 
     fun unlockWithPin(pin: String): Boolean {
