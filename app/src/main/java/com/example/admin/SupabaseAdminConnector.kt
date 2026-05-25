@@ -58,8 +58,8 @@ class SupabaseAdminConnector {
                         
                         devicesList.add(
                             Device(
-                                id = childObj.optString("id"),
-                                name = childObj.optString("device_name"),
+                                id = childObj.optString("device_token"),
+                                name = childObj.optString("name"),
                                 battery = childObj.optInt("battery", 90),
                                 lastActive = childObj.optLong("last_active", 0L),
                                 storageUsed = childObj.optLong("storage_used", 4L * 1024 * 1024 * 1024),
@@ -80,7 +80,7 @@ class SupabaseAdminConnector {
     }
 
     suspend fun updateLockInDatabase(deviceToken: String, isLocked: Boolean): Boolean = withContext(Dispatchers.IO) {
-        val url = "$rootUrl/rest/v1/devices?id=eq.$deviceToken"
+        val url = "$rootUrl/rest/v1/devices?device_token=eq.$deviceToken"
         val mediaType = "application/json; charset=utf-8".toMediaType()
         val json = JSONObject().apply { put("is_locked", isLocked) }
         val body = json.toString().toRequestBody(mediaType)
@@ -112,7 +112,9 @@ class SupabaseAdminConnector {
             put("command", commandType)
             put("status", "pending")
             put("timestamp", commandTimestamp)
-            put("params", paramsJson)
+            if (additionalParams.isNotEmpty()) {
+                put("params", paramsJson)
+            }
         }
 
         val mediaType = "application/json; charset=utf-8".toMediaType()
@@ -120,18 +122,25 @@ class SupabaseAdminConnector {
         val request = Request.Builder()
             .url(url)
             .addSupabaseHeaders()
-            .header("Prefer", "resolution=merge-duplicates")
             .post(body)
             .build()
 
         try {
             client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    val errorBody = response.body?.string()
+                    Log.e("SupabaseConnector", "Error sending command: ${response.code} $errorBody")
+                    throw Exception("HTTP ${response.code}: $errorBody")
+                }
                 if (response.isSuccessful && (commandType == "lock_device" || commandType == "unlock_device")) {
                     updateLockInDatabase(deviceToken, commandType == "lock_device")
                 }
                 return@withContext response.isSuccessful
             }
-        } catch (e: IOException) { return@withContext false }
+        } catch (e: Exception) { 
+            Log.e("SupabaseConnector", "Exception sending command", e)
+            throw e
+        }
     }
 
     suspend fun clearCommandResponse(deviceToken: String): Boolean = withContext(Dispatchers.IO) {
@@ -429,8 +438,8 @@ class SupabaseAdminConnector {
     suspend fun registerNewDeviceToken(deviceToken: String, deviceName: String): Boolean = withContext(Dispatchers.IO) {
         val url = "$rootUrl/rest/v1/devices"
         val deviceJson = JSONObject().apply {
-            put("id", deviceToken)
-            put("device_name", deviceName)
+            put("device_token", deviceToken)
+            put("name", deviceName)
             put("battery", 85)
             put("last_active", System.currentTimeMillis())
             put("storage_used", 12L * 1024 * 1024 * 1024)
