@@ -100,6 +100,19 @@ class SupabaseAdminConnector {
         additionalParams: Map<String, Any> = emptyMap(),
         commandTimestamp: Long = System.currentTimeMillis()
     ): Boolean = withContext(Dispatchers.IO) {
+        
+        // Delete old commands for this device to simulate PUT behavior
+        val deleteRequest = Request.Builder()
+            .url("$rootUrl/rest/v1/commands?device_token=eq.$deviceToken")
+            .addSupabaseHeaders()
+            .delete()
+            .build()
+        try {
+            client.newCall(deleteRequest).execute().close()
+        } catch (e: Exception) {
+            Log.e("SupabaseConnector", "Failed to clear old commands", e)
+        }
+
         val commandId = commandTimestamp.toString()
         val url = "$rootUrl/rest/v1/commands"
         
