@@ -186,7 +186,7 @@ fun PinLockScreen(onUnlockSuccess: (String) -> Boolean) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF0B0E14)) // Cosmic deep black
+            .background(Color(0xFFF9FAFB)) // Cosmic deep black
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
@@ -201,7 +201,7 @@ fun PinLockScreen(onUnlockSuccess: (String) -> Boolean) {
 
         Text(
             text = "تأكيد هوية المشرف",
-            color = Color.White,
+            color = Color(0xFF9155FF),
             fontSize = 24.sp,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(bottom = 8.dp)
@@ -209,7 +209,7 @@ fun PinLockScreen(onUnlockSuccess: (String) -> Boolean) {
 
         Text(
             text = "الرجاء إدخال الرمز السري للدخول للوحة المراقبة",
-            color = Color(0xFF8B949E),
+            color = Color(0xFF6B7280),
             fontSize = 14.sp,
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 32.dp)
@@ -227,13 +227,13 @@ fun PinLockScreen(onUnlockSuccess: (String) -> Boolean) {
                         .size(18.dp)
                         .clip(CircleShape)
                         .background(
-                            if (errorAlert) Color(0xFFDA3633)
+                            if (errorAlert) Color(0xFFEF4444)
                             else if (filled) Color(0xFF9155FF)
-                            else Color(0xFF21262D)
+                            else Color(0xFFE5E7EB)
                         )
                         .border(
                             width = 2.dp,
-                            color = if (errorAlert) Color(0xFFDA3633) else Color(0xFF30363D),
+                            color = if (errorAlert) Color(0xFFEF4444) else Color(0xFFE5E7EB),
                             shape = CircleShape
                         )
                 )
@@ -280,8 +280,8 @@ fun PinLockScreen(onUnlockSuccess: (String) -> Boolean) {
                                 }
                             },
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = if (key == "C" || key == "⌫") Color(0xFF21262D) else Color(0xFF161B22),
-                                contentColor = if (key == "C" || key == "⌫") Color(0xFFFF4081) else Color.White
+                                containerColor = if (key == "C" || key == "⌫") Color(0xFFE5E7EB) else Color(0xFFFFFFFF),
+                                contentColor = if (key == "C" || key == "⌫") Color(0xFFFF4081) else Color(0xFF1F2937)
                             ),
                             shape = RoundedCornerShape(12.dp),
                             modifier = Modifier
@@ -302,7 +302,7 @@ fun PinLockScreen(onUnlockSuccess: (String) -> Boolean) {
         Spacer(modifier = Modifier.height(24.dp))
         Text(
             text = "الرمز الافتراضي: 1111",
-            color = Color(0xFF8B949E).copy(alpha = 0.5f),
+            color = Color(0xFF6B7280).copy(alpha = 0.5f),
             fontSize = 12.sp
         )
     }
@@ -359,12 +359,12 @@ fun AdminDashboard(viewModel: AdminViewModel) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xFF0B0E14))
+                .background(Color(0xFFF9FAFB))
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color(0xFF161B22))
+                    .background(Color(0xFFFFFFFF))
                     .padding(horizontal = 16.dp, vertical = 14.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
@@ -380,13 +380,13 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                     Column {
                         Text(
                             text = "التحكم والمراقبة الأبوية",
-                            color = Color.White,
+                            color = Color(0xFF1F2937),
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
                             text = "اختر جهاز طفل للملخصات والتحكم البعيد",
-                            color = Color(0xFF8B949E),
+                            color = Color(0xFF6B7280),
                             fontSize = 11.sp
                         )
                     }
@@ -400,7 +400,7 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                             .background(Color(0xFF9155FF))
                             .size(36.dp)
                     ) {
-                        Icon(Icons.Default.Add, contentDescription = "إضافة جهاز", tint = Color.White, modifier = Modifier.size(18.dp))
+                        Icon(Icons.Default.Add, contentDescription = "إضافة جهاز", tint = Color(0xFF1F2937), modifier = Modifier.size(18.dp))
                     }
                     Spacer(modifier = Modifier.width(8.dp))
                     IconButton(onClick = { viewModel.lockPIN() }) {
@@ -411,8 +411,8 @@ fun AdminDashboard(viewModel: AdminViewModel) {
 
             TabRow(
                 selectedTabIndex = deviceListTabSelected,
-                containerColor = Color(0xFF161B22),
-                contentColor = Color.White,
+                containerColor = Color(0xFFFFFFFF),
+                contentColor = Color(0xFF1F2937),
                 indicator = { tabPositions ->
                     TabRowDefaults.SecondaryIndicator(
                         modifier = Modifier.tabIndicatorOffset(tabPositions[deviceListTabSelected]),
@@ -425,7 +425,7 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                     onClick = { deviceListTabSelected = 0 },
                     text = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.PhoneAndroid, null, tint = Color.White, modifier = Modifier.size(14.dp))
+                            Icon(Icons.Default.PhoneAndroid, null, tint = Color(0xFF1F2937), modifier = Modifier.size(14.dp))
                             Spacer(modifier = Modifier.width(6.dp))
                             Text("جميع الأجهزة", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         }
@@ -447,7 +447,7 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                     onClick = { deviceListTabSelected = 2 },
                     text = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Color(0xFF8B949E)))
+                            Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Color(0xFF6B7280)))
                             Spacer(modifier = Modifier.width(6.dp))
                             Text("الأجهزة غير النشطة", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         }
@@ -473,7 +473,7 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                         Icon(
                             imageVector = Icons.Default.HourglassEmpty,
                             contentDescription = null,
-                            tint = Color(0xFF8B949E).copy(alpha = 0.5f),
+                            tint = Color(0xFF6B7280).copy(alpha = 0.5f),
                             modifier = Modifier.size(48.dp)
                         )
                         Spacer(modifier = Modifier.height(8.dp))
@@ -483,7 +483,7 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                                 1 -> "لا توجد أجهزة نشطة حالياً (نشط خلال 15 دقيقة)"
                                 else -> "لا توجد أجهزة غير نشطة حالياً"
                             },
-                            color = Color(0xFF8B949E),
+                            color = Color(0xFF6B7280),
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Medium,
                             textAlign = TextAlign.Center
@@ -493,8 +493,8 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                         
                         // Diagnostics Panel
                         Card(
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
-                            border = BorderStroke(1.dp, Color(0xFF30363D)),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
+                            border = BorderStroke(1.dp, Color(0xFFE5E7EB)),
                             shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.fillMaxWidth()
                         ) {
@@ -509,7 +509,7 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Text(
                                         text = "معلومات الاتصال بالخادم والتشخيص",
-                                        color = Color.White,
+                                        color = Color(0xFF1F2937),
                                         fontSize = 12.sp,
                                         fontWeight = FontWeight.Bold
                                     )
@@ -519,7 +519,7 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                                 
                                 Text(
                                     text = "الرابط الحالي المستخدم لقاعدة البيانات:",
-                                    color = Color(0xFF8B949E),
+                                    color = Color(0xFF6B7280),
                                     fontSize = 11.sp
                                 )
                                 Text(
@@ -581,22 +581,22 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                                 
                                 Button(
                                     onClick = { showEditDbDialog = true },
-                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF21262D)),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE5E7EB)),
                                     shape = RoundedCornerShape(8.dp),
                                     modifier = Modifier.fillMaxWidth(),
-                                    border = BorderStroke(1.dp, Color(0xFF30363D)),
+                                    border = BorderStroke(1.dp, Color(0xFFE5E7EB)),
                                     contentPadding = PaddingValues(vertical = 8.dp)
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Edit,
                                         contentDescription = null,
-                                        tint = Color.White,
+                                        tint = Color(0xFF1F2937),
                                         modifier = Modifier.size(12.dp)
                                     )
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Text(
                                         text = "تغيير رابط قاعدة البيانات يدوياً",
-                                        color = Color.White,
+                                        color = Color(0xFF1F2937),
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold
                                     )
@@ -613,8 +613,8 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                     items(filteredDevices) { dev ->
                         Card(
                             onClick = { viewModel.selectDevice(dev.id) },
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
-                            border = BorderStroke(1.dp, Color(0xFF30363D)),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
+                            border = BorderStroke(1.dp, Color(0xFFE5E7EB)),
                             shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.fillMaxWidth()
                         ) {
@@ -632,7 +632,7 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                                     }
                                     Spacer(modifier = Modifier.width(12.dp))
                                     Column {
-                                        Text(dev.name, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                        Text(dev.name, color = Color(0xFF1F2937), fontSize = 14.sp, fontWeight = FontWeight.Bold)
                                         Spacer(modifier = Modifier.height(2.dp))
                                         if (dev.isOnline) {
                                             Text("متصل الآن • رعاية نشطة", color = Color(0xFF39D353), fontSize = 11.sp)
@@ -644,9 +644,9 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(getBatteryIcon(dev.battery), null, tint = getBatteryColor(dev.battery), modifier = Modifier.size(14.dp))
                                     Spacer(modifier = Modifier.width(4.dp))
-                                    Text("${dev.battery}%", color = Color(0xFF8B949E), fontSize = 11.sp)
+                                    Text("${dev.battery}%", color = Color(0xFF6B7280), fontSize = 11.sp)
                                     Spacer(modifier = Modifier.width(8.dp))
-                                    Icon(Icons.Default.ArrowForwardIos, null, tint = Color(0xFF8B949E), modifier = Modifier.size(12.dp))
+                                    Icon(Icons.Default.ArrowForwardIos, null, tint = Color(0xFF6B7280), modifier = Modifier.size(12.dp))
                                 }
                             }
                         }
@@ -686,7 +686,7 @@ fun AdminDashboard(viewModel: AdminViewModel) {
         Scaffold(
             bottomBar = {
                 Surface(
-                    color = Color(0xFF161B22),
+                    color = Color(0xFFFFFFFF),
                     tonalElevation = 8.dp,
                     modifier = Modifier.fillMaxWidth().height(60.dp)
                 ) {
@@ -713,14 +713,14 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                                 Icon(
                                     imageVector = icon,
                                     contentDescription = null,
-                                    tint = if (isSelected) Color(0xFF9155FF) else Color(0xFF8B949E),
+                                    tint = if (isSelected) Color(0xFF9155FF) else Color(0xFF6B7280),
                                     modifier = Modifier.size(20.dp)
                                 )
                                 Text(
                                     text = label,
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = if (isSelected) Color(0xFF9155FF) else Color(0xFF8B949E)
+                                    color = if (isSelected) Color(0xFF9155FF) else Color(0xFF6B7280)
                                 )
                             }
                         }
@@ -731,13 +731,13 @@ fun AdminDashboard(viewModel: AdminViewModel) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color(0xFF0B0E14))
+                    .background(Color(0xFFF9FAFB))
                     .padding(innerPadding)
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color(0xFF161B22))
+                        .background(Color(0xFFFFFFFF))
                         .padding(horizontal = 4.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -748,18 +748,18 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                             viewModel.selectDevice("")
                         }
                     }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "رجوع", tint = Color.White)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "رجوع", tint = Color(0xFF1F2937))
                     }
                     
                     Column(
                         modifier = Modifier.weight(1f),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Text(activeDevice.name, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        Text(activeDevice.name, color = Color(0xFF1F2937), fontSize = 14.sp, fontWeight = FontWeight.Bold)
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(modifier = Modifier.size(5.dp).clip(CircleShape).background(if (activeDevice.isOnline) Color(0xFF39D353) else Color(0xFF8B949E)))
+                            Box(modifier = Modifier.size(5.dp).clip(CircleShape).background(if (activeDevice.isOnline) Color(0xFF39D353) else Color(0xFF6B7280)))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text(if (activeDevice.isOnline) "متصل الآن" else "غير متصل", color = if (activeDevice.isOnline) Color(0xFF39D353) else Color(0xFF8B949E), fontSize = 10.sp)
+                            Text(if (activeDevice.isOnline) "متصل الآن" else "غير متصل", color = if (activeDevice.isOnline) Color(0xFF39D353) else Color(0xFF6B7280), fontSize = 10.sp)
                         }
                     }
                     
@@ -770,14 +770,14 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                     // Only show status messages if they are NOT "success" to remove top success notifications
                     if (resp.first != "success") {
                         Card(
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFF4C1C1B)),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFFFEF2F2)),
                             shape = RoundedCornerShape(0.dp),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Row(modifier = Modifier.padding(12.dp, 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.Warning, null, tint = Color.White, modifier = Modifier.size(14.dp))
+                                Icon(Icons.Default.Warning, null, tint = Color(0xFF1F2937), modifier = Modifier.size(14.dp))
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("تنبيه: ${resp.second}", color = Color.White, fontSize = 11.sp)
+                                Text("تنبيه: ${resp.second}", color = Color(0xFF1F2937), fontSize = 11.sp)
                             }
                         }
                     }
@@ -808,8 +808,8 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                     .fillMaxWidth()
                     .padding(16.dp),
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
-                border = BorderStroke(1.dp, Color(0xFF30363D))
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
+                border = BorderStroke(1.dp, Color(0xFFE5E7EB))
             ) {
                 Column(
                     modifier = Modifier
@@ -826,7 +826,7 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
                         text = "جاري تنفيذ الأمر",
-                        color = Color.White,
+                        color = Color(0xFF1F2937),
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center
@@ -853,8 +853,8 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                                     when (progress.sendStatus) {
                                         CommandStepStatus.RUNNING -> Color(0xFF9155FF).copy(alpha = 0.2f)
                                         CommandStepStatus.SUCCESS -> Color(0xFF238636).copy(alpha = 0.2f)
-                                        CommandStepStatus.FAILED -> Color(0xFFDA3633).copy(alpha = 0.2f)
-                                        else -> Color(0xFF21262D)
+                                        CommandStepStatus.FAILED -> Color(0xFFEF4444).copy(alpha = 0.2f)
+                                        else -> Color(0xFFE5E7EB)
                                     }
                                 ),
                             contentAlignment = Alignment.Center
@@ -871,10 +871,10 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                                     Icon(Icons.Default.Check, null, tint = Color(0xFF39D353), modifier = Modifier.size(18.dp))
                                 }
                                 CommandStepStatus.FAILED -> {
-                                    Icon(Icons.Default.Close, null, tint = Color(0xFFDA3633), modifier = Modifier.size(18.dp))
+                                    Icon(Icons.Default.Close, null, tint = Color(0xFFEF4444), modifier = Modifier.size(18.dp))
                                 }
                                 else -> {
-                                    Text("١", color = Color(0xFF8B949E), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    Text("١", color = Color(0xFF6B7280), fontSize = 12.sp, fontWeight = FontWeight.Bold)
                                 }
                             }
                         }
@@ -882,7 +882,7 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = "المرحلة الأولى: إرسال الأمر للجهاز",
-                                color = Color.White,
+                                color = Color(0xFF1F2937),
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold
                             )
@@ -893,7 +893,7 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                                     CommandStepStatus.SUCCESS -> "تم إرسال الأمر وتأكيده بنجاح في قاعدة البيانات!"
                                     CommandStepStatus.FAILED -> "فشل إرسال الأمر بنجاح"
                                 },
-                                color = Color(0xFF8B949E),
+                                color = Color(0xFF6B7280),
                                 fontSize = 11.sp
                             )
                         }
@@ -901,15 +901,15 @@ fun AdminDashboard(viewModel: AdminViewModel) {
 
                     progress.sendError?.let { err ->
                         Card(
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFFDA3633).copy(alpha = 0.1f)),
-                            border = BorderStroke(1.dp, Color(0xFFDA3633).copy(alpha = 0.3f)),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFFEF4444).copy(alpha = 0.1f)),
+                            border = BorderStroke(1.dp, Color(0xFFEF4444).copy(alpha = 0.3f)),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(start = 44.dp, bottom = 10.dp)
                         ) {
                             Text(
                                 text = "خطأ بالتفصيل: $err",
-                                color = Color(0xFFF85149),
+                                color = Color(0xFFEF4444),
                                 fontSize = 11.sp,
                                 modifier = Modifier.padding(10.dp)
                             )
@@ -921,7 +921,7 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                             .padding(start = 16.dp)
                             .width(2.dp)
                             .height(20.dp)
-                            .background(Color(0xFF30363D))
+                            .background(Color(0xFFE5E7EB))
                             .align(Alignment.Start)
                     )
 
@@ -938,8 +938,8 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                                     when (progress.executionStatus) {
                                         CommandStepStatus.RUNNING -> Color(0xFF9155FF).copy(alpha = 0.2f)
                                         CommandStepStatus.SUCCESS -> Color(0xFF238636).copy(alpha = 0.2f)
-                                        CommandStepStatus.FAILED -> Color(0xFFDA3633).copy(alpha = 0.2f)
-                                        else -> Color(0xFF21262D)
+                                        CommandStepStatus.FAILED -> Color(0xFFEF4444).copy(alpha = 0.2f)
+                                        else -> Color(0xFFE5E7EB)
                                     }
                                 ),
                             contentAlignment = Alignment.Center
@@ -956,10 +956,10 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                                     Icon(Icons.Default.Check, null, tint = Color(0xFF39D353), modifier = Modifier.size(18.dp))
                                 }
                                 CommandStepStatus.FAILED -> {
-                                    Icon(Icons.Default.Close, null, tint = Color(0xFFDA3633), modifier = Modifier.size(18.dp))
+                                    Icon(Icons.Default.Close, null, tint = Color(0xFFEF4444), modifier = Modifier.size(18.dp))
                                 }
                                 else -> {
-                                    Text("٢", color = Color(0xFF8B949E), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    Text("٢", color = Color(0xFF6B7280), fontSize = 12.sp, fontWeight = FontWeight.Bold)
                                 }
                             }
                         }
@@ -967,7 +967,7 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = "المرحلة الثانية: قبول وتنفيذ هاتف الطفل للأمر",
-                                color = Color.White,
+                                color = Color(0xFF1F2937),
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold
                             )
@@ -978,7 +978,7 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                                     CommandStepStatus.SUCCESS -> "تمت معالجة وتنفيذ الأمر بنجاح من طرف هاتف الطفل!"
                                     CommandStepStatus.FAILED -> "فشل هاتف الطفل في معالجة أو تنفيذ الأمر"
                                 },
-                                color = Color(0xFF8B949E),
+                                color = Color(0xFF6B7280),
                                 fontSize = 11.sp
                             )
                         }
@@ -986,15 +986,15 @@ fun AdminDashboard(viewModel: AdminViewModel) {
 
                     progress.executionError?.let { err ->
                         Card(
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFFDA3633).copy(alpha = 0.1f)),
-                            border = BorderStroke(1.dp, Color(0xFFDA3633).copy(alpha = 0.3f)),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFFEF4444).copy(alpha = 0.1f)),
+                            border = BorderStroke(1.dp, Color(0xFFEF4444).copy(alpha = 0.3f)),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(start = 44.dp, bottom = 10.dp)
                         ) {
                             Text(
                                 text = "تفاصيل الخطأ: $err",
-                                color = Color(0xFFF85149),
+                                color = Color(0xFFEF4444),
                                 fontSize = 11.sp,
                                 modifier = Modifier.padding(10.dp)
                             )
@@ -1005,8 +1005,8 @@ fun AdminDashboard(viewModel: AdminViewModel) {
 
                     progress.resultMessage?.let { msg ->
                         Card(
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFF1F242C)),
-                            border = BorderStroke(1.dp, Color(0xFF30363D)),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFFF3F4F6)),
+                            border = BorderStroke(1.dp, Color(0xFFE5E7EB)),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Column(modifier = Modifier.padding(12.dp)) {
@@ -1019,7 +1019,7 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
                                     text = msg,
-                                    color = Color.White,
+                                    color = Color(0xFF1F2937),
                                     fontSize = 12.sp
                                 )
                             }
@@ -1030,7 +1030,7 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                     Button(
                         onClick = { viewModel.clearActiveCommandProgress() },
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = if (progress.executionStatus == CommandStepStatus.RUNNING || progress.sendStatus == CommandStepStatus.RUNNING) Color(0xFF21262D) else Color(0xFF9155FF)
+                            containerColor = if (progress.executionStatus == CommandStepStatus.RUNNING || progress.sendStatus == CommandStepStatus.RUNNING) Color(0xFFE5E7EB) else Color(0xFF9155FF)
                         ),
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(8.dp)
@@ -1058,8 +1058,8 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                     .fillMaxWidth()
                     .padding(8.dp),
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
-                border = BorderStroke(1.dp, Color(0xFF30363D))
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
+                border = BorderStroke(1.dp, Color(0xFFE5E7EB))
             ) {
                 Column(
                     modifier = Modifier
@@ -1073,18 +1073,18 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                     ) {
                         Text(
                             text = "تم استلام لقطة الشاشة المطلوبة مباشرة!",
-                            color = Color.White,
+                            color = Color(0xFF1F2937),
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Bold
                         )
                         IconButton(onClick = { viewModel.clearDirectScreenshot() }) {
-                            Icon(Icons.Default.Close, null, tint = Color.White)
+                            Icon(Icons.Default.Close, null, tint = Color(0xFF1F2937))
                         }
                     }
 
                     Text(
                         text = "تم التقاطها: " + SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date(item.timestamp)),
-                        color = Color(0xFF8B949E),
+                        color = Color(0xFF6B7280),
                         fontSize = 11.sp
                     )
 
@@ -1134,7 +1134,7 @@ fun AdminDashboard(viewModel: AdminViewModel) {
 
                             Button(
                                 onClick = { viewModel.clearDirectScreenshot() },
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF21262D)),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE5E7EB)),
                                 modifier = Modifier.weight(1f),
                                 shape = RoundedCornerShape(8.dp)
                             ) {
@@ -1168,8 +1168,8 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                     .fillMaxWidth()
                     .padding(8.dp),
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
-                border = BorderStroke(1.dp, Color(0xFF30363D))
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
+                border = BorderStroke(1.dp, Color(0xFFE5E7EB))
             ) {
                 Column(
                     modifier = Modifier
@@ -1183,18 +1183,18 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                     ) {
                         Text(
                             text = "تم التقاط واستلام صورة الكاميرا بنجاح!",
-                            color = Color.White,
+                            color = Color(0xFF1F2937),
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Bold
                         )
                         IconButton(onClick = { viewModel.clearDirectPhoto() }) {
-                            Icon(Icons.Default.Close, null, tint = Color.White)
+                            Icon(Icons.Default.Close, null, tint = Color(0xFF1F2937))
                         }
                     }
 
                     Text(
                         text = "الكاميرا المستعملة: " + (if (item.cameraType == "front" || item.type == "camera_front") "الأمامية" else "الخلفية") + " | " + SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date(item.timestamp)),
-                        color = Color(0xFF8B949E),
+                        color = Color(0xFF6B7280),
                         fontSize = 11.sp
                     )
 
@@ -1244,7 +1244,7 @@ fun AdminDashboard(viewModel: AdminViewModel) {
 
                             Button(
                                 onClick = { viewModel.clearDirectPhoto() },
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF21262D)),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE5E7EB)),
                                 modifier = Modifier.weight(1f),
                                 shape = RoundedCornerShape(8.dp)
                             ) {
@@ -1277,9 +1277,9 @@ fun DeviceHomeTab(device: Device, viewModel: AdminViewModel) {
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         Card(
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
             shape = RoundedCornerShape(12.dp),
-            border = BorderStroke(1.dp, Color(0xFF30363D)),
+            border = BorderStroke(1.dp, Color(0xFFE5E7EB)),
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(modifier = Modifier.padding(14.dp)) {
@@ -1292,8 +1292,8 @@ fun DeviceHomeTab(device: Device, viewModel: AdminViewModel) {
                     )
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {
-                        Text(if (device.isLocked) "الجهاز مقفل حالياً" else "الجهاز حر ومفتوح", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                        Text("قفل أو فك قفل شاشة الطفل لمنع استخدامه", color = Color(0xFF8B949E), fontSize = 10.sp)
+                        Text(if (device.isLocked) "الجهاز مقفل حالياً" else "الجهاز حر ومفتوح", color = Color(0xFF1F2937), fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        Text("قفل أو فك قفل شاشة الطفل لمنع استخدامه", color = Color(0xFF6B7280), fontSize = 10.sp)
                     }
                 }
                 Spacer(modifier = Modifier.height(12.dp))
@@ -1351,8 +1351,8 @@ fun DeviceHomeTab(device: Device, viewModel: AdminViewModel) {
 
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             Card(
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
-                border = BorderStroke(1.dp, Color(0xFF30363D)),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
+                border = BorderStroke(1.dp, Color(0xFFE5E7EB)),
                 modifier = Modifier.weight(1f)
             ) {
                 Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -1363,14 +1363,14 @@ fun DeviceHomeTab(device: Device, viewModel: AdminViewModel) {
                         }
                     }
                     Spacer(modifier = Modifier.height(6.dp))
-                    Text("البطارية", color = Color(0xFF8B949E), fontSize = 11.sp)
-                    Text("${device.battery}%", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    Text("البطارية", color = Color(0xFF6B7280), fontSize = 11.sp)
+                    Text("${device.battery}%", color = Color(0xFF1F2937), fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 }
             }
 
             Card(
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
-                border = BorderStroke(1.dp, Color(0xFF30363D)),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
+                border = BorderStroke(1.dp, Color(0xFFE5E7EB)),
                 modifier = Modifier.weight(1f)
             ) {
                 val networkIcon = when (device.networkType?.uppercase()) {
@@ -1382,33 +1382,33 @@ fun DeviceHomeTab(device: Device, viewModel: AdminViewModel) {
                 Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(networkIcon, null, tint = Color(0xFF2196F3), modifier = Modifier.size(32.dp))
                     Spacer(modifier = Modifier.height(6.dp))
-                    Text("الشبكة", color = Color(0xFF8B949E), fontSize = 11.sp)
-                    Text(device.networkType ?: "---", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    Text("الشبكة", color = Color(0xFF6B7280), fontSize = 11.sp)
+                    Text(device.networkType ?: "---", color = Color(0xFF1F2937), fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 }
             }
 
             Card(
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
-                border = BorderStroke(1.dp, Color(0xFF30363D)),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
+                border = BorderStroke(1.dp, Color(0xFFE5E7EB)),
                 modifier = Modifier.weight(1f)
             ) {
                 val usagePercentage = if (device.storageTotal > 0) ((device.storageUsed.toDouble() / device.storageTotal.toDouble()) * 100).toInt() else 0
                 Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(Icons.Default.Storage, null, tint = Color(0xFF9155FF), modifier = Modifier.size(32.dp))
                     Spacer(modifier = Modifier.height(6.dp))
-                    Text("التخزين", color = Color(0xFF8B949E), fontSize = 11.sp)
-                    Text("$usagePercentage%", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    Text("التخزين", color = Color(0xFF6B7280), fontSize = 11.sp)
+                    Text("$usagePercentage%", color = Color(0xFF1F2937), fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
 
         Card(
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
-            border = BorderStroke(1.dp, Color(0xFF30363D)),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
+            border = BorderStroke(1.dp, Color(0xFFE5E7EB)),
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(modifier = Modifier.padding(14.dp)) {
-                Text("تفاصيل مساحة التخزين", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Text("تفاصيل مساحة التخزين", color = Color(0xFF1F2937), fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(6.dp))
                 val usedGb = if (device.storageUsed > 1_000_000) 
                     String.format(Locale.ENGLISH, "%.2f", device.storageUsed.toDouble() / (1024.0 * 1024.0 * 1024.0))
@@ -1423,13 +1423,13 @@ fun DeviceHomeTab(device: Device, viewModel: AdminViewModel) {
                 LinearProgressIndicator(
                     progress = { progress },
                     color = Color(0xFF9155FF),
-                    trackColor = Color(0xFF21262D),
+                    trackColor = Color(0xFFE5E7EB),
                     modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp))
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("المستخدم: $usedGb جيجا", color = Color(0xFF8B949E), fontSize = 11.sp)
-                    Text("الإجمالي: $totalGb جيجا", color = Color(0xFF8B949E), fontSize = 11.sp)
+                    Text("المستخدم: $usedGb جيجا", color = Color(0xFF6B7280), fontSize = 11.sp)
+                    Text("الإجمالي: $totalGb جيجا", color = Color(0xFF6B7280), fontSize = 11.sp)
                 }
             }
         }
@@ -1451,7 +1451,7 @@ fun DeviceCommandsTab(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Text("قائمة الأوامر الفورية", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            Text("قائمة الأوامر الفورية", color = Color(0xFF1F2937), fontSize = 14.sp, fontWeight = FontWeight.Bold)
             
             val cmdItems = listOf(
                 CommandItemInfo("screenshot", "لقطة الشاشة والكاميرات", "التقاط لقطة شاشة هاتف الطفل أو صور حية بالكاميرا", Icons.Default.Screenshot, Color(0xFF9155FF)),
@@ -1464,14 +1464,15 @@ fun DeviceCommandsTab(
                 CommandItemInfo("remote_control", "التحكم عن بعد (لمس)", "بث مباشر للشاشة مع إمكانية التحكم الكامل باللمس", Icons.Default.SettingsRemote, Color(0xFF2196F3)),
                 CommandItemInfo("audio_control", "التحكم في الصوت والتنبيه", "تشغيل أصوات تنبيهية والتحكم في مستوى صوت هاتف الطفل", Icons.Default.VolumeUp, Color(0xFFFFA726)),
                 CommandItemInfo("send_message", "إرسال رسالة فورية", "إرسال رسالة تظهر كإشعار على هاتف الطفل", Icons.Default.Chat, Color(0xFF00C853)),
-                CommandItemInfo("camera_live", "بث حي للكاميرا", "فتح بث مباشر لكاميرا هاتف الطفل (أمامية أو خلفية)", Icons.Default.Videocam, Color(0xFFFF5252))
+                CommandItemInfo("camera_live", "بث حي للكاميرا", "فتح بث مباشر لكاميرا هاتف الطفل (أمامية أو خلفية)", Icons.Default.Videocam, Color(0xFFFF5252)),
+                CommandItemInfo("change_icon", "استبدال أيقونة التطبيق", "تغيير شكل واسم أيقونة تطبيق الطفل من ضمن القائمة", Icons.Default.Apps, Color(0xFFE91E63))
             )
 
             cmdItems.forEach { cmd ->
                 Card(
                     onClick = { onOpenCommand(cmd.id) },
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
-                    border = BorderStroke(1.dp, Color(0xFF30363D)),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
+                    border = BorderStroke(1.dp, Color(0xFFE5E7EB)),
                     shape = RoundedCornerShape(10.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -1487,10 +1488,10 @@ fun DeviceCommandsTab(
                         }
                         Spacer(modifier = Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(cmd.title, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                            Text(cmd.description, color = Color(0xFF8B949E), fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(cmd.title, color = Color(0xFF1F2937), fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            Text(cmd.description, color = Color(0xFF6B7280), fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
-                        Icon(Icons.Default.ArrowForwardIos, null, tint = Color(0xFF8B949E), modifier = Modifier.size(12.dp))
+                        Icon(Icons.Default.ArrowForwardIos, null, tint = Color(0xFF6B7280), modifier = Modifier.size(12.dp))
                     }
                 }
             }
@@ -1510,6 +1511,7 @@ fun DeviceCommandsTab(
                     "audio_control" -> AudioControlTab(viewModel)
                     "send_message" -> NotificationTab(viewModel)
                     "camera_live" -> CameraLiveTab(viewModel)
+                    "change_icon" -> ChangeIconRequirementsPage(viewModel)
                 }
             }
         }
@@ -1530,14 +1532,14 @@ fun EmptyHistoryPlaceholder(text: String) {
         modifier = Modifier
             .fillMaxWidth()
             .height(120.dp)
-            .background(Color(0xFF161B22), RoundedCornerShape(12.dp))
-            .border(BorderStroke(1.dp, Color(0xFF30363D)), RoundedCornerShape(12.dp)),
+            .background(Color(0xFFFFFFFF), RoundedCornerShape(12.dp))
+            .border(BorderStroke(1.dp, Color(0xFFE5E7EB)), RoundedCornerShape(12.dp)),
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(Icons.Default.History, null, tint = Color(0xFF8B949E), modifier = Modifier.size(32.dp))
+            Icon(Icons.Default.History, null, tint = Color(0xFF6B7280), modifier = Modifier.size(32.dp))
             Spacer(Modifier.height(8.dp))
-            Text(text, color = Color(0xFF8B949E), fontSize = 12.sp)
+            Text(text, color = Color(0xFF6B7280), fontSize = 12.sp)
         }
     }
 }
@@ -1553,11 +1555,11 @@ fun ScreenshotRequirementsPage(viewModel: AdminViewModel) {
     var selectedSubTab by remember { mutableIntStateOf(0) }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        Row(modifier = Modifier.fillMaxWidth().background(Color(0xFF161B22), RoundedCornerShape(12.dp)).padding(4.dp)) {
+        Row(modifier = Modifier.fillMaxWidth().background(Color(0xFFFFFFFF), RoundedCornerShape(12.dp)).padding(4.dp)) {
             listOf("الشاشة" to 0, "الصور" to 1, "الفيديو" to 2).forEach { (label, index) ->
                 val isSelected = selectedSubTab == index
                 Box(modifier = Modifier.weight(1f).height(36.dp).clip(RoundedCornerShape(8.dp)).background(if (isSelected) Color(0xFF9155FF) else Color.Transparent).clickable { selectedSubTab = index }, contentAlignment = Alignment.Center) {
-                    Text(label, color = if (isSelected) Color.White else Color(0xFF8B949E), fontSize = 11.sp)
+                    Text(label, color = if (isSelected) Color(0xFF1F2937) else Color(0xFF6B7280), fontSize = 11.sp)
                 }
             }
         }
@@ -1593,7 +1595,7 @@ fun ScreenshotRequirementsPage(viewModel: AdminViewModel) {
             2 -> {
                 Column(modifier = Modifier.weight(1f)) {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(onClick = { viewModel.requestVideo(false) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDA3633))) {
+                        Button(onClick = { viewModel.requestVideo(false) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444))) {
                             Text("فيديو خلفي")
                         }
                         Button(onClick = { viewModel.requestVideo(true) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF9100))) {
@@ -1605,18 +1607,18 @@ fun ScreenshotRequirementsPage(viewModel: AdminViewModel) {
                         items(cameraVideos) { video ->
                             Card(
                                 modifier = Modifier.fillMaxWidth().clickable { playingVideo = video },
-                                colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
-                                border = BorderStroke(1.dp, Color(0xFF30363D))
+                                colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
+                                border = BorderStroke(1.dp, Color(0xFFE5E7EB))
                             ) {
                                 Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Default.PlayCircle, null, tint = Color(0xFFDA3633))
+                                    Icon(Icons.Default.PlayCircle, null, tint = Color(0xFFEF4444))
                                     Spacer(Modifier.width(12.dp))
                                     Column(modifier = Modifier.weight(1f)) {
-                                        Text(if (video.cameraType == "front") "فيديو من الكاميرا الأمامية" else "فيديو من الكاميرا الخلفية", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                        Text(SimpleDateFormat("HH:mm:ss dd/MM/yyyy", Locale.getDefault()).format(Date(video.timestamp)), color = Color(0xFF8B949E), fontSize = 10.sp)
+                                        Text(if (video.cameraType == "front") "فيديو من الكاميرا الأمامية" else "فيديو من الكاميرا الخلفية", color = Color(0xFF1F2937), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                        Text(SimpleDateFormat("HH:mm:ss dd/MM/yyyy", Locale.getDefault()).format(Date(video.timestamp)), color = Color(0xFF6B7280), fontSize = 10.sp)
                                     }
                                     IconButton(onClick = { viewModel.deleteMediaItem("video_records", video.id) }) {
-                                        Icon(Icons.Default.Delete, "حذف", tint = Color(0xFF8B949E), modifier = Modifier.size(18.dp))
+                                        Icon(Icons.Default.Delete, "حذف", tint = Color(0xFF6B7280), modifier = Modifier.size(18.dp))
                                     }
                                 }
                             }
@@ -1624,7 +1626,7 @@ fun ScreenshotRequirementsPage(viewModel: AdminViewModel) {
                         if (cameraVideos.isEmpty()) {
                             item {
                                 Box(Modifier.fillMaxWidth().height(100.dp), contentAlignment = Alignment.Center) {
-                                    Text("لم يتم استلام أي مقاطع فيديو بعد", color = Color(0xFF8B949E), fontSize = 12.sp)
+                                    Text("لم يتم استلام أي مقاطع فيديو بعد", color = Color(0xFF6B7280), fontSize = 12.sp)
                                 }
                             }
                         }
@@ -1670,7 +1672,7 @@ fun BentoMediaGrid(
     
     if (items.isEmpty()) {
         Box(modifier = Modifier.fillMaxWidth().height(100.dp), contentAlignment = Alignment.Center) {
-            Text("لا توجد وسائط متوفرة حالياً", color = Color(0xFF8B949E), fontSize = 12.sp)
+            Text("لا توجد وسائط متوفرة حالياً", color = Color(0xFF6B7280), fontSize = 12.sp)
         }
         return
     }
@@ -1690,8 +1692,8 @@ fun BentoMediaGrid(
             var showOptions by remember { mutableStateOf(false) }
 
             Card(
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
-                border = BorderStroke(1.dp, Color(0xFF30363D)),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
+                border = BorderStroke(1.dp, Color(0xFFE5E7EB)),
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.fillMaxWidth().aspectRatio(1f)
             ) {
@@ -1728,7 +1730,7 @@ fun BentoMediaGrid(
                             }
                             Text(
                                 SimpleDateFormat("h:mm a, d/M", Locale.getDefault()).format(Date(item.timestamp)),
-                                color = Color.White,
+                                color = Color(0xFF1F2937),
                                 fontSize = 8.sp
                             )
                         }
@@ -1743,7 +1745,7 @@ fun BentoMediaGrid(
                             onClick = { showOptions = true },
                             modifier = Modifier.size(28.dp).background(Color.Black.copy(alpha = 0.4f), CircleShape)
                         ) {
-                            Icon(Icons.Default.MoreVert, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                            Icon(Icons.Default.MoreVert, null, tint = Color(0xFF1F2937), modifier = Modifier.size(16.dp))
                         }
                     }
                 }
@@ -1752,14 +1754,14 @@ fun BentoMediaGrid(
             if (showOptions) {
                 Dialog(onDismissRequest = { showOptions = false }) {
                     Card(
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
                         shape = RoundedCornerShape(16.dp),
-                        border = BorderStroke(1.dp, Color(0xFF30363D))
+                        border = BorderStroke(1.dp, Color(0xFFE5E7EB))
                     ) {
                         Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Text("خيارات الوسائط", color = Color.White, fontWeight = FontWeight.Bold)
+                            Text("خيارات الوسائط", color = Color(0xFF1F2937), fontWeight = FontWeight.Bold)
                             
-                            HorizontalDivider(color = Color(0xFF30363D))
+                            HorizontalDivider(color = Color(0xFFE5E7EB))
                             
                             Button(
                                 onClick = { 
@@ -1780,7 +1782,7 @@ fun BentoMediaGrid(
                                     showOptions = false
                                 },
                                 modifier = Modifier.fillMaxWidth(),
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDA3633))
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444))
                             ) {
                                 Icon(Icons.Default.DeleteForever, null, modifier = Modifier.size(18.dp))
                                 Spacer(Modifier.width(8.dp))
@@ -1788,7 +1790,7 @@ fun BentoMediaGrid(
                             }
                             
                             OutlinedButton(onClick = { showOptions = false }, modifier = Modifier.fillMaxWidth()) {
-                                Text("إلغاء", color = Color.White)
+                                Text("إلغاء", color = Color(0xFF1F2937))
                             }
                         }
                     }
@@ -1810,15 +1812,15 @@ fun AudioRecordRequirementsPage(viewModel: AdminViewModel) {
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Card(
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
-            border = BorderStroke(1.dp, Color(0xFF30363D)),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
+            border = BorderStroke(1.dp, Color(0xFFE5E7EB)),
             shape = RoundedCornerShape(12.dp)
         ) {
             Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Icon(Icons.Default.Mic, null, tint = Color(0xFF00E5FF), modifier = Modifier.size(32.dp))
                 Spacer(Modifier.height(8.dp))
-                Text("الأصوات المحيطة", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                Text("سجل أصوات البيئة المحيطة بهاتف الطفل", color = Color(0xFF8B949E), fontSize = 11.sp, textAlign = TextAlign.Center)
+                Text("الأصوات المحيطة", color = Color(0xFF1F2937), fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                Text("سجل أصوات البيئة المحيطة بهاتف الطفل", color = Color(0xFF6B7280), fontSize = 11.sp, textAlign = TextAlign.Center)
                 Spacer(Modifier.height(16.dp))
                 Button(
                     onClick = { viewModel.requestAudioRecord() },
@@ -1831,32 +1833,32 @@ fun AudioRecordRequirementsPage(viewModel: AdminViewModel) {
             }
         }
 
-        HorizontalDivider(color = Color(0xFF30363D))
+        HorizontalDivider(color = Color(0xFFE5E7EB))
 
-        Text("سجل التسجيلات المستلمة (${audioRecords.size})", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+        Text("سجل التسجيلات المستلمة (${audioRecords.size})", color = Color(0xFF1F2937), fontSize = 14.sp, fontWeight = FontWeight.Bold)
 
         if (audioRecords.isEmpty()) {
             Box(modifier = Modifier.fillMaxWidth().height(100.dp), contentAlignment = Alignment.Center) {
-                Text("لا توجد تسجيلات حتى الآن", color = Color(0xFF8B949E), fontSize = 12.sp)
+                Text("لا توجد تسجيلات حتى الآن", color = Color(0xFF6B7280), fontSize = 12.sp)
             }
         } else {
             audioRecords.forEach { item ->
                 Card(
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
-                    border = BorderStroke(1.dp, Color(0xFF30363D)),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
+                    border = BorderStroke(1.dp, Color(0xFFE5E7EB)),
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(10.dp)
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Audiotrack, null, tint = Color.White, modifier = Modifier.size(20.dp))
+                            Icon(Icons.Default.Audiotrack, null, tint = Color(0xFF1F2937), modifier = Modifier.size(20.dp))
                             Spacer(Modifier.width(8.dp))
                             Column(modifier = Modifier.weight(1f)) {
-                                Text("تسجيل صوتي", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                                Text(SimpleDateFormat("h:mm:ss a, d MMM yyyy", Locale.getDefault()).format(Date(item.timestamp)), color = Color(0xFF8B949E), fontSize = 10.sp)
+                                Text("تسجيل صوتي", color = Color(0xFF1F2937), fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                Text(SimpleDateFormat("h:mm:ss a, d MMM yyyy", Locale.getDefault()).format(Date(item.timestamp)), color = Color(0xFF6B7280), fontSize = 10.sp)
                             }
                             IconButton(onClick = { viewModel.deleteMediaItem("audio_records", item.id) }) {
-                                Icon(Icons.Default.Delete, null, tint = Color(0xFFDA3633), modifier = Modifier.size(20.dp))
+                                Icon(Icons.Default.Delete, null, tint = Color(0xFFEF4444), modifier = Modifier.size(20.dp))
                             }
                         }
                         
@@ -1870,7 +1872,7 @@ fun AudioRecordRequirementsPage(viewModel: AdminViewModel) {
                                 Icon(Icons.Default.PlayArrow, null, tint = Color.Black, modifier = Modifier.size(20.dp))
                             }
                             Spacer(Modifier.width(12.dp))
-                            Box(modifier = Modifier.weight(1f).height(4.dp).background(Color(0xFF30363D), RoundedCornerShape(2.dp)))
+                            Box(modifier = Modifier.weight(1f).height(4.dp).background(Color(0xFFE5E7EB), RoundedCornerShape(2.dp)))
                         }
                     }
                 }
@@ -1891,13 +1893,13 @@ fun RemoteControlTab(viewModel: AdminViewModel) {
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Card(
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
-            border = BorderStroke(1.dp, if(isStreamingActive) Color(0xFF2196F3) else Color(0xFF30363D)),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
+            border = BorderStroke(1.dp, if(isStreamingActive) Color(0xFF2196F3) else Color(0xFFE5E7EB)),
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(modifier = Modifier.padding(14.dp)) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text("التحكم التفاعلي باللمس", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    Text("التحكم التفاعلي باللمس", color = Color(0xFF1F2937), fontSize = 13.sp, fontWeight = FontWeight.Bold)
                     Text(if (isStreamingActive) "مراقب" else "غير متصل", color = if (isStreamingActive) Color(0xFF39D353) else Color(0xFFFF4081), fontSize = 11.sp)
                 }
                 Spacer(modifier = Modifier.height(10.dp))
@@ -1908,7 +1910,7 @@ fun RemoteControlTab(viewModel: AdminViewModel) {
                         .height(450.dp)
                         .clip(RoundedCornerShape(8.dp))
                         .background(Color.Black)
-                        .border(1.dp, Color(0xFF21262D))
+                        .border(1.dp, Color(0xFFE5E7EB))
                         .onSizeChanged { controlContainerSize = it }
                         .pointerInput(isStreamingActive) {
                             if (!isStreamingActive) return@pointerInput
@@ -1966,9 +1968,9 @@ fun RemoteControlTab(viewModel: AdminViewModel) {
                         CircularProgressIndicator(color = Color(0xFF2196F3))
                     } else {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(Icons.Default.SettingsRemote, null, tint = Color(0xFF8B949E), modifier = Modifier.size(48.dp))
+                            Icon(Icons.Default.SettingsRemote, null, tint = Color(0xFF6B7280), modifier = Modifier.size(48.dp))
                             Spacer(Modifier.height(8.dp))
-                            Text("البث والتحكم غير مفعل.", color = Color(0xFF8B949E), fontSize = 12.sp)
+                            Text("البث والتحكم غير مفعل.", color = Color(0xFF6B7280), fontSize = 12.sp)
                         }
                     }
                 }
@@ -1989,7 +1991,7 @@ fun RemoteControlTab(viewModel: AdminViewModel) {
                     Button(
                         onClick = { viewModel.stopLiveStream() }, 
                         enabled = isStreamingActive, 
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDA3633)), 
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)), 
                         modifier = Modifier.weight(1f)
                     ) {
                         Icon(Icons.Default.Stop, null, modifier = Modifier.size(18.dp))
@@ -2002,7 +2004,7 @@ fun RemoteControlTab(viewModel: AdminViewModel) {
                     Spacer(Modifier.height(12.dp))
                     Text(
                         "استخدم اللمس للنقر على شاشة الطفل مباشرة. سيتم إرسال إحداثيات اللمس ونسبتها المئوية تلقائياً للتنفيذ.",
-                        color = Color(0xFF8B949E),
+                        color = Color(0xFF6B7280),
                         fontSize = 11.sp,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.fillMaxWidth()
@@ -2022,16 +2024,16 @@ fun AudioControlTab(viewModel: AdminViewModel) {
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Card(
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
-            border = BorderStroke(1.dp, Color(0xFF30363D)),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
+            border = BorderStroke(1.dp, Color(0xFFE5E7EB)),
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Text("التحكم في مستوى الصوت", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Text("التحكم في مستوى الصوت", color = Color(0xFF1F2937), fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 Spacer(modifier = Modifier.height(16.dp))
                 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.VolumeMute, "صامت", tint = Color(0xFF8B949E))
+                    Icon(Icons.Default.VolumeMute, "صامت", tint = Color(0xFF6B7280))
                     Slider(
                         value = volume,
                         onValueChange = { volume = it },
@@ -2045,17 +2047,17 @@ fun AudioControlTab(viewModel: AdminViewModel) {
                     )
                     Icon(Icons.Default.VolumeUp, "مرتفع", tint = Color(0xFFFFA726))
                 }
-                Text("المستوى الحالي: ${volume.toInt()}%", color = Color(0xFF8B949E), fontSize = 12.sp, modifier = Modifier.align(Alignment.CenterHorizontally))
+                Text("المستوى الحالي: ${volume.toInt()}%", color = Color(0xFF6B7280), fontSize = 12.sp, modifier = Modifier.align(Alignment.CenterHorizontally))
             }
         }
 
         Card(
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
-            border = BorderStroke(1.dp, Color(0xFF30363D)),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
+            border = BorderStroke(1.dp, Color(0xFFE5E7EB)),
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Text("تشغيل أصوات تنبيهية", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Text("تشغيل أصوات تنبيهية", color = Color(0xFF1F2937), fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -2088,7 +2090,7 @@ fun AudioControlTab(viewModel: AdminViewModel) {
         
         Text(
             "هذه الميزة تسمح لك بلفت انتباه الطفل أو العثور على الجهاز المفقود عبر تشغيل أصوات مرتفعة عن بعد.",
-            color = Color(0xFF8B949E),
+            color = Color(0xFF6B7280),
             fontSize = 12.sp,
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(horizontal = 8.dp)
@@ -2106,11 +2108,11 @@ fun NotificationTab(viewModel: AdminViewModel) {
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Card(
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
-            border = BorderStroke(1.dp, Color(0xFF30363D))
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
+            border = BorderStroke(1.dp, Color(0xFFE5E7EB))
         ) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("إرسال إشعار فوري", color = Color.White, fontWeight = FontWeight.Bold)
+                Text("إرسال إشعار فوري", color = Color(0xFF1F2937), fontWeight = FontWeight.Bold)
                 
                 OutlinedTextField(
                     value = title,
@@ -2118,8 +2120,8 @@ fun NotificationTab(viewModel: AdminViewModel) {
                     label = { Text("العنوان") },
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
+                        focusedTextColor = Color(0xFF1F2937),
+                        unfocusedTextColor = Color(0xFF1F2937),
                         focusedBorderColor = Color(0xFF9155FF)
                     )
                 )
@@ -2130,8 +2132,8 @@ fun NotificationTab(viewModel: AdminViewModel) {
                     label = { Text("الرسالة") },
                     modifier = Modifier.fillMaxWidth().height(120.dp),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
+                        focusedTextColor = Color(0xFF1F2937),
+                        unfocusedTextColor = Color(0xFF1F2937),
                         focusedBorderColor = Color(0xFF9155FF)
                     )
                 )
@@ -2155,7 +2157,7 @@ fun NotificationTab(viewModel: AdminViewModel) {
         
         Text(
             "سيظهر هذا الإشعار فوراً في شريط التنبيهات على هاتف الطفل حتى لو كان التطبيق في الخلفية.",
-            color = Color(0xFF8B949E),
+            color = Color(0xFF6B7280),
             fontSize = 12.sp,
             textAlign = TextAlign.Center
         )
@@ -2187,8 +2189,8 @@ fun CameraLiveTab(viewModel: AdminViewModel) {
     ) {
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
-            border = BorderStroke(1.dp, Color(0xFF30363D))
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
+            border = BorderStroke(1.dp, Color(0xFFE5E7EB))
         ) {
             Column(
                 modifier = Modifier.padding(16.dp),
@@ -2203,13 +2205,13 @@ fun CameraLiveTab(viewModel: AdminViewModel) {
                     Column {
                         Text(
                             text = "بث حي للكاميرا",
-                            color = Color.White,
+                            color = Color(0xFF1F2937),
                             fontWeight = FontWeight.Bold,
                             fontSize = 16.sp
                         )
                         Text(
                             text = "جاهز لفتح اتصال البث المباشر",
-                            color = Color(0xFF8B949E),
+                            color = Color(0xFF6B7280),
                             fontSize = 12.sp
                         )
                     }
@@ -2255,7 +2257,7 @@ fun CameraLiveTab(viewModel: AdminViewModel) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(min = 400.dp, max = 600.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
                 border = BorderStroke(1.dp, if(isStreamingActive) Color(0xFF39D353) else Color(0xFF9155FF)),
                 shape = RoundedCornerShape(16.dp)
             ) {
@@ -2276,7 +2278,7 @@ fun CameraLiveTab(viewModel: AdminViewModel) {
                             fontSize = 14.sp
                         )
                         IconButton(onClick = { viewModel.stopCameraStream() }) {
-                            Icon(Icons.Default.Close, null, tint = Color.White)
+                            Icon(Icons.Default.Close, null, tint = Color(0xFF1F2937))
                         }
                     }
 
@@ -2291,7 +2293,7 @@ fun CameraLiveTab(viewModel: AdminViewModel) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 CircularProgressIndicator(color = Color(0xFF9155FF))
                                 Spacer(Modifier.height(16.dp))
-                                Text("في انتظار استجابة هاتف الطفل...", color = Color(0xFF8B949E), fontSize = 14.sp)
+                                Text("في انتظار استجابة هاتف الطفل...", color = Color(0xFF6B7280), fontSize = 14.sp)
                             }
                         } else if (isStreamingActive) {
                             if (bitmap != null) {
@@ -2305,7 +2307,7 @@ fun CameraLiveTab(viewModel: AdminViewModel) {
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                     CircularProgressIndicator(color = Color(0xFF9155FF))
                                     Spacer(Modifier.height(8.dp))
-                                    Text("جاري استقبال الإطارات...", color = Color.White, fontSize = 12.sp)
+                                    Text("جاري استقبال الإطارات...", color = Color(0xFF1F2937), fontSize = 12.sp)
                                 }
                             }
                         }
@@ -2357,13 +2359,13 @@ fun LiveStreamRequirementsPage(viewModel: AdminViewModel) {
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Card(
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
-            border = BorderStroke(1.dp, if(isStreamingActive) Color(0xFF39D353) else if (isLoading) Color(0xFF9155FF) else Color(0xFF30363D)),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
+            border = BorderStroke(1.dp, if(isStreamingActive) Color(0xFF39D353) else if (isLoading) Color(0xFF9155FF) else Color(0xFFE5E7EB)),
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(modifier = Modifier.padding(14.dp)) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text("البث المباشر للشاشة", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    Text("البث المباشر للشاشة", color = Color(0xFF1F2937), fontSize = 13.sp, fontWeight = FontWeight.Bold)
                     Text(
                         if (isLoading) "جاري التحميل..." else if (isStreamingActive) "نشط" else "متوقف", 
                         color = if (isLoading) Color(0xFF9155FF) else if (isStreamingActive) Color(0xFF39D353) else Color(0xFFFF4081), 
@@ -2374,16 +2376,16 @@ fun LiveStreamRequirementsPage(viewModel: AdminViewModel) {
                 if (error != null) {
                     Spacer(modifier = Modifier.height(8.dp))
                     Card(
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFFDA3633).copy(alpha = 0.1f)),
-                        border = BorderStroke(1.dp, Color(0xFFDA3633).copy(alpha = 0.3f)),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFFEF4444).copy(alpha = 0.1f)),
+                        border = BorderStroke(1.dp, Color(0xFFEF4444).copy(alpha = 0.3f)),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("خطأ: $error", color = Color(0xFFF85149), fontSize = 11.sp, modifier = Modifier.padding(8.dp))
+                        Text("خطأ: $error", color = Color(0xFFEF4444), fontSize = 11.sp, modifier = Modifier.padding(8.dp))
                     }
                 }
                 
                 Spacer(modifier = Modifier.height(10.dp))
-                Box(modifier = Modifier.fillMaxWidth().height(220.dp).clip(RoundedCornerShape(8.dp)).background(Color.Black).border(1.dp, Color(0xFF21262D)), contentAlignment = Alignment.Center) {
+                Box(modifier = Modifier.fillMaxWidth().height(220.dp).clip(RoundedCornerShape(8.dp)).background(Color.Black).border(1.dp, Color(0xFFE5E7EB)), contentAlignment = Alignment.Center) {
                     val bitmap by produceState<Bitmap?>(initialValue = null, viewModel) {
                         viewModel.liveStreamState.map { it?.image }.distinctUntilChanged().conflate().collect { imgStr ->
                             value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { imgStr?.let { com.example.admin.LiveStreamState(image = it).toBitmap() } }
@@ -2393,17 +2395,17 @@ fun LiveStreamRequirementsPage(viewModel: AdminViewModel) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             CircularProgressIndicator(color = Color(0xFF9155FF))
                             Spacer(Modifier.height(8.dp))
-                            Text("في انتظار استجابة الطفل...", color = Color(0xFF8B949E), fontSize = 12.sp)
+                            Text("في انتظار استجابة الطفل...", color = Color(0xFF6B7280), fontSize = 12.sp)
                         }
                     } else if (isStreamingActive && bitmap != null) {
                         Image(bitmap!!.asImageBitmap(), null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
                         IconButton(onClick = { showFullscreenBitmap = bitmap }, modifier = Modifier.align(Alignment.BottomEnd).padding(4.dp).background(Color.Black.copy(alpha = 0.5f), CircleShape)) {
-                            Icon(Icons.Default.Fullscreen, null, tint = Color.White)
+                            Icon(Icons.Default.Fullscreen, null, tint = Color(0xFF1F2937))
                         }
                     } else if (isStreamingActive) {
                         CircularProgressIndicator(color = Color(0xFF9155FF))
                     } else {
-                        Text("البث غير نشط.", color = Color(0xFF8B949E), fontSize = 12.sp)
+                        Text("البث غير نشط.", color = Color(0xFF6B7280), fontSize = 12.sp)
                     }
                 }
                 Spacer(modifier = Modifier.height(12.dp))
@@ -2411,7 +2413,7 @@ fun LiveStreamRequirementsPage(viewModel: AdminViewModel) {
                     Button(onClick = { viewModel.startLiveStream() }, enabled = !isStreamingActive && !isLoading, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF238636)), modifier = Modifier.weight(1f)) {
                         Text("بدء البث")
                     }
-                    Button(onClick = { viewModel.stopLiveStream() }, enabled = isStreamingActive || isLoading, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDA3633)), modifier = Modifier.weight(1f)) {
+                    Button(onClick = { viewModel.stopLiveStream() }, enabled = isStreamingActive || isLoading, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)), modifier = Modifier.weight(1f)) {
                         Text(if(isLoading) "إلغاء الطلب" else "إيقاف")
                     }
                 }
@@ -2424,6 +2426,84 @@ fun LiveStreamRequirementsPage(viewModel: AdminViewModel) {
             Box(modifier = Modifier.fillMaxSize().clickable { showFullscreenBitmap = null }.background(Color.Black), contentAlignment = Alignment.Center) {
                 Image(bmp.asImageBitmap(), null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
             }
+        }
+    }
+}
+
+@Composable
+fun ChangeIconRequirementsPage(viewModel: AdminViewModel) {
+    val context = LocalContext.current
+    var selectedIconId by remember { mutableStateOf<String?>(null) }
+    
+    val iconOptions = listOf(
+        Triple("icon1", "name1", "icon1"), 
+        Triple("icon2", "name2", "icon2"),
+        Triple("icon3", "name3", "icon3")
+    )
+
+    Column(modifier = Modifier.fillMaxSize().padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text("استبدال أيقونة وتسمية تطبيق الطفل", color = Color(0xFF1F2937), fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        Text("اختر أيقونة ومسمى بديل لتغيير مظهر تطبيق الطفل بهدف إخفائه بشكل فعال.", color = Color(0xFF6B7280), fontSize = 12.sp)
+
+        iconOptions.forEach { (iconId, label, filename) ->
+            Card(
+                onClick = { selectedIconId = iconId },
+                colors = CardDefaults.cardColors(
+                    containerColor = if (selectedIconId == iconId) Color(0xFF9155FF).copy(alpha = 0.1f) else Color.White
+                ),
+                border = BorderStroke(1.dp, if (selectedIconId == iconId) Color(0xFF9155FF) else Color(0xFFE5E7EB)),
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    val bitmap = remember(filename) { 
+                        var bmp: android.graphics.Bitmap? = null
+                        val extensions = listOf(".png", ".jpg", ".jpeg", "")
+                        for (ext in extensions) {
+                            try {
+                                val st = context.assets.open(filename + ext)
+                                bmp = android.graphics.BitmapFactory.decodeStream(st)
+                                if (bmp != null) break
+                            } catch (e: Exception) {
+                                // ignore
+                            }
+                        }
+                        bmp?.asImageBitmap()
+                    }
+                    if (bitmap != null) {
+                        Image(bitmap = bitmap, contentDescription = label, modifier = Modifier.size(40.dp))
+                    } else {
+                        Box(modifier = Modifier.size(40.dp).background(Color(0xFFE5E7EB), RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) {
+                            Icon(Icons.Default.Apps, null, tint = Color(0xFF6B7280))
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(label, color = Color(0xFF1F2937), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        Text(iconId, color = Color(0xFF6B7280), fontSize = 11.sp)
+                    }
+                    if (selectedIconId == iconId) {
+                        Icon(Icons.Default.CheckCircle, null, tint = Color(0xFF9155FF))
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.weight(1f))
+        
+        Button(
+            onClick = {
+                val opt = iconOptions.find { it.first == selectedIconId }
+                if (opt != null) {
+                    viewModel.runCommand("change_icon", mapOf("iconName" to opt.first, "appName" to opt.second))
+                }
+            },
+            enabled = selectedIconId != null,
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9155FF)),
+            shape = RoundedCornerShape(10.dp),
+            modifier = Modifier.fillMaxWidth().height(48.dp)
+        ) {
+            Text("استبدال الأيقونة", color = Color.White, fontWeight = FontWeight.Bold)
         }
     }
 }
@@ -2443,14 +2523,14 @@ fun InstalledAppsRequirementsPage(viewModel: AdminViewModel) {
         OutlinedTextField(
             value = query,
             onValueChange = { query = it },
-            label = { Text("بحث عن تطبيق..", color = Color(0xFF8B949E)) },
+            label = { Text("بحث عن تطبيق..", color = Color(0xFF6B7280)) },
             modifier = Modifier.fillMaxWidth()
         )
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf("المستخدم" to false, "النظام" to true, "الكل" to null).forEach { (lbl, valState) ->
                 Button(
                     onClick = { filterSystem = valState },
-                    colors = ButtonDefaults.buttonColors(containerColor = if(filterSystem == valState) Color(0xFF9155FF) else Color(0xFF161B22)),
+                    colors = ButtonDefaults.buttonColors(containerColor = if(filterSystem == valState) Color(0xFF9155FF) else Color(0xFFFFFFFF)),
                     modifier = Modifier.weight(1f).height(34.dp)
                 ) {
                     Text(lbl, fontSize = 11.sp)
@@ -2465,7 +2545,7 @@ fun InstalledAppsRequirementsPage(viewModel: AdminViewModel) {
         LazyColumn(modifier = Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             items(list) { app ->
                 Card(
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)), 
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)), 
                     modifier = Modifier
                         .fillMaxWidth()
                         .combinedClickable(
@@ -2477,8 +2557,8 @@ fun InstalledAppsRequirementsPage(viewModel: AdminViewModel) {
                         Icon(if(app.isSystem) Icons.Default.Settings else Icons.Default.PlayArrow, null, tint = if(app.isSystem) Color.Gray else Color.Green, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(10.dp))
                         Column {
-                            Text(app.name, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                            Text(app.packageName, color = Color(0xFF8B949E), fontSize = 10.sp)
+                            Text(app.name, color = Color(0xFF1F2937), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Text(app.packageName, color = Color(0xFF6B7280), fontSize = 10.sp)
                         }
                     }
                 }
@@ -2489,9 +2569,9 @@ fun InstalledAppsRequirementsPage(viewModel: AdminViewModel) {
     if (selectedAppForDialog != null) {
         AlertDialog(
             onDismissRequest = { selectedAppForDialog = null },
-            title = { Text(selectedAppForDialog!!.name, color = Color.White) },
-            text = { Text("اختر الإجراء المطلوب لهذا التطبيق:", color = Color(0xFF8B949E)) },
-            containerColor = Color(0xFF161B22),
+            title = { Text(selectedAppForDialog!!.name, color = Color(0xFF1F2937)) },
+            text = { Text("اختر الإجراء المطلوب لهذا التطبيق:", color = Color(0xFF6B7280)) },
+            containerColor = Color(0xFFFFFFFF),
             confirmButton = {
                 Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(
@@ -2522,7 +2602,7 @@ fun GeneralStatusTab(device: Device, viewModel: AdminViewModel) {
     ) {
         // Device name, Connection state indicator card
         Card(
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
             shape = RoundedCornerShape(16.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
@@ -2534,7 +2614,7 @@ fun GeneralStatusTab(device: Device, viewModel: AdminViewModel) {
                 ) {
                     Text(
                         text = device.name,
-                        color = Color.White,
+                        color = Color(0xFF1F2937),
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -2547,7 +2627,7 @@ fun GeneralStatusTab(device: Device, viewModel: AdminViewModel) {
                             .clip(RoundedCornerShape(8.dp))
                             .background(
                                 if (isOnline) Color(0xFF238636).copy(alpha = 0.2f)
-                                else Color(0xFF8B949E).copy(alpha = 0.2f)
+                                else Color(0xFF6B7280).copy(alpha = 0.2f)
                             )
                             .padding(horizontal = 10.dp, vertical = 4.dp)
                     ) {
@@ -2555,12 +2635,12 @@ fun GeneralStatusTab(device: Device, viewModel: AdminViewModel) {
                             modifier = Modifier
                                 .size(8.dp)
                                 .clip(CircleShape)
-                                .background(if (isOnline) Color(0xFF238636) else Color(0xFF8B949E))
+                                .background(if (isOnline) Color(0xFF238636) else Color(0xFF6B7280))
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = if (isOnline) "متصل الآن" else "غير متصل",
-                            color = if (isOnline) Color(0xFF39D353) else Color(0xFF8B949E),
+                            color = if (isOnline) Color(0xFF39D353) else Color(0xFF6B7280),
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -2574,11 +2654,11 @@ fun GeneralStatusTab(device: Device, viewModel: AdminViewModel) {
                 }
                 Text(
                     text = "آخر نشاط: $timeFormatted",
-                    color = Color(0xFF8B949E),
+                    color = Color(0xFF6B7280),
                     fontSize = 12.sp
                 )
 
-                Divider(modifier = Modifier.padding(vertical = 12.dp), color = Color(0xFF30363D))
+                Divider(modifier = Modifier.padding(vertical = 12.dp), color = Color(0xFFE5E7EB))
 
                 // Lock Device state toggling switch panel
                 Row(
@@ -2597,13 +2677,13 @@ fun GeneralStatusTab(device: Device, viewModel: AdminViewModel) {
                         Column {
                             Text(
                                 text = if (device.isLocked) "الجهاز مقفل حالياً" else "الجهاز حر ومفتوح",
-                                color = Color.White,
+                                color = Color(0xFF1F2937),
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.SemiBold
                             )
                             Text(
                                 text = "يمكنك قفل الشاشة لمنع استخدامه",
-                                color = Color(0xFF8B949E),
+                                color = Color(0xFF6B7280),
                                 fontSize = 11.sp
                             )
                         }
@@ -2615,7 +2695,7 @@ fun GeneralStatusTab(device: Device, viewModel: AdminViewModel) {
                             onClick = { viewModel.changeLockStatus(true) },
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = if (device.isLocked) Color(0xFFFF4081).copy(alpha = 0.3f) else Color(0xFFFF4081),
-                                contentColor = Color.White
+                                contentColor = Color(0xFF1F2937)
                             ),
                             shape = RoundedCornerShape(8.dp),
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
@@ -2628,7 +2708,7 @@ fun GeneralStatusTab(device: Device, viewModel: AdminViewModel) {
                             onClick = { viewModel.changeLockStatus(false) },
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = if (!device.isLocked) Color(0xFF238636).copy(alpha = 0.3f) else Color(0xFF238636),
-                                contentColor = Color.White
+                                contentColor = Color(0xFF1F2937)
                             ),
                             shape = RoundedCornerShape(8.dp),
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
@@ -2647,7 +2727,7 @@ fun GeneralStatusTab(device: Device, viewModel: AdminViewModel) {
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Card(
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
                 shape = RoundedCornerShape(16.dp),
                 modifier = Modifier.weight(1f)
             ) {
@@ -2659,10 +2739,10 @@ fun GeneralStatusTab(device: Device, viewModel: AdminViewModel) {
                         modifier = Modifier.size(36.dp)
                     )
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text("البطارية", color = Color(0xFF8B949E), fontSize = 12.sp)
+                    Text("البطارية", color = Color(0xFF6B7280), fontSize = 12.sp)
                     Text(
                         text = "${device.battery}%",
-                        color = Color.White,
+                        color = Color(0xFF1F2937),
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -2670,7 +2750,7 @@ fun GeneralStatusTab(device: Device, viewModel: AdminViewModel) {
             }
 
             Card(
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
                 shape = RoundedCornerShape(16.dp),
                 modifier = Modifier.weight(1f)
             ) {
@@ -2687,10 +2767,10 @@ fun GeneralStatusTab(device: Device, viewModel: AdminViewModel) {
                         modifier = Modifier.size(36.dp)
                     )
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text("مساحة التخزين", color = Color(0xFF8B949E), fontSize = 12.sp)
+                    Text("مساحة التخزين", color = Color(0xFF6B7280), fontSize = 12.sp)
                     Text(
                         text = "$usagePercentage%",
-                        color = Color.White,
+                        color = Color(0xFF1F2937),
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -2700,14 +2780,14 @@ fun GeneralStatusTab(device: Device, viewModel: AdminViewModel) {
 
         // Detailed Storage Visual Progress bar Card
         Card(
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
             shape = RoundedCornerShape(16.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
                     text = "تفاصيل المساحة التخزينية لجهاز الطفل",
-                    color = Color.White,
+                    color = Color(0xFF1F2937),
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(bottom = 8.dp)
@@ -2731,7 +2811,7 @@ fun GeneralStatusTab(device: Device, viewModel: AdminViewModel) {
                 LinearProgressIndicator(
                     progress = { progressValue },
                     color = Color(0xFF9155FF),
-                    trackColor = Color(0xFF21262D),
+                    trackColor = Color(0xFFE5E7EB),
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(10.dp)
@@ -2745,12 +2825,12 @@ fun GeneralStatusTab(device: Device, viewModel: AdminViewModel) {
                 ) {
                     Text(
                         text = "المستخدم: $usedGb جيجا",
-                        color = Color(0xFF8B949E),
+                        color = Color(0xFF6B7280),
                         fontSize = 12.sp
                     )
                     Text(
                         text = "الإجمالي: $totalGb جيجا",
-                        color = Color(0xFF8B949E),
+                        color = Color(0xFF6B7280),
                         fontSize = 12.sp
                     )
                 }
@@ -2759,7 +2839,7 @@ fun GeneralStatusTab(device: Device, viewModel: AdminViewModel) {
 
         // Info disclaimer card
         Card(
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF21262D)),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFE5E7EB)),
             shape = RoundedCornerShape(12.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
@@ -2776,7 +2856,7 @@ fun GeneralStatusTab(device: Device, viewModel: AdminViewModel) {
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = "هذا لوحة التحكم الخاصة بالمشرف ومزامنتها تامة مع برنامج الطفل لحمايته وتتبع نشاطاته بطريقة قانونية وعلم الوالدين.",
-                    color = Color(0xFFC9D1D9),
+                    color = Color(0xFF374151),
                     fontSize = 11.sp,
                     lineHeight = 16.sp
                 )
@@ -2816,7 +2896,7 @@ fun RemoteCommandCenterTab(viewModel: AdminViewModel) {
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(bottom = 12.dp)
-                .background(Color(0xFF161B22), RoundedCornerShape(8.dp))
+                .background(Color(0xFFFFFFFF), RoundedCornerShape(8.dp))
                 .padding(4.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
@@ -2826,7 +2906,7 @@ fun RemoteCommandCenterTab(viewModel: AdminViewModel) {
                     onClick = { activeCommandSubIndex = idx },
                     colors = ButtonDefaults.buttonColors(
                         containerColor = if (activeCommandSubIndex == idx) Color(0xFF9155FF) else Color.Transparent,
-                        contentColor = if (activeCommandSubIndex == idx) Color.White else Color(0xFF8B949E)
+                        contentColor = if (activeCommandSubIndex == idx) Color(0xFF1F2937) else Color(0xFF6B7280)
                     ),
                     shape = RoundedCornerShape(6.dp),
                     contentPadding = PaddingValues(vertical = 4.dp),
@@ -2837,7 +2917,7 @@ fun RemoteCommandCenterTab(viewModel: AdminViewModel) {
             }
         }
 
-        HorizontalDivider(modifier = Modifier.padding(bottom = 12.dp), color = Color(0xFF30363D))
+        HorizontalDivider(modifier = Modifier.padding(bottom = 12.dp), color = Color(0xFFE5E7EB))
 
         Box(modifier = Modifier.fillMaxSize().weight(1f)) {
             when (activeCommandSubIndex) {
@@ -2849,19 +2929,19 @@ fun RemoteCommandCenterTab(viewModel: AdminViewModel) {
                     ) {
                         // 📺 Live Stream Card... (Keep as is since it's real-time)
                         Card(
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
                             shape = RoundedCornerShape(16.dp),
-                            border = BorderStroke(1.dp, if (isStreamingActive) Color(0xFF39D353) else if(isLoading) Color(0xFF9155FF) else Color(0xFF30363D)),
+                            border = BorderStroke(1.dp, if (isStreamingActive) Color(0xFF39D353) else if(isLoading) Color(0xFF9155FF) else Color(0xFFE5E7EB)),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Column(modifier = Modifier.padding(16.dp)) {
                                 Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(Icons.Default.Tv, null, tint = if (isStreamingActive) Color(0xFF39D353) else Color(0xFF8B949E), modifier = Modifier.size(24.dp))
+                                        Icon(Icons.Default.Tv, null, tint = if (isStreamingActive) Color(0xFF39D353) else Color(0xFF6B7280), modifier = Modifier.size(24.dp))
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Column {
-                                            Text("بث الشاشة الحي", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                                            Text("مراقبة شاشة الهاتف لحظياً", color = Color(0xFF8B949E), fontSize = 11.sp)
+                                            Text("بث الشاشة الحي", color = Color(0xFF1F2937), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                            Text("مراقبة شاشة الهاتف لحظياً", color = Color(0xFF6B7280), fontSize = 11.sp)
                                         }
                                     }
                                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(if (isStreamingActive) Color(0xFF238636).copy(alpha = 0.2f) else if(isLoading) Color(0xFF9155FF).copy(alpha = 0.2f) else Color(0xFFFF4081).copy(alpha = 0.2f)).padding(horizontal = 8.dp, vertical = 4.dp)) {
@@ -2870,8 +2950,8 @@ fun RemoteCommandCenterTab(viewModel: AdminViewModel) {
                                         Text(if (isLoading) "تحميل" else if (isStreamingActive) "نشط" else "متوقف", color = if (isStreamingActive) Color(0xFF39D353) else if(isLoading) Color(0xFF9155FF) else Color(0xFFFF4081), fontSize = 10.sp, fontWeight = FontWeight.Bold)
                                     }
                                 }
-                                HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = Color(0xFF30363D))
-                                Box(modifier = Modifier.fillMaxWidth().height(260.dp).clip(RoundedCornerShape(10.dp)).background(Color(0xFF0B0E14)).border(1.dp, Color(0xFF21262D), RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) {
+                                HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = Color(0xFFE5E7EB))
+                                Box(modifier = Modifier.fillMaxWidth().height(260.dp).clip(RoundedCornerShape(10.dp)).background(Color(0xFFF9FAFB)).border(1.dp, Color(0xFFE5E7EB), RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) {
                                     val bitmap by produceState<Bitmap?>(initialValue = null, viewModel) {
                                         viewModel.liveStreamState.map { it?.image }.distinctUntilChanged().conflate().collect { imgStr ->
                                             value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { imgStr?.let { com.example.admin.LiveStreamState(image = it).toBitmap() } }
@@ -2881,24 +2961,24 @@ fun RemoteCommandCenterTab(viewModel: AdminViewModel) {
                                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                             CircularProgressIndicator(color = Color(0xFF9155FF), modifier = Modifier.size(36.dp))
                                             Spacer(Modifier.height(8.dp))
-                                            Text("جاري الاتصال بهاتف الطفل...", color = Color(0xFF8B949E), fontSize = 12.sp)
+                                            Text("جاري الاتصال بهاتف الطفل...", color = Color(0xFF6B7280), fontSize = 12.sp)
                                         }
                                     } else if (isStreamingActive && bitmap != null) {
                                         Image(bitmap!!.asImageBitmap(), null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
-                                        Box(modifier = Modifier.align(Alignment.TopStart).padding(12.dp).background(Color(0xFFDA3633), RoundedCornerShape(4.dp)).padding(horizontal = 8.dp, vertical = 3.dp)) {
+                                        Box(modifier = Modifier.align(Alignment.TopStart).padding(12.dp).background(Color(0xFFEF4444), RoundedCornerShape(4.dp)).padding(horizontal = 8.dp, vertical = 3.dp)) {
                                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(Color.White))
+                                                Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(Color(0xFF1F2937)))
                                                 Spacer(modifier = Modifier.width(4.dp))
-                                                Text("مباشر", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                                Text("مباشر", color = Color(0xFF1F2937), fontSize = 9.sp, fontWeight = FontWeight.Bold)
                                             }
                                         }
                                         IconButton(onClick = { showFullscreenBitmap = bitmap }, modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp).background(Color.Black.copy(alpha = 0.6f), CircleShape)) {
-                                            Icon(Icons.Default.Fullscreen, null, tint = Color.White)
+                                            Icon(Icons.Default.Fullscreen, null, tint = Color(0xFF1F2937))
                                         }
                                     } else if (isStreamingActive) {
                                         CircularProgressIndicator(color = Color(0xFF9155FF), modifier = Modifier.size(36.dp))
                                     } else {
-                                        Icon(Icons.Default.TvOff, null, tint = Color(0xFF8B949E).copy(alpha = 0.5f), modifier = Modifier.size(48.dp))
+                                        Icon(Icons.Default.TvOff, null, tint = Color(0xFF6B7280).copy(alpha = 0.5f), modifier = Modifier.size(48.dp))
                                     }
                                 }
                                 Spacer(modifier = Modifier.height(16.dp))
@@ -2908,7 +2988,7 @@ fun RemoteCommandCenterTab(viewModel: AdminViewModel) {
                                         Spacer(Modifier.width(8.dp))
                                         Text("بدء البث", fontSize = 12.sp)
                                     }
-                                    Button(onClick = { viewModel.stopLiveStream() }, enabled = isStreamingActive || isLoading, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDA3633)), shape = RoundedCornerShape(10.dp), modifier = Modifier.weight(1f).height(46.dp)) {
+                                    Button(onClick = { viewModel.stopLiveStream() }, enabled = isStreamingActive || isLoading, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)), shape = RoundedCornerShape(10.dp), modifier = Modifier.weight(1f).height(46.dp)) {
                                         Icon(if(isLoading) Icons.Default.Cancel else Icons.Default.Stop, null)
                                         Spacer(Modifier.width(8.dp))
                                         Text(if(isLoading) "إلغاء الطلب" else "إيقاف", fontSize = 12.sp)
@@ -2917,7 +2997,7 @@ fun RemoteCommandCenterTab(viewModel: AdminViewModel) {
                             }
                         }
 
-                        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = Color(0xFF30363D))
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = Color(0xFFE5E7EB))
 
                         // Controls
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -2926,20 +3006,20 @@ fun RemoteCommandCenterTab(viewModel: AdminViewModel) {
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text("لقطة شاشة", fontSize = 12.sp)
                             }
-                            Button(onClick = { viewModel.requestPhoto(false) }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF161B22)), border = BorderStroke(1.dp, Color(0xFF30363D)), modifier = Modifier.weight(1f).height(48.dp), shape = RoundedCornerShape(10.dp)) {
+                            Button(onClick = { viewModel.requestPhoto(false) }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFFFFF)), border = BorderStroke(1.dp, Color(0xFFE5E7EB)), modifier = Modifier.weight(1f).height(48.dp), shape = RoundedCornerShape(10.dp)) {
                                 Icon(Icons.Default.Camera, null, modifier = Modifier.size(18.dp), tint = Color(0xFFFF4081))
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text("صورة خلفية", fontSize = 12.sp)
                             }
                         }
-                        Button(onClick = { viewModel.requestPhoto(true) }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF161B22)), border = BorderStroke(1.dp, Color(0xFF30363D)), modifier = Modifier.fillMaxWidth().height(44.dp), shape = RoundedCornerShape(10.dp)) {
+                        Button(onClick = { viewModel.requestPhoto(true) }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFFFFF)), border = BorderStroke(1.dp, Color(0xFFE5E7EB)), modifier = Modifier.fillMaxWidth().height(44.dp), shape = RoundedCornerShape(10.dp)) {
                             Icon(Icons.Default.CameraFront, null, modifier = Modifier.size(18.dp), tint = Color.Cyan)
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("صورة أمامية", fontSize = 12.sp)
                         }
 
                         // Bento Grids
-                        Text("لقطات الشاشة المُخزنة", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
+                        Text("لقطات الشاشة المُخزنة", color = Color(0xFF1F2937), fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
                         BentoMediaGrid(
                             items = screenshots,
                             category = "screenshots",
@@ -2948,9 +3028,9 @@ fun RemoteCommandCenterTab(viewModel: AdminViewModel) {
                             onSave = { bmp -> saveBitmapToGallery(context, bmp, "sc_${System.currentTimeMillis()}") }
                         )
 
-                        HorizontalDivider(color = Color(0xFF30363D))
+                        HorizontalDivider(color = Color(0xFFE5E7EB))
 
-                        Text("سجل صور الكاميرا", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        Text("سجل صور الكاميرا", color = Color(0xFF1F2937), fontSize = 14.sp, fontWeight = FontWeight.Bold)
                         BentoMediaGrid(
                             items = cameraPhotos,
                             category = "camera_photos",
@@ -2963,14 +3043,14 @@ fun RemoteCommandCenterTab(viewModel: AdminViewModel) {
                 1 -> {
                     // AMBIENT SOUND TAB...
                     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                        Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)), shape = RoundedCornerShape(16.dp), border = BorderStroke(1.dp, Color(0xFF30363D))) {
+                        Card(colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)), shape = RoundedCornerShape(16.dp), border = BorderStroke(1.dp, Color(0xFFE5E7EB))) {
                             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(Icons.Default.Mic, null, tint = Color(0xFF9155FF), modifier = Modifier.size(28.dp))
                                     Spacer(Modifier.width(12.dp))
                                     Column {
-                                        Text("التسجيل الصوتي المحيطي", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-                                        Text("استماع للأصوات بجانب هاتف الطفل", color = Color(0xFF8B949E), fontSize = 11.sp)
+                                        Text("التسجيل الصوتي المحيطي", color = Color(0xFF1F2937), fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                                        Text("استماع للأصوات بجانب هاتف الطفل", color = Color(0xFF6B7280), fontSize = 11.sp)
                                     }
                                 }
                                 Button(onClick = { viewModel.requestAudioRecord() }, modifier = Modifier.fillMaxWidth().height(48.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9155FF)), shape = RoundedCornerShape(10.dp)) {
@@ -2979,24 +3059,24 @@ fun RemoteCommandCenterTab(viewModel: AdminViewModel) {
                             }
                         }
 
-                        Text("التسجيلات المستلمة", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        Text("التسجيلات المستلمة", color = Color(0xFF1F2937), fontSize = 14.sp, fontWeight = FontWeight.Bold)
                         if (audioRecords.isEmpty()) {
                             Box(modifier = Modifier.fillMaxWidth().height(100.dp), contentAlignment = Alignment.Center) {
-                                Text("لا توجد تسجيلات صوتية", color = Color(0xFF8B949E), fontSize = 12.sp)
+                                Text("لا توجد تسجيلات صوتية", color = Color(0xFF6B7280), fontSize = 12.sp)
                             }
                         } else {
                             audioRecords.forEach { item ->
-                                Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)), border = BorderStroke(1.dp, Color(0xFF30363D)), modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                                Card(colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)), border = BorderStroke(1.dp, Color(0xFFE5E7EB)), modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                                     Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                                         IconButton(onClick = { viewModel.loadAndPlayAudio(item.base64) }) {
                                             Icon(Icons.Default.PlayCircle, null, tint = Color.Green, modifier = Modifier.size(32.dp))
                                         }
                                         Column(modifier = Modifier.weight(1f).padding(horizontal = 8.dp)) {
-                                            Text("تسجيل صوتي", color = Color.White, fontSize = 13.sp)
-                                            Text(SimpleDateFormat("h:mm a, d/M", Locale.getDefault()).format(Date(item.timestamp)), color = Color(0xFF8B949E), fontSize = 10.sp)
+                                            Text("تسجيل صوتي", color = Color(0xFF1F2937), fontSize = 13.sp)
+                                            Text(SimpleDateFormat("h:mm a, d/M", Locale.getDefault()).format(Date(item.timestamp)), color = Color(0xFF6B7280), fontSize = 10.sp)
                                         }
                                         IconButton(onClick = { viewModel.deleteMediaItem("audio_records", item.id) }) {
-                                            Icon(Icons.Default.Delete, null, tint = Color(0xFFDA3633))
+                                            Icon(Icons.Default.Delete, null, tint = Color(0xFFEF4444))
                                         }
                                     }
                                 }
@@ -3014,13 +3094,13 @@ fun RemoteCommandCenterTab(viewModel: AdminViewModel) {
                         // Simplified apps list
                         LazyColumn(modifier = Modifier.weight(1f)) {
                             items(installedApps) { app ->
-                                Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)), modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                                Card(colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)), modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                                     Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(Icons.Default.Apps, null, tint = Color.White)
+                                        Icon(Icons.Default.Apps, null, tint = Color(0xFF1F2937))
                                         Spacer(Modifier.width(12.dp))
                                         Column {
-                                            Text(app.name, color = Color.White, fontWeight = FontWeight.Bold)
-                                            Text(app.packageName, color = Color(0xFF8B949E), fontSize = 10.sp)
+                                            Text(app.name, color = Color(0xFF1F2937), fontWeight = FontWeight.Bold)
+                                            Text(app.packageName, color = Color(0xFF6B7280), fontSize = 10.sp)
                                         }
                                     }
                                 }
@@ -3036,20 +3116,20 @@ fun RemoteCommandCenterTab(viewModel: AdminViewModel) {
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         Card(
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
-                            border = BorderStroke(1.dp, Color(0xFF30363D)),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
+                            border = BorderStroke(1.dp, Color(0xFFE5E7EB)),
                             shape = RoundedCornerShape(16.dp)
                         ) {
                             Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                                Icon(Icons.Default.Videocam, null, tint = Color(0xFFDA3633), modifier = Modifier.size(36.dp))
+                                Icon(Icons.Default.Videocam, null, tint = Color(0xFFEF4444), modifier = Modifier.size(36.dp))
                                 Spacer(Modifier.height(8.dp))
-                                Text("تسجيل فيديو عن بعد", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                                Text("سيتم تسجيل فيديو لمدة 10 ثوانٍ من كاميرا الطفل", color = Color(0xFF8B949E), fontSize = 11.sp)
+                                Text("تسجيل فيديو عن بعد", color = Color(0xFF1F2937), fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                                Text("سيتم تسجيل فيديو لمدة 10 ثوانٍ من كاميرا الطفل", color = Color(0xFF6B7280), fontSize = 11.sp)
                                 Spacer(Modifier.height(16.dp))
                                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                     Button(
                                         onClick = { viewModel.requestVideo(false) },
-                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDA3633)),
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
                                         modifier = Modifier.weight(1f).height(46.dp),
                                         shape = RoundedCornerShape(10.dp)
                                     ) {
@@ -3073,11 +3153,11 @@ fun RemoteCommandCenterTab(viewModel: AdminViewModel) {
 
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.VideoLibrary, null, tint = Color(0xFF8B949E), modifier = Modifier.size(18.dp))
+                                Icon(Icons.Default.VideoLibrary, null, tint = Color(0xFF6B7280), modifier = Modifier.size(18.dp))
                                 Spacer(Modifier.width(8.dp))
-                                Text("سجل الفيديوهات المستلمة", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                Text("سجل الفيديوهات المستلمة", color = Color(0xFF1F2937), fontSize = 14.sp, fontWeight = FontWeight.Bold)
                                 Spacer(Modifier.weight(1f))
-                                Text("${cameraVideos.size} فيديو", color = Color(0xFF8B949E), fontSize = 10.sp)
+                                Text("${cameraVideos.size} فيديو", color = Color(0xFF6B7280), fontSize = 10.sp)
                             }
                             
                             if (cameraVideos.isEmpty()) {
@@ -3086,26 +3166,26 @@ fun RemoteCommandCenterTab(viewModel: AdminViewModel) {
                                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                     cameraVideos.forEach { video ->
                                         Card(
-                                            colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
-                                            border = BorderStroke(1.dp, Color(0xFF30363D)),
+                                            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
+                                            border = BorderStroke(1.dp, Color(0xFFE5E7EB)),
                                             shape = RoundedCornerShape(12.dp)
                                         ) {
                                             Row(
                                                 modifier = Modifier.fillMaxWidth().padding(12.dp),
                                                 verticalAlignment = Alignment.CenterVertically
                                             ) {
-                                                Icon(Icons.Default.PlayCircle, null, tint = Color(0xFFDA3633), modifier = Modifier.size(32.dp))
+                                                Icon(Icons.Default.PlayCircle, null, tint = Color(0xFFEF4444), modifier = Modifier.size(32.dp))
                                                 Spacer(Modifier.width(12.dp))
                                                 Column(Modifier.weight(1f)) {
-                                                    Text("فيديو مسجل", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                                    Text("فيديو مسجل", color = Color(0xFF1F2937), fontWeight = FontWeight.Bold, fontSize = 13.sp)
                                                     Text(
                                                         SimpleDateFormat("HH:mm:ss dd/MM", Locale.getDefault()).format(Date(video.timestamp)),
-                                                        color = Color(0xFF8B949E),
+                                                        color = Color(0xFF6B7280),
                                                         fontSize = 11.sp
                                                     )
                                                 }
                                                 IconButton(onClick = { viewModel.deleteMediaItem("camera_videos", video.id) }) {
-                                                    Icon(Icons.Default.Delete, null, tint = Color(0xFFDA3633), modifier = Modifier.size(18.dp))
+                                                    Icon(Icons.Default.Delete, null, tint = Color(0xFFEF4444), modifier = Modifier.size(18.dp))
                                                 }
                                             }
                                         }
@@ -3141,17 +3221,17 @@ fun RemoteFileExplorerTab(viewModel: AdminViewModel) {
     ) {
         // Upper Navigation Breadcrumbs
         Card(
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
             shape = RoundedCornerShape(10.dp),
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(bottom = 12.dp),
-            border = BorderStroke(1.dp, Color(0xFF30363D))
+            border = BorderStroke(1.dp, Color(0xFFE5E7EB))
         ) {
             Column(modifier = Modifier.padding(12.dp)) {
                 Text(
                     text = "مستكشف ملفات الطفل السحابي",
-                    color = Color(0xFF8B949E),
+                    color = Color(0xFF6B7280),
                     fontSize = 11.sp
                 )
                 Spacer(modifier = Modifier.height(4.dp))
@@ -3163,7 +3243,7 @@ fun RemoteFileExplorerTab(viewModel: AdminViewModel) {
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = currentPath,
-                        color = Color.White,
+                        color = Color(0xFF1F2937),
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = FontFamily.Monospace,
@@ -3192,7 +3272,7 @@ fun RemoteFileExplorerTab(viewModel: AdminViewModel) {
                         viewModel.exploreDirectory("/storage/emulated/0")
                     }
                 },
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF21262D)),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE5E7EB)),
                 enabled = showUp,
                 shape = RoundedCornerShape(8.dp)
             ) {
@@ -3203,9 +3283,9 @@ fun RemoteFileExplorerTab(viewModel: AdminViewModel) {
 
             IconButton(
                 onClick = { viewModel.exploreDirectory(currentPath) },
-                modifier = Modifier.background(Color(0xFF21262D), CircleShape).size(36.dp)
+                modifier = Modifier.background(Color(0xFFE5E7EB), CircleShape).size(36.dp)
             ) {
-                Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = Color.White, modifier = Modifier.size(18.dp))
+                Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = Color(0xFF1F2937), modifier = Modifier.size(18.dp))
             }
         }
 
@@ -3222,7 +3302,7 @@ fun RemoteFileExplorerTab(viewModel: AdminViewModel) {
                                 viewModel.exploreDirectory(item.path)
                             }
                         },
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
                         shape = RoundedCornerShape(8.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -3235,7 +3315,7 @@ fun RemoteFileExplorerTab(viewModel: AdminViewModel) {
                             Icon(
                                 imageVector = if (item.isDir) Icons.Default.Folder else Icons.Default.InsertDriveFile,
                                 contentDescription = null,
-                                tint = if (item.isDir) Color(0xFFD29922) else Color(0xFF8B949E),
+                                tint = if (item.isDir) Color(0xFFD29922) else Color(0xFF6B7280),
                                 modifier = Modifier.size(24.dp)
                             )
 
@@ -3244,7 +3324,7 @@ fun RemoteFileExplorerTab(viewModel: AdminViewModel) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = item.name,
-                                    color = Color.White,
+                                    color = Color(0xFF1F2937),
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.Bold,
                                     maxLines = 1,
@@ -3254,14 +3334,14 @@ fun RemoteFileExplorerTab(viewModel: AdminViewModel) {
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     Text(
                                         text = item.date,
-                                        color = Color(0xFF8B949E),
+                                        color = Color(0xFF6B7280),
                                         fontSize = 10.sp
                                     )
                                     if (!item.isDir) {
                                         val kbGbText = remember(item.size) { formatSize(item.size) }
                                         Text(
                                             text = "• $kbGbText",
-                                            color = Color(0xFF8B949E),
+                                            color = Color(0xFF6B7280),
                                             fontSize = 10.sp
                                         )
                                     }
@@ -3272,7 +3352,7 @@ fun RemoteFileExplorerTab(viewModel: AdminViewModel) {
                                 Icon(
                                     imageVector = Icons.Default.ChevronRight,
                                     contentDescription = null,
-                                    tint = Color(0xFF30363D)
+                                    tint = Color(0xFFE5E7EB)
                                 )
                             }
                         }
@@ -3287,9 +3367,9 @@ fun RemoteFileExplorerTab(viewModel: AdminViewModel) {
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Icons.Default.FolderZip, null, tint = Color(0xFF21262D), modifier = Modifier.size(48.dp))
+                    Icon(Icons.Default.FolderZip, null, tint = Color(0xFFE5E7EB), modifier = Modifier.size(48.dp))
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text("المجلد فارغ أو لم يتم تلقي القائمة بعد.", color = Color(0xFF8B949E), fontSize = 12.sp)
+                    Text("المجلد فارغ أو لم يتم تلقي القائمة بعد.", color = Color(0xFF6B7280), fontSize = 12.sp)
                 }
             }
         }
@@ -3318,8 +3398,8 @@ fun ContactsTab(viewModel: AdminViewModel) {
             items(contacts) { contact ->
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
-                    border = BorderStroke(1.dp, Color(0xFF30363D))
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
+                    border = BorderStroke(1.dp, Color(0xFFE5E7EB))
                 ) {
                     Row(
                         modifier = Modifier.padding(12.dp),
@@ -3336,8 +3416,8 @@ fun ContactsTab(viewModel: AdminViewModel) {
                         }
                         Spacer(Modifier.width(12.dp))
                         Column {
-                            Text(contact.name, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                            Text(contact.number, color = Color(0xFF8B949E), fontSize = 12.sp)
+                            Text(contact.name, color = Color(0xFF1F2937), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                            Text(contact.number, color = Color(0xFF6B7280), fontSize = 12.sp)
                         }
                     }
                 }
@@ -3345,7 +3425,7 @@ fun ContactsTab(viewModel: AdminViewModel) {
             if (contacts.isEmpty()) {
                 item {
                     Box(Modifier.fillMaxWidth().height(100.dp), contentAlignment = Alignment.Center) {
-                        Text("لا توجد جهات اتصال متاحة، جرب التحديث.", color = Color(0xFF8B949E), fontSize = 12.sp)
+                        Text("لا توجد جهات اتصال متاحة، جرب التحديث.", color = Color(0xFF6B7280), fontSize = 12.sp)
                     }
                 }
             }
@@ -3370,7 +3450,7 @@ fun SmsAndSecurityAlertsTab(viewModel: AdminViewModel) {
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(bottom = 12.dp)
-                .background(Color(0xFF161B22), RoundedCornerShape(8.dp))
+                .background(Color(0xFFFFFFFF), RoundedCornerShape(8.dp))
                 .padding(4.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
@@ -3378,7 +3458,7 @@ fun SmsAndSecurityAlertsTab(viewModel: AdminViewModel) {
                 onClick = { activeSmsSubTab = 0 },
                 colors = ButtonDefaults.buttonColors(
                     containerColor = if (activeSmsSubTab == 0) Color(0xFF9155FF) else Color.Transparent,
-                    contentColor = if (activeSmsSubTab == 0) Color.White else Color(0xFF8B949E)
+                    contentColor = if (activeSmsSubTab == 0) Color(0xFF1F2937) else Color(0xFF6B7280)
                 ),
                 shape = RoundedCornerShape(6.dp),
                 modifier = Modifier.weight(1f),
@@ -3391,7 +3471,7 @@ fun SmsAndSecurityAlertsTab(viewModel: AdminViewModel) {
                 onClick = { activeSmsSubTab = 1 },
                 colors = ButtonDefaults.buttonColors(
                     containerColor = if (activeSmsSubTab == 1) Color(0xFFFF4081) else Color.Transparent,
-                    contentColor = if (activeSmsSubTab == 1) Color.White else Color(0xFF8B949E)
+                    contentColor = if (activeSmsSubTab == 1) Color(0xFF1F2937) else Color(0xFF6B7280)
                 ),
                 shape = RoundedCornerShape(6.dp),
                 modifier = Modifier.weight(1f),
@@ -3403,7 +3483,7 @@ fun SmsAndSecurityAlertsTab(viewModel: AdminViewModel) {
                             modifier = Modifier
                                 .size(8.dp)
                                 .clip(CircleShape)
-                                .background(Color(0xFFDA3633))
+                                .background(Color(0xFFEF4444))
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                     }
@@ -3432,7 +3512,7 @@ fun SmsAndSecurityAlertsTab(viewModel: AdminViewModel) {
                             ) {
                                 Card(
                                     colors = CardDefaults.cardColors(
-                                        containerColor = if (isIncoming) Color(0xFF161B22) else Color(0xFF2A1C3F)
+                                        containerColor = if (isIncoming) Color(0xFFFFFFFF) else Color(0xFFF5F3FF)
                                     ),
                                     shape = RoundedCornerShape(
                                         topStart = 12.dp,
@@ -3440,7 +3520,7 @@ fun SmsAndSecurityAlertsTab(viewModel: AdminViewModel) {
                                         bottomStart = if (isIncoming) 0.dp else 12.dp,
                                         bottomEnd = if (isIncoming) 12.dp else 0.dp
                                     ),
-                                    border = BorderStroke(1.dp, if (isIncoming) Color(0xFF30363D) else Color(0xFF9155FF).copy(alpha = 0.5f)),
+                                    border = BorderStroke(1.dp, if (isIncoming) Color(0xFFE5E7EB) else Color(0xFF9155FF).copy(alpha = 0.5f)),
                                     modifier = Modifier.widthIn(max = 280.dp)
                                 ) {
                                     Column(modifier = Modifier.padding(12.dp)) {
@@ -3460,7 +3540,7 @@ fun SmsAndSecurityAlertsTab(viewModel: AdminViewModel) {
                                             Box(
                                                 modifier = Modifier
                                                     .clip(RoundedCornerShape(4.dp))
-                                                    .background(Color(0xFF21262D))
+                                                    .background(Color(0xFFE5E7EB))
                                                     .padding(horizontal = 4.dp, vertical = 2.dp)
                                             ) {
                                                 Text(
@@ -3474,7 +3554,7 @@ fun SmsAndSecurityAlertsTab(viewModel: AdminViewModel) {
 
                                         Text(
                                             text = sms.body,
-                                            color = Color.White,
+                                            color = Color(0xFF1F2937),
                                             fontSize = 13.sp,
                                             lineHeight = 18.sp
                                         )
@@ -3485,7 +3565,7 @@ fun SmsAndSecurityAlertsTab(viewModel: AdminViewModel) {
                                         }
                                         Text(
                                             text = timeStr,
-                                            color = Color(0xFF8B949E),
+                                            color = Color(0xFF6B7280),
                                             fontSize = 9.sp,
                                             textAlign = TextAlign.End,
                                             modifier = Modifier.fillMaxWidth()
@@ -3501,9 +3581,9 @@ fun SmsAndSecurityAlertsTab(viewModel: AdminViewModel) {
                         contentAlignment = Alignment.Center
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(Icons.Default.Sms, null, tint = Color(0xFF21262D), modifier = Modifier.size(48.dp))
+                            Icon(Icons.Default.Sms, null, tint = Color(0xFFE5E7EB), modifier = Modifier.size(48.dp))
                             Spacer(modifier = Modifier.height(8.dp))
-                            Text("لا يتوفر رسائل SMS مؤرشفة في النظام حالياً.", color = Color(0xFF8B949E), fontSize = 12.sp)
+                            Text("لا يتوفر رسائل SMS مؤرشفة في النظام حالياً.", color = Color(0xFF6B7280), fontSize = 12.sp)
                         }
                     }
                 }
@@ -3518,14 +3598,14 @@ fun SmsAndSecurityAlertsTab(viewModel: AdminViewModel) {
                         ) {
                             Text(
                                 text = "مؤشر الإنذارات:  ${securityAlerts.size} تنبيهات",
-                                color = Color.White,
+                                color = Color(0xFF1F2937),
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.SemiBold
                             )
 
                             Button(
                                 onClick = { viewModel.clearAlerts() },
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDA3633)),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
                                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 2.dp),
                                 shape = RoundedCornerShape(6.dp),
                                 modifier = Modifier.height(28.dp)
@@ -3540,8 +3620,8 @@ fun SmsAndSecurityAlertsTab(viewModel: AdminViewModel) {
                         ) {
                             items(securityAlerts) { alert ->
                                 Card(
-                                    colors = CardDefaults.cardColors(containerColor = Color(0xFF1C1113)),
-                                    border = BorderStroke(1.dp, Color(0xFFDA3633)),
+                                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFEF2F2)),
+                                    border = BorderStroke(1.dp, Color(0xFFEF4444)),
                                     shape = RoundedCornerShape(10.dp)
                                 ) {
                                     Row(
@@ -3554,13 +3634,13 @@ fun SmsAndSecurityAlertsTab(viewModel: AdminViewModel) {
                                             modifier = Modifier
                                                 .size(36.dp)
                                                 .clip(CircleShape)
-                                                .background(Color(0xFFDA3633).copy(alpha = 0.2f)),
+                                                .background(Color(0xFFEF4444).copy(alpha = 0.2f)),
                                             contentAlignment = Alignment.Center
                                         ) {
                                             Icon(
                                                 imageVector = Icons.Default.Warning,
                                                 contentDescription = null,
-                                                tint = Color(0xFFDA3633),
+                                                tint = Color(0xFFEF4444),
                                                 modifier = Modifier.size(18.dp)
                                             )
                                         }
@@ -3572,14 +3652,14 @@ fun SmsAndSecurityAlertsTab(viewModel: AdminViewModel) {
                                                 text = if (alert.title == "DEVICE_BOOTED") "إعادة التشغيل (BOOT)" 
                                                        else if (alert.title == "BATTERY_LOW") "بطارية حرجة منخفضة" 
                                                        else alert.title,
-                                                color = Color.White,
+                                                color = Color(0xFF1F2937),
                                                 fontSize = 13.sp,
                                                 fontWeight = FontWeight.Bold
                                             )
                                             Spacer(modifier = Modifier.height(2.dp))
                                             Text(
                                                 text = alert.message,
-                                                color = Color(0xFFC9D1D9),
+                                                color = Color(0xFF374151),
                                                 fontSize = 11.sp
                                             )
                                             Spacer(modifier = Modifier.height(4.dp))
@@ -3588,7 +3668,7 @@ fun SmsAndSecurityAlertsTab(viewModel: AdminViewModel) {
                                             }
                                             Text(
                                                 text = timeStr,
-                                                color = Color(0xFF8B949E),
+                                                color = Color(0xFF6B7280),
                                                 fontSize = 9.sp
                                             )
                                         }
@@ -3604,8 +3684,8 @@ fun SmsAndSecurityAlertsTab(viewModel: AdminViewModel) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Icon(Icons.Default.HealthAndSafety, null, tint = Color(0xFF238636), modifier = Modifier.size(64.dp))
                                 Spacer(modifier = Modifier.height(12.dp))
-                                Text("لا يوجد تجاوزات خطيرة. طفلكم بأمان!", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                                Text("أي تنبيهات مثل هبوط البطارية أو تشغيل الهاتف ستظهر هنا فورياً.", color = Color(0xFF8B949E), fontSize = 11.sp)
+                                Text("لا يوجد تجاوزات خطيرة. طفلكم بأمان!", color = Color(0xFF1F2937), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                Text("أي تنبيهات مثل هبوط البطارية أو تشغيل الهاتف ستظهر هنا فورياً.", color = Color(0xFF6B7280), fontSize = 11.sp)
                             }
                         }
                     }
@@ -3641,13 +3721,13 @@ fun EmptyDevicesScreen(viewModel: AdminViewModel) {
 
         Text(
             text = "توصيل هاتف طفل جديد",
-            color = Color.White,
+            color = Color(0xFF1F2937),
             fontSize = 20.sp,
             fontWeight = FontWeight.Bold
         )
         Text(
             text = "الرجاء كتابة رمز الاقتران الفريد (Pairing Token) الخاص بالطفل للربط الفوري ومزامنته",
-            color = Color(0xFF8B949E),
+            color = Color(0xFF6B7280),
             fontSize = 12.sp,
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(vertical = 8.dp)
@@ -3657,7 +3737,7 @@ fun EmptyDevicesScreen(viewModel: AdminViewModel) {
 
         // Card Entry Inputs
         Card(
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
             shape = RoundedCornerShape(12.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
@@ -3665,14 +3745,14 @@ fun EmptyDevicesScreen(viewModel: AdminViewModel) {
                 OutlinedTextField(
                     value = pairingToken,
                     onValueChange = { pairingToken = it },
-                    label = { Text("رمز الاقتران (Token)", color = Color(0xFF8B949E)) },
+                    label = { Text("رمز الاقتران (Token)", color = Color(0xFF6B7280)) },
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
+                        focusedTextColor = Color(0xFF1F2937),
+                        unfocusedTextColor = Color(0xFF1F2937),
                         focusedBorderColor = Color(0xFF9155FF),
-                        unfocusedBorderColor = Color(0xFF30363D),
-                        focusedContainerColor = Color(0xFF0D1117),
-                        unfocusedContainerColor = Color(0xFF0D1117)
+                        unfocusedBorderColor = Color(0xFFE5E7EB),
+                        focusedContainerColor = Color(0xFFF3F4F6),
+                        unfocusedContainerColor = Color(0xFFF3F4F6)
                     ),
                     maxLines = 1,
                     modifier = Modifier.fillMaxWidth()
@@ -3681,14 +3761,14 @@ fun EmptyDevicesScreen(viewModel: AdminViewModel) {
                 OutlinedTextField(
                     value = friendlyName,
                     onValueChange = { friendlyName = it },
-                    label = { Text("اسم هاتف الطفل (مثال: هاتف أحمد)", color = Color(0xFF8B949E)) },
+                    label = { Text("اسم هاتف الطفل (مثال: هاتف أحمد)", color = Color(0xFF6B7280)) },
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
+                        focusedTextColor = Color(0xFF1F2937),
+                        unfocusedTextColor = Color(0xFF1F2937),
                         focusedBorderColor = Color(0xFF9155FF),
-                        unfocusedBorderColor = Color(0xFF30363D),
-                        focusedContainerColor = Color(0xFF0D1117),
-                        unfocusedContainerColor = Color(0xFF0D1117)
+                        unfocusedBorderColor = Color(0xFFE5E7EB),
+                        focusedContainerColor = Color(0xFFF3F4F6),
+                        unfocusedContainerColor = Color(0xFFF3F4F6)
                     ),
                     maxLines = 1,
                     modifier = Modifier.fillMaxWidth()
@@ -3706,7 +3786,7 @@ fun EmptyDevicesScreen(viewModel: AdminViewModel) {
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     if (isProgressing) {
-                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                        CircularProgressIndicator(color = Color(0xFF1F2937), modifier = Modifier.size(24.dp))
                     } else {
                         Text("مزامنة وإقتران في قاعدة البيانات", fontWeight = FontWeight.Bold)
                     }
@@ -3726,10 +3806,10 @@ fun EditDatabaseUrlDialog(
     
     Dialog(onDismissRequest = onClose) {
         Card(
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
             shape = RoundedCornerShape(16.dp),
             modifier = Modifier.fillMaxWidth().padding(8.dp),
-            border = BorderStroke(1.dp, Color(0xFF30363D))
+            border = BorderStroke(1.dp, Color(0xFFE5E7EB))
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Row(
@@ -3739,20 +3819,20 @@ fun EditDatabaseUrlDialog(
                 ) {
                     Text(
                         text = "تعديل رابط قاعدة البيانات",
-                        color = Color.White,
+                        color = Color(0xFF1F2937),
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold
                     )
                     IconButton(onClick = onClose) {
-                        Icon(Icons.Default.Close, contentDescription = "اغلاق", tint = Color(0xFF8B949E))
+                        Icon(Icons.Default.Close, contentDescription = "اغلاق", tint = Color(0xFF6B7280))
                     }
                 }
                 
-                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color(0xFF30363D))
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color(0xFFE5E7EB))
                 
                 Text(
                     text = "أدخل الرابط الكامل لقاعدة بيانات Firebase Realtime المخصصة لك:",
-                    color = Color(0xFF8B949E),
+                    color = Color(0xFF6B7280),
                     fontSize = 12.sp,
                     modifier = Modifier.padding(bottom = 12.dp)
                 )
@@ -3761,14 +3841,14 @@ fun EditDatabaseUrlDialog(
                     value = urlText,
                     onValueChange = { urlText = it },
                     modifier = Modifier.fillMaxWidth(),
-                    textStyle = androidx.compose.ui.text.TextStyle(color = Color.White, fontFamily = FontFamily.Monospace, fontSize = 12.sp),
-                    placeholder = { Text("https://example-default-rtdb.firebaseio.com", color = Color(0xFF8B949E)) },
+                    textStyle = androidx.compose.ui.text.TextStyle(color = Color(0xFF1F2937), fontFamily = FontFamily.Monospace, fontSize = 12.sp),
+                    placeholder = { Text("https://example-default-rtdb.firebaseio.com", color = Color(0xFF6B7280)) },
                     singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = Color(0xFF9155FF),
-                        unfocusedBorderColor = Color(0xFF30363D),
+                        unfocusedBorderColor = Color(0xFFE5E7EB),
                         focusedLabelColor = Color(0xFF9155FF),
-                        unfocusedLabelColor = Color(0xFF8B949E)
+                        unfocusedLabelColor = Color(0xFF6B7280)
                     )
                 )
                 
@@ -3776,7 +3856,7 @@ fun EditDatabaseUrlDialog(
                 
                 Text(
                     text = "خوادم ومناطق مقترحة (اضغط للتحديد):",
-                    color = Color.White,
+                    color = Color(0xFF1F2937),
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(bottom = 8.dp)
@@ -3795,7 +3875,7 @@ fun EditDatabaseUrlDialog(
                             .fillMaxWidth()
                             .padding(vertical = 4.dp)
                             .clip(RoundedCornerShape(8.dp))
-                            .background(Color(0xFF21262D))
+                            .background(Color(0xFFE5E7EB))
                             .clickable { urlText = url }
                             .padding(horizontal = 12.dp, vertical = 8.dp)
                     ) {
@@ -3807,7 +3887,7 @@ fun EditDatabaseUrlDialog(
                             Text(text = label, color = Color(0xFF9155FF), fontSize = 11.sp, fontWeight = FontWeight.Bold)
                             Text(
                                 text = if (url.length > 35) url.take(25) + "..." else url,
-                                color = Color(0xFF8B949E),
+                                color = Color(0xFF6B7280),
                                 fontSize = 10.sp,
                                 fontFamily = FontFamily.Monospace
                             )
@@ -3823,7 +3903,7 @@ fun EditDatabaseUrlDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     TextButton(onClick = onClose) {
-                        Text("إلغاء", color = Color(0xFF8B949E))
+                        Text("إلغاء", color = Color(0xFF6B7280))
                     }
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(
@@ -3857,10 +3937,10 @@ fun DeviceSelectionDialog(
 
     Dialog(onDismissRequest = onClose) {
         Card(
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
             shape = RoundedCornerShape(16.dp),
             modifier = Modifier.fillMaxWidth(),
-            border = BorderStroke(1.dp, Color(0xFF30363D))
+            border = BorderStroke(1.dp, Color(0xFFE5E7EB))
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Row(
@@ -3870,17 +3950,17 @@ fun DeviceSelectionDialog(
                 ) {
                     Text(
                         text = if (showAddPane) "إضافة جهاز طفل جديد" else "أجهزة الأطفال المتصلة",
-                        color = Color.White,
+                        color = Color(0xFF1F2937),
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold
                     )
 
                     IconButton(onClick = onClose) {
-                        Icon(Icons.Default.Close, contentDescription = "Close", tint = Color(0xFF8B949E))
+                        Icon(Icons.Default.Close, contentDescription = "Close", tint = Color(0xFF6B7280))
                     }
                 }
 
-                Divider(modifier = Modifier.padding(vertical = 8.dp), color = Color(0xFF30363D))
+                Divider(modifier = Modifier.padding(vertical = 8.dp), color = Color(0xFFE5E7EB))
 
                 if (!showAddPane) {
                     // Devices selector list
@@ -3895,7 +3975,7 @@ fun DeviceSelectionDialog(
                                 Card(
                                     onClick = { onSelect(dev.id) },
                                     colors = CardDefaults.cardColors(
-                                        containerColor = if (selected) Color(0xFF21262D) else Color(0xFF0D1117)
+                                        containerColor = if (selected) Color(0xFFE5E7EB) else Color(0xFFF3F4F6)
                                     ),
                                     border = BorderStroke(
                                         width = 1.dp,
@@ -3913,19 +3993,19 @@ fun DeviceSelectionDialog(
                                             modifier = Modifier
                                                 .size(10.dp)
                                                 .clip(CircleShape)
-                                                .background(if (online) Color(0xFF238636) else Color(0xFF8B949E))
+                                                .background(if (online) Color(0xFF238636) else Color(0xFF6B7280))
                                         )
                                         Spacer(modifier = Modifier.width(12.dp))
                                         Column(modifier = Modifier.weight(1f)) {
                                             Text(
                                                 text = dev.name,
-                                                color = Color.White,
+                                                color = Color(0xFF1F2937),
                                                 fontSize = 13.sp,
                                                 fontWeight = FontWeight.Bold
                                             )
                                             Text(
                                                 text = "الرمز الفريد: ${dev.id}",
-                                                color = Color(0xFF8B949E),
+                                                color = Color(0xFF6B7280),
                                                 fontSize = 11.sp
                                             )
                                         }
@@ -3948,7 +4028,7 @@ fun DeviceSelectionDialog(
                                 .height(100.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text("لا يتوفر أجهزة مسجلة.", color = Color(0xFF8B949E), fontSize = 12.sp)
+                            Text("لا يتوفر أجهزة مسجلة.", color = Color(0xFF6B7280), fontSize = 12.sp)
                         }
                     }
 
@@ -3970,14 +4050,14 @@ fun DeviceSelectionDialog(
                         OutlinedTextField(
                             value = newToken,
                             onValueChange = { newToken = it },
-                            placeholder = { Text("اكتب token فريد هنا.. (مثل: ahmad_phone)", color = Color(0xFF8B949E)) },
+                            placeholder = { Text("اكتب token فريد هنا.. (مثل: ahmad_phone)", color = Color(0xFF6B7280)) },
                             colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = Color.White,
-                                unfocusedTextColor = Color.White,
+                                focusedTextColor = Color(0xFF1F2937),
+                                unfocusedTextColor = Color(0xFF1F2937),
                                 focusedBorderColor = Color(0xFF9155FF),
-                                unfocusedBorderColor = Color(0xFF30363D),
-                                focusedContainerColor = Color(0xFF0D1117),
-                                unfocusedContainerColor = Color(0xFF0D1117)
+                                unfocusedBorderColor = Color(0xFFE5E7EB),
+                                focusedContainerColor = Color(0xFFF3F4F6),
+                                unfocusedContainerColor = Color(0xFFF3F4F6)
                             ),
                             maxLines = 1,
                             modifier = Modifier.fillMaxWidth()
@@ -3986,14 +4066,14 @@ fun DeviceSelectionDialog(
                         OutlinedTextField(
                             value = newName,
                             onValueChange = { newName = it },
-                            placeholder = { Text("اسم وكنية هاتف الطفل..", color = Color(0xFF8B949E)) },
+                            placeholder = { Text("اسم وكنية هاتف الطفل..", color = Color(0xFF6B7280)) },
                             colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = Color.White,
-                                unfocusedTextColor = Color.White,
+                                focusedTextColor = Color(0xFF1F2937),
+                                unfocusedTextColor = Color(0xFF1F2937),
                                 focusedBorderColor = Color(0xFF9155FF),
-                                unfocusedBorderColor = Color(0xFF30363D),
-                                focusedContainerColor = Color(0xFF0D1117),
-                                unfocusedContainerColor = Color(0xFF0D1117)
+                                unfocusedBorderColor = Color(0xFFE5E7EB),
+                                focusedContainerColor = Color(0xFFF3F4F6),
+                                unfocusedContainerColor = Color(0xFFF3F4F6)
                             ),
                             maxLines = 1,
                             modifier = Modifier.fillMaxWidth()
@@ -4005,7 +4085,7 @@ fun DeviceSelectionDialog(
                         ) {
                             Button(
                                 onClick = { showAddPane = false },
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF21262D)),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE5E7EB)),
                                 modifier = Modifier.weight(1f)
                             ) {
                                 Text("إلغاء", fontSize = 11.sp)
@@ -4056,7 +4136,7 @@ fun getBatteryColor(level: Int): Color {
     return when {
         level >= 40 -> Color(0xFF39D353)
         level >= 15 -> Color(0xFFD29922)
-        else -> Color(0xFFDA3633)
+        else -> Color(0xFFEF4444)
     }
 }
 
@@ -4138,7 +4218,7 @@ fun SwipeToRefreshBox(
                         scaleY = scaleTransition.value
                         alpha = scaleTransition.value
                     }
-                    .background(Color(0xFF1F2937), RoundedCornerShape(24.dp))
+                    .background(Color(0xFFF3F4F6), RoundedCornerShape(24.dp))
                     .border(1.dp, Color(0xFF374151), RoundedCornerShape(24.dp))
                     .padding(10.dp)
             ) {
@@ -4214,9 +4294,9 @@ fun VideoPlayerDialog(
             modifier = Modifier
                 .fillMaxWidth(0.95f)
                 .fillMaxHeight(0.8f),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF0D1117)),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFF3F4F6)),
             shape = RoundedCornerShape(16.dp),
-            border = BorderStroke(1.dp, Color(0xFF30363D))
+            border = BorderStroke(1.dp, Color(0xFFE5E7EB))
         ) {
             Column {
                 Row(
@@ -4226,7 +4306,7 @@ fun VideoPlayerDialog(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("مشغل الفيديو", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text("مشغل الفيديو", color = Color(0xFF1F2937), fontWeight = FontWeight.Bold)
                     Row {
                         IconButton(onClick = onDownload, enabled = !isPreparing) {
                             Icon(Icons.Default.Download, "تنزيل", tint = if (isPreparing) Color.Gray else Color.White, modifier = Modifier.size(20.dp))
