@@ -79,6 +79,7 @@ data class LiveStreamState(
     val isActive: Boolean = false,
     val isLoading: Boolean = false,
     val image: String? = null,
+    val streamUrl: String? = null,
     val timestamp: Long = 0L,
     val error: String? = null
 ) {
@@ -99,6 +100,7 @@ data class CameraStreamState(
     val isActive: Boolean = false,
     val isLoading: Boolean = false,
     val image: String? = null,
+    val streamUrl: String? = null,
     val cameraType: String = "back", // "front" or "back"
     val timestamp: Long = 0L,
     val error: String? = null

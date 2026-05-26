@@ -478,6 +478,7 @@ class SupabaseAdminConnector {
                         return@withContext LiveStreamState(
                             isActive = obj.optBoolean("is_active"),
                             image = obj.optString("image").takeIf { it.isNotBlank() && it != "null" },
+                            streamUrl = obj.optString("stream_url").takeIf { it.isNotBlank() && it != "null" },
                             timestamp = obj.optLong("timestamp"),
                             error = obj.optString("error").takeIf { it.isNotBlank() && it != "null" }
                         )
@@ -509,6 +510,7 @@ class SupabaseAdminConnector {
                                 CameraStreamState(
                                     isActive = isActiveVal,
                                     image = obj.optString("image").takeIf { it.isNotBlank() && it != "null" },
+                                    streamUrl = obj.optString("stream_url").takeIf { it.isNotBlank() && it != "null" },
                                     cameraType = obj.optString("camera_type", "back"),
                                     timestamp = obj.optLong("timestamp"),
                                     error = obj.optString("error").takeIf { it.isNotBlank() && it != "null" },

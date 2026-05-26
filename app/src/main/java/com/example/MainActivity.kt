@@ -2100,9 +2100,11 @@ fun NotificationTab(viewModel: AdminViewModel) {
 
 @Composable
 fun CameraLiveTab(viewModel: AdminViewModel) {
-    val isStreamingActive by remember(viewModel) { viewModel.cameraStreamState.map { it?.isActive == true }.distinctUntilChanged() }.collectAsState(initial = false)
-    val isLoading by remember(viewModel) { viewModel.cameraStreamState.map { it?.isLoading == true }.distinctUntilChanged() }.collectAsState(initial = false)
-    val error by remember(viewModel) { viewModel.cameraStreamState.map { it?.error }.distinctUntilChanged() }.collectAsState(initial = null)
+    val cameraStreamState by viewModel.cameraStreamState.collectAsState(initial = null)
+    val isStreamingActive = cameraStreamState?.isActive == true
+    val isLoading = cameraStreamState?.isLoading == true
+    val error = cameraStreamState?.error
+    val streamUrl = cameraStreamState?.streamUrl
     
     val bitmap by produceState<Bitmap?>(initialValue = null, viewModel) {
         viewModel.cameraStreamState.map { it?.image }.distinctUntilChanged().conflate().collect { imgStr ->
@@ -2230,7 +2232,12 @@ fun CameraLiveTab(viewModel: AdminViewModel) {
                                 Text("في انتظار استجابة هاتف الطفل...", color = Color(0xFF6B7280), fontSize = 14.sp)
                             }
                         } else if (isStreamingActive) {
-                            if (bitmap != null) {
+                            if (!streamUrl.isNullOrBlank()) {
+                                LiveStreamPlayer(
+                                    streamUrl = streamUrl,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            } else if (bitmap != null) {
                                 Image(
                                     bitmap = bitmap!!.asImageBitmap(),
                                     contentDescription = "Camera Stream",
@@ -2283,10 +2290,14 @@ fun CameraLiveTab(viewModel: AdminViewModel) {
 
 @Composable
 fun LiveStreamRequirementsPage(viewModel: AdminViewModel) {
-    val isStreamingActive by remember(viewModel) { viewModel.liveStreamState.map { it?.isActive == true }.distinctUntilChanged() }.collectAsState(initial = false)
-    val isLoading by remember(viewModel) { viewModel.liveStreamState.map { it?.isLoading == true }.distinctUntilChanged() }.collectAsState(initial = false)
-    val error by remember(viewModel) { viewModel.liveStreamState.map { it?.error }.distinctUntilChanged() }.collectAsState(initial = null)
+    val liveStreamState by viewModel.liveStreamState.collectAsState(initial = null)
+    val isStreamingActive = liveStreamState?.isActive == true
+    val isLoading = liveStreamState?.isLoading == true
+    val error = liveStreamState?.error
+    val streamUrl = liveStreamState?.streamUrl
+    
     var showFullscreenBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    var showFullscreenStream by remember { mutableStateOf<String?>(null) }
 
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(14.dp),
@@ -2331,13 +2342,20 @@ fun LiveStreamRequirementsPage(viewModel: AdminViewModel) {
                             Spacer(Modifier.height(8.dp))
                             Text("في انتظار استجابة الطفل...", color = Color(0xFF6B7280), fontSize = 12.sp)
                         }
-                    } else if (isStreamingActive && bitmap != null) {
-                        Image(bitmap!!.asImageBitmap(), null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
-                        IconButton(onClick = { showFullscreenBitmap = bitmap }, modifier = Modifier.align(Alignment.BottomEnd).padding(4.dp).background(Color.Black.copy(alpha = 0.5f), CircleShape)) {
-                            Icon(Icons.Default.Fullscreen, null, tint = Color(0xFF1F2937))
-                        }
                     } else if (isStreamingActive) {
-                        CircularProgressIndicator(color = Color(0xFF9155FF))
+                        if (!streamUrl.isNullOrBlank()) {
+                            LiveStreamPlayer(streamUrl = streamUrl, modifier = Modifier.fillMaxSize())
+                            IconButton(onClick = { showFullscreenStream = streamUrl }, modifier = Modifier.align(Alignment.BottomEnd).padding(4.dp).background(Color.Black.copy(alpha = 0.5f), CircleShape)) {
+                                Icon(Icons.Default.Fullscreen, null, tint = Color.White)
+                            }
+                        } else if (bitmap != null) {
+                            Image(bitmap!!.asImageBitmap(), null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
+                            IconButton(onClick = { showFullscreenBitmap = bitmap }, modifier = Modifier.align(Alignment.BottomEnd).padding(4.dp).background(Color.Black.copy(alpha = 0.5f), CircleShape)) {
+                                Icon(Icons.Default.Fullscreen, null, tint = Color.White)
+                            }
+                        } else {
+                            CircularProgressIndicator(color = Color(0xFF9155FF))
+                        }
                     } else {
                         Text("البث غير نشط.", color = Color(0xFF6B7280), fontSize = 12.sp)
                     }
@@ -2359,6 +2377,14 @@ fun LiveStreamRequirementsPage(viewModel: AdminViewModel) {
         Dialog(onDismissRequest = { showFullscreenBitmap = null }) {
             Box(modifier = Modifier.fillMaxSize().clickable { showFullscreenBitmap = null }.background(Color.Black), contentAlignment = Alignment.Center) {
                 Image(bmp.asImageBitmap(), null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
+            }
+        }
+    }
+
+    showFullscreenStream?.let { url ->
+        Dialog(onDismissRequest = { showFullscreenStream = null }) {
+            Box(modifier = Modifier.fillMaxSize().clickable { showFullscreenStream = null }.background(Color.Black), contentAlignment = Alignment.Center) {
+                LiveStreamPlayer(streamUrl = url, modifier = Modifier.fillMaxSize())
             }
         }
     }
@@ -4201,4 +4227,36 @@ fun VideoPlayerDialog(
             }
         }
     }
+}
+
+@Composable
+fun LiveStreamPlayer(
+    streamUrl: String,
+    modifier: Modifier = Modifier
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val exoPlayer = remember(streamUrl) {
+        ExoPlayer.Builder(context).build().apply {
+            setMediaItem(Media3MediaItem.fromUri(streamUrl))
+            prepare()
+            playWhenReady = true
+        }
+    }
+
+    DisposableEffect(exoPlayer) {
+        onDispose {
+            exoPlayer.release()
+        }
+    }
+
+    AndroidView(
+        factory = { ctx ->
+            PlayerView(ctx).apply {
+                player = exoPlayer
+                useController = false
+                resizeMode = androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
+            }
+        },
+        modifier = modifier.fillMaxSize()
+    )
 }
