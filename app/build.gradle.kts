@@ -11,13 +11,16 @@ android {
   compileSdk { version = release(36) { minorApiLevel = 1 } }
 
   defaultConfig {
-    applicationId = "com.aistudio.supervisorcontrol.xjhywq"
+    applicationId = "com.aistudio.supervisorcontrol.wkqzxn"
     minSdk = 24
-    targetSdk = 36
+    targetSdk = 35
     versionCode = 2
     versionName = "1.1"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    ndk {
+      abiFilters.addAll(setOf("x86_64", "arm64-v8a"))
+    }
   }
 
   signingConfigs {
@@ -52,7 +55,6 @@ android {
       signingConfig = signingConfigs.getByName("release")
     }
     debug {
-      applicationIdSuffix = ".debug"
       signingConfig = signingConfigs.getByName("debugConfig")
     }
   }
