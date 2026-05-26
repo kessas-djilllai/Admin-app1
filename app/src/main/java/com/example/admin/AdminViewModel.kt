@@ -128,6 +128,7 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
     // Polling and synchronization jobs
     private var syncJob: Job? = null
     private var streamPollingJob: Job? = null
+    private var realtimeStreamer: SupabaseRealtimeStreamer? = null
     private var lastKnownAlertTime = 0L
 
     // Database URL and status states
@@ -864,7 +865,21 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                     error = null
                 )
                 
-                // Start high-frequency stream-polling
+                // Connect Realtime Stream WebSocket for instant real-time frames
+                realtimeStreamer?.shutdown()
+                realtimeStreamer = SupabaseRealtimeStreamer(
+                    deviceToken = token,
+                    onLiveStreamUpdate = { state ->
+                        _liveStreamState.value = state
+                    },
+                    onCameraStreamUpdate = { state ->
+                        _cameraStreamState.value = state
+                    }
+                ).apply {
+                    connect(connector.getRootUrl(), anonKey)
+                }
+                
+                // Start high-frequency stream-polling as fallback/backup channel
                 streamPollingJob?.cancel()
                 streamPollingJob = viewModelScope.launch {
                     while (true) {
@@ -874,7 +889,7 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                         } catch (e: Exception) {
                             Log.e("AdminViewModel", "Error in screen stream polling", e)
                         }
-                        delay(1200) // Poll every 1.2s
+                        delay(2000) // Poll slower (every 2.0s) because websocket is the main channel
                     }
                 }
             } else {
@@ -890,6 +905,8 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
         val token = _selectedDeviceToken.value ?: return
         runCommand("stop_stream")
         streamPollingJob?.cancel()
+        realtimeStreamer?.shutdown()
+        realtimeStreamer = null
         _liveStreamState.value = _liveStreamState.value?.copy(isActive = false)
     }
 
@@ -967,7 +984,21 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                     error = null
                 )
                 
-                // Start high-frequency camera-stream-polling / SSE listener
+                // Connect Realtime Stream WebSocket for instant real-time frames
+                realtimeStreamer?.shutdown()
+                realtimeStreamer = SupabaseRealtimeStreamer(
+                    deviceToken = token,
+                    onLiveStreamUpdate = { state ->
+                        _liveStreamState.value = state
+                    },
+                    onCameraStreamUpdate = { state ->
+                        _cameraStreamState.value = state
+                    }
+                ).apply {
+                    connect(connector.getRootUrl(), anonKey)
+                }
+                
+                // Start high-frequency camera-stream-polling / SSE listener as fallback
                 streamPollingJob?.cancel()
                 streamPollingJob = viewModelScope.launch {
                     try {
@@ -991,6 +1022,8 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
         val token = _selectedDeviceToken.value ?: return
         runCommand("stop_camera_stream")
         streamPollingJob?.cancel()
+        realtimeStreamer?.shutdown()
+        realtimeStreamer = null
         _cameraStreamState.value = _cameraStreamState.value?.copy(isActive = false)
     }
 
@@ -1128,6 +1161,8 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
         super.onCleared()
         syncJob?.cancel()
         streamPollingJob?.cancel()
+        realtimeStreamer?.shutdown()
+        realtimeStreamer = null
         stopAudio()
     }
 }

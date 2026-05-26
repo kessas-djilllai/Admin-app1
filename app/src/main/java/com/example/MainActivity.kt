@@ -66,6 +66,7 @@ import java.text.SimpleDateFormat
 import java.util.*
 import android.util.Base64
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.media3.exoplayer.rtsp.RtspMediaSource
 import androidx.media3.common.MediaItem as Media3MediaItem
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
@@ -700,9 +701,7 @@ fun AdminDashboard(viewModel: AdminViewModel) {
 
                 val isRefreshing by viewModel.isRefreshing.collectAsState()
 
-                SwipeToRefreshBox(
-                    isRefreshing = isRefreshing,
-                    onRefresh = { viewModel.refreshCurrentDevice() },
+                Box(
                     modifier = Modifier.weight(1f).fillMaxWidth()
                 ) {
                     if (bottomNavSelectedTab == 0) {
@@ -2251,7 +2250,7 @@ fun CameraLiveTab(viewModel: AdminViewModel) {
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                     CircularProgressIndicator(color = Color(0xFF9155FF))
                                     Spacer(Modifier.height(8.dp))
-                                    Text("جاري استقبال الإطارات...", color = Color(0xFF1F2937), fontSize = 12.sp)
+                                    Text("جاري استقبال الإطارات...", color = Color(0xFF6B7280), fontSize = 12.sp)
                                 }
                             }
                         }
@@ -2357,7 +2356,11 @@ fun LiveStreamRequirementsPage(viewModel: AdminViewModel) {
                                 Icon(Icons.Default.Fullscreen, null, tint = Color.White)
                             }
                         } else {
-                            CircularProgressIndicator(color = Color(0xFF9155FF))
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                CircularProgressIndicator(color = Color(0xFF9155FF))
+                                Spacer(Modifier.height(8.dp))
+                                Text("جاري استقبال الإطارات...", color = Color(0xFF6B7280), fontSize = 11.sp)
+                            }
                         }
                     } else {
                         Text("البث غير نشط.", color = Color(0xFF6B7280), fontSize = 12.sp)
@@ -4316,61 +4319,59 @@ fun LiveStreamPlayer(
     deviceToken: String? = null,
     modifier: Modifier = Modifier
 ) {
-    var isWebRtcEnabled by remember { mutableStateOf(true) }
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     Box(modifier = modifier) {
-        if (isWebRtcEnabled && !deviceToken.isNullOrBlank()) {
-            com.example.webrtc.WebRtcLiveStreamPlayer(
-                signalingUrl = "https://webrtc-signaling-jj6h.onrender.com",
-                roomId = deviceToken,
-                modifier = Modifier.fillMaxSize()
-            )
-        } else {
-            val context = androidx.compose.ui.platform.LocalContext.current
-            val exoPlayer = remember(streamUrl) {
-                ExoPlayer.Builder(context).build().apply {
-                    setMediaItem(Media3MediaItem.fromUri(streamUrl))
-                    prepare()
-                    playWhenReady = true
+        val exoPlayer = remember(streamUrl) {
+            ExoPlayer.Builder(context).build().apply {
+                val mediaItem = Media3MediaItem.fromUri(streamUrl)
+                if (streamUrl.startsWith("rtsp://", ignoreCase = true)) {
+                    val mediaSource = RtspMediaSource.Factory()
+                        .setForceUseRtpTcp(true)
+                        .setTimeoutMs(5000)
+                        .createMediaSource(mediaItem)
+                    setMediaSource(mediaSource)
+                } else {
+                    setMediaItem(mediaItem)
                 }
+                playWhenReady = true
+                prepare()
             }
-
-            DisposableEffect(exoPlayer) {
-                onDispose {
-                    exoPlayer.release()
-                }
-            }
-
-            AndroidView(
-                factory = { ctx ->
-                    PlayerView(ctx).apply {
-                        player = exoPlayer
-                        useController = false
-                        resizeMode = androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
-                    }
-                },
-                modifier = Modifier.fillMaxSize()
-            )
         }
 
-        // Beautiful Material design toggle overlay
+        DisposableEffect(exoPlayer) {
+            onDispose {
+                exoPlayer.release()
+            }
+        }
+
+        AndroidView(
+            factory = { ctx ->
+                PlayerView(ctx).apply {
+                    player = exoPlayer
+                    useController = false
+                    resizeMode = androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
+                }
+            },
+            modifier = Modifier.fillMaxSize()
+        )
+
         Row(
             modifier = Modifier
                 .align(androidx.compose.ui.Alignment.TopEnd)
                 .padding(8.dp)
                 .background(Color.Black.copy(alpha = 0.7f), androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
-                .clickable { isWebRtcEnabled = !isWebRtcEnabled }
                 .padding(horizontal = 10.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
                 modifier = Modifier
                     .size(8.dp)
-                    .background(if (isWebRtcEnabled) Color(0xFF39D353) else Color(0xFFFFA726), androidx.compose.foundation.shape.CircleShape)
+                    .background(Color(0xFF39D353), androidx.compose.foundation.shape.CircleShape)
             )
             Spacer(Modifier.width(6.dp))
             Text(
-                text = if (isWebRtcEnabled) "بث WebRTC (50ms فوري)" else "بث ExoPlayer (احتياطي)",
+                text = "بث مشغل الفيديو الآمن الفوري",
                 color = Color.White,
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Bold

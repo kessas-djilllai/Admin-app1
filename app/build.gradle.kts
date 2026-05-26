@@ -8,7 +8,7 @@ plugins {
 
 android {
   namespace = "com.example"
-  compileSdk { version = release(36) { minorApiLevel = 1 } }
+  compileSdk = 35
 
   defaultConfig {
     applicationId = "com.aistudio.supervisorcontrol.wkqzxn"
@@ -18,9 +18,6 @@ android {
     versionName = "1.1"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-    ndk {
-      abiFilters.addAll(setOf("x86_64", "arm64-v8a"))
-    }
   }
 
   signingConfigs {
@@ -111,10 +108,10 @@ dependencies {
   implementation(libs.okhttp)
   // implementation(libs.play.services.location)
   implementation(libs.retrofit)
-  implementation(libs.androidx.media3.exoplayer)
+   implementation(libs.androidx.media3.exoplayer)
+   implementation(libs.androidx.media3.exoplayer.rtsp)
   implementation(libs.androidx.media3.ui)
   implementation(libs.androidx.media3.common)
-  implementation(libs.google.webrtc)
   testImplementation(libs.androidx.compose.ui.test.junit4)
   testImplementation(libs.androidx.core)
   testImplementation(libs.androidx.junit)
