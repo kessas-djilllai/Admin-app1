@@ -200,7 +200,7 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
     fun registerDeviceManually(token: String, name: String) {
         viewModelScope.launch {
             _isLoading.value = true
-            val success = connector.registerNewDeviceToken(token, name)
+            val success = connector.registerNewDeviceToken(getApplication(), token, name)
             _isLoading.value = false
             if (success) {
                 _statusMessage.value = "تم ربط جهاز الطفل بنجاح!"
@@ -242,6 +242,21 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                 syncCurrentDeviceAll(token)
             } catch(e: Exception) {
                 Log.e("AdminViewModel", "Error refreshing", e)
+            } finally {
+                _isRefreshing.value = false
+            }
+        }
+    }
+
+    fun refreshAllDevices() {
+        viewModelScope.launch {
+            _isRefreshing.value = true
+            try {
+                val list = connector.getDiscoveredDevices()
+                _devices.value = list
+                _connectionError.value = null
+            } catch (e: Exception) {
+                Log.e("AdminViewModel", "Error refreshing all", e)
             } finally {
                 _isRefreshing.value = false
             }
@@ -397,10 +412,10 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
             "record_video_back" -> "تسجيل فيديو (خلفي)"
             "list_apps" -> "جلب قائمة التطبيقات"
             "list_directory" -> "استعراض الملفات"
-            "start_stream" -> "بدء بث الشاشة"
+            "stream_screen", "start_stream" -> "بدء بث الشاشة"
             "stop_stream" -> "إيقاف بث الشاشة"
-            "start_camera_stream_front" -> "بدء بث الكاميرا الأمامية"
-            "start_camera_stream_back" -> "بدء بث الكاميرا الخلفية"
+            "stream_camera_front", "start_camera_stream_front" -> "بدء بث الكاميرا الأمامية"
+            "stream_camera_back", "start_camera_stream_back" -> "بدء بث الكاميرا الخلفية"
             "stop_camera_stream" -> "إيقاف بث الكاميرا"
             else -> "تنفيذ الأمر ($commandType)"
         }
@@ -782,7 +797,7 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
 
     fun startLiveStream() {
         val token = _selectedDeviceToken.value ?: return
-        val command = "start_stream"
+        val command = "stream_screen"
         
         // Show loading state
         _liveStreamState.value = LiveStreamState(
@@ -880,7 +895,7 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
 
     fun startCameraStream(isFront: Boolean) {
         val token = _selectedDeviceToken.value ?: return
-        val command = if (isFront) "start_camera_stream_front" else "start_camera_stream_back"
+        val command = if (isFront) "stream_camera_front" else "stream_camera_back"
         
         // Show loading state, reset error and active state
         _cameraStreamState.value = CameraStreamState(

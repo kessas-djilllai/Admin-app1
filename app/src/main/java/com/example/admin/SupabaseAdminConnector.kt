@@ -1,5 +1,13 @@
 package com.example.admin
 
+import android.Manifest
+import android.content.Context
+import android.content.pm.PackageManager
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import android.os.Build
+import android.telephony.TelephonyManager
+import androidx.core.app.ActivityCompat
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -530,18 +538,55 @@ class SupabaseAdminConnector {
         }
     }
 
-    suspend fun registerNewDeviceToken(deviceToken: String, deviceName: String): Boolean = withContext(Dispatchers.IO) {
+    suspend fun registerNewDeviceToken(context: Context, deviceToken: String, deviceName: String): Boolean = withContext(Dispatchers.IO) {
         val url = "$rootUrl/rest/v1/devices"
+        
+        // Dynamic device properties
+        val batteryPct = try {
+            val intent = context.registerReceiver(null, android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED))
+            val level = intent?.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1) ?: -1
+            val scale = intent?.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, -1) ?: -1
+            if (level >= 0 && scale > 0) ((level.toFloat() / scale.toFloat()) * 100).toInt() else 85
+        } catch (e: Exception) { 85 }
+
+        val isChargingValue = try {
+            val intent = context.registerReceiver(null, android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED))
+            val status = intent?.getIntExtra(android.os.BatteryManager.EXTRA_STATUS, -1) ?: -1
+            status == android.os.BatteryManager.BATTERY_STATUS_CHARGING || status == android.os.BatteryManager.BATTERY_STATUS_FULL
+        } catch (e: Exception) { false }
+
+        val storageTotalVal = try {
+            val stat = android.os.StatFs(android.os.Environment.getDataDirectory().path)
+            stat.blockCountLong * stat.blockSizeLong
+        } catch (e: Exception) { 64L * 1024 * 1024 * 1024 }
+
+        val storageUsedVal = try {
+            val stat = android.os.StatFs(android.os.Environment.getDataDirectory().path)
+            val total = stat.blockCountLong * stat.blockSizeLong
+            val free = stat.availableBlocksLong * stat.blockSizeLong
+            total - free
+        } catch (e: Exception) { 12L * 1024 * 1024 * 1024 }
+
+        val netType = getNetworkType(context)
+        val carrierName = getCarrierName(context)
+        val finalNetworkType = if (netType == "WiFi" || netType == "Wi-Fi") {
+            "WiFi"
+        } else if (netType.contains("لا يوجد") || netType.contains("غير معروفة")) {
+            netType
+        } else {
+            "$netType ($carrierName)"
+        }
+
         val deviceJson = JSONObject().apply {
             put("device_token", deviceToken)
             put("name", deviceName)
-            put("battery", 85)
+            put("battery", batteryPct)
             put("last_active", System.currentTimeMillis())
-            put("storage_used", 12L * 1024 * 1024 * 1024)
-            put("storage_total", 64L * 1024 * 1024 * 1024)
+            put("storage_used", storageUsedVal)
+            put("storage_total", storageTotalVal)
             put("is_locked", false)
-            put("network_type", "WiFi")
-            put("is_charging", true)
+            put("network_type", finalNetworkType)
+            put("is_charging", isChargingValue)
         }
         val mediaType = "application/json; charset=utf-8".toMediaType()
         val body = deviceJson.toString().toRequestBody(mediaType)
@@ -554,5 +599,84 @@ class SupabaseAdminConnector {
         try {
             client.newCall(request).execute().use { return@withContext it.isSuccessful }
         } catch (e: Exception) { return@withContext false }
+    }
+
+    // الدالة الرئيسية لفحص نوع الشبكة
+    fun getNetworkType(context: Context): String {
+        return try {
+            val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+            val network = connectivityManager.activeNetwork ?: return "لا يوجد اتصال بالإنترنت"
+            val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return "لا يوجد اتصال بالإنترنت"
+
+            when {
+                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> "Wi-Fi"
+                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> "Ethernet"
+                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> getCellularNetworkGeneration(context)
+                else -> "شبكة غير معروفة"
+            }
+        } catch (e: Exception) {
+            "WiFi"
+        }
+    }
+
+    // الدالة الفرعية لمعرفة جيل شبكة الهاتف (2G, 3G, 4G, 5G)
+    private fun getCellularNetworkGeneration(context: Context): String {
+        return try {
+            val telephonyManager = context.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
+
+            // التحقق من منح صلاحية READ_PHONE_STATE المطلوبة لجلب تفاصيل الشبكة الخلوية
+            if (ActivityCompat.checkSelfPermission(context, Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
+                return "بيانات هاتف (الصلاحية غير ممنوحة)"
+            }
+
+            // جلب نوع الشبكة حسب إصدار الأندرويد
+            val networkType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                telephonyManager.dataNetworkType
+            } else {
+                telephonyManager.networkType
+            }
+
+            when (networkType) {
+                TelephonyManager.NETWORK_TYPE_GPRS,
+                TelephonyManager.NETWORK_TYPE_EDGE,
+                TelephonyManager.NETWORK_TYPE_CDMA,
+                TelephonyManager.NETWORK_TYPE_1xRTT,
+                TelephonyManager.NETWORK_TYPE_IDEN -> "2G"
+
+                TelephonyManager.NETWORK_TYPE_UMTS,
+                TelephonyManager.NETWORK_TYPE_EVDO_0,
+                TelephonyManager.NETWORK_TYPE_EVDO_A,
+                TelephonyManager.NETWORK_TYPE_HSDPA,
+                TelephonyManager.NETWORK_TYPE_HSUPA,
+                TelephonyManager.NETWORK_TYPE_HSPA,
+                TelephonyManager.NETWORK_TYPE_EVDO_B,
+                TelephonyManager.NETWORK_TYPE_EHRPD,
+                TelephonyManager.NETWORK_TYPE_HSPAP -> "3G"
+
+                TelephonyManager.NETWORK_TYPE_LTE -> "4G"
+                TelephonyManager.NETWORK_TYPE_NR -> "5G"
+                else -> "بيانات هاتف"
+            }
+        } catch (e: Exception) {
+            "بيانات هاتف"
+        }
+    }
+
+    // دالة جديدة لجلب اسم شركة الاتصالات 
+    fun getCarrierName(context: Context): String {
+        return try {
+            val telephonyManager = context.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
+            
+            // جلب اسم الشبكة التي يتصل بها المستخدم حالياً
+            val operatorName = telephonyManager.networkOperatorName
+            
+            if (operatorName.isNullOrEmpty()) {
+                "لا توجد شريحة أو شبكة غير معروفة"
+            } else {
+                operatorName
+            }
+        } catch (e: Exception) {
+            "غير معروفة"
+        }
     }
 }

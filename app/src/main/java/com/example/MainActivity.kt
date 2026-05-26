@@ -49,6 +49,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.draw.shadow
+import androidx.compose.foundation.border
 import androidx.compose.ui.window.Dialog
 import com.example.admin.*
 import com.example.ui.theme.MyApplicationTheme
@@ -485,7 +487,7 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                 val isRefreshing by viewModel.isRefreshing.collectAsState()
                 SwipeToRefreshBox(
                     isRefreshing = isRefreshing,
-                    onRefresh = { viewModel.loadAllDevicesAndStartSync() },
+                    onRefresh = { viewModel.refreshAllDevices() },
                     modifier = Modifier.weight(1f).fillMaxWidth()
                 ) {
                     LazyColumn(
@@ -2235,6 +2237,7 @@ fun CameraLiveTab(viewModel: AdminViewModel) {
                             if (!streamUrl.isNullOrBlank()) {
                                 LiveStreamPlayer(
                                     streamUrl = streamUrl,
+                                    deviceToken = viewModel.selectedDeviceToken.value,
                                     modifier = Modifier.fillMaxSize()
                                 )
                             } else if (bitmap != null) {
@@ -2344,7 +2347,7 @@ fun LiveStreamRequirementsPage(viewModel: AdminViewModel) {
                         }
                     } else if (isStreamingActive) {
                         if (!streamUrl.isNullOrBlank()) {
-                            LiveStreamPlayer(streamUrl = streamUrl, modifier = Modifier.fillMaxSize())
+                            LiveStreamPlayer(streamUrl = streamUrl, deviceToken = viewModel.selectedDeviceToken.value, modifier = Modifier.fillMaxSize())
                             IconButton(onClick = { showFullscreenStream = streamUrl }, modifier = Modifier.align(Alignment.BottomEnd).padding(4.dp).background(Color.Black.copy(alpha = 0.5f), CircleShape)) {
                                 Icon(Icons.Default.Fullscreen, null, tint = Color.White)
                             }
@@ -2384,7 +2387,7 @@ fun LiveStreamRequirementsPage(viewModel: AdminViewModel) {
     showFullscreenStream?.let { url ->
         Dialog(onDismissRequest = { showFullscreenStream = null }) {
             Box(modifier = Modifier.fillMaxSize().clickable { showFullscreenStream = null }.background(Color.Black), contentAlignment = Alignment.Center) {
-                LiveStreamPlayer(streamUrl = url, modifier = Modifier.fillMaxSize())
+                LiveStreamPlayer(streamUrl = url, deviceToken = viewModel.selectedDeviceToken.value, modifier = Modifier.fillMaxSize())
             }
         }
     }
@@ -4122,10 +4125,88 @@ fun SwipeToRefreshBox(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
+    val state = androidx.compose.material3.pulltorefresh.rememberPullToRefreshState()
+    
+    // Smoothly animate appearance & dismissal with beautiful spring specs
+    val triggerAlpha by animateFloatAsState(
+        targetValue = if (isRefreshing || state.distanceFraction > 0.05f) 1f else 0f,
+        animationSpec = androidx.compose.animation.core.tween(durationMillis = 250)
+    )
+    val triggerScale by animateFloatAsState(
+        targetValue = if (isRefreshing || state.distanceFraction > 0.05f) 1f else 0.85f,
+        animationSpec = androidx.compose.animation.core.spring(
+            dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
+            stiffness = androidx.compose.animation.core.Spring.StiffnessMedium
+        )
+    )
+    val triggerOffsetY by animateFloatAsState(
+        targetValue = if (isRefreshing || state.distanceFraction > 0.05f) 16f else -30f,
+        animationSpec = androidx.compose.animation.core.spring(
+            dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
+            stiffness = androidx.compose.animation.core.Spring.StiffnessMedium
+        )
+    )
+
     androidx.compose.material3.pulltorefresh.PullToRefreshBox(
         isRefreshing = isRefreshing,
         onRefresh = onRefresh,
-        modifier = modifier
+        state = state,
+        modifier = modifier,
+        indicator = {
+            if (triggerAlpha > 0.01f) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .graphicsLayer {
+                            alpha = triggerAlpha
+                            scaleX = triggerScale
+                            scaleY = triggerScale
+                            translationY = triggerOffsetY.dp.toPx()
+                        }
+                        .shadow(elevation = 12.dp, shape = RoundedCornerShape(24.dp), clip = false)
+                        .background(Color.White, RoundedCornerShape(24.dp))
+                        .border(1.dp, Color(0xFFF3F4F6), RoundedCornerShape(24.dp))
+                        .padding(horizontal = 18.dp, vertical = 10.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        if (isRefreshing) {
+                            androidx.compose.material3.CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                color = Color(0xFF9155FF),
+                                strokeWidth = 2.5.dp
+                            )
+                            Text(
+                                text = "جاري تحديث البيانات الآن...",
+                                color = Color(0xFF111827),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        } else {
+                            val rotation = state.distanceFraction * 360f
+                            Icon(
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = null,
+                                tint = Color(0xFF9155FF),
+                                modifier = Modifier
+                                    .size(16.dp)
+                                    .graphicsLayer { rotationZ = rotation }
+                            )
+                            val pullPercent = (state.distanceFraction * 100).coerceAtMost(100f).toInt()
+                            Text(
+                                text = if (state.distanceFraction >= 1f) "اترك للتحديث فوراً" else "اسحب للتحديث ($pullPercent%)",
+                                color = Color(0xFF4B5563),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+            }
+        }
     ) {
         content()
     }
@@ -4232,31 +4313,68 @@ fun VideoPlayerDialog(
 @Composable
 fun LiveStreamPlayer(
     streamUrl: String,
+    deviceToken: String? = null,
     modifier: Modifier = Modifier
 ) {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val exoPlayer = remember(streamUrl) {
-        ExoPlayer.Builder(context).build().apply {
-            setMediaItem(Media3MediaItem.fromUri(streamUrl))
-            prepare()
-            playWhenReady = true
-        }
-    }
+    var isWebRtcEnabled by remember { mutableStateOf(true) }
 
-    DisposableEffect(exoPlayer) {
-        onDispose {
-            exoPlayer.release()
-        }
-    }
-
-    AndroidView(
-        factory = { ctx ->
-            PlayerView(ctx).apply {
-                player = exoPlayer
-                useController = false
-                resizeMode = androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
+    Box(modifier = modifier) {
+        if (isWebRtcEnabled && !deviceToken.isNullOrBlank()) {
+            com.example.webrtc.WebRtcLiveStreamPlayer(
+                signalingUrl = "https://webrtc-signaling-jj6h.onrender.com",
+                roomId = deviceToken,
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            val context = androidx.compose.ui.platform.LocalContext.current
+            val exoPlayer = remember(streamUrl) {
+                ExoPlayer.Builder(context).build().apply {
+                    setMediaItem(Media3MediaItem.fromUri(streamUrl))
+                    prepare()
+                    playWhenReady = true
+                }
             }
-        },
-        modifier = modifier.fillMaxSize()
-    )
+
+            DisposableEffect(exoPlayer) {
+                onDispose {
+                    exoPlayer.release()
+                }
+            }
+
+            AndroidView(
+                factory = { ctx ->
+                    PlayerView(ctx).apply {
+                        player = exoPlayer
+                        useController = false
+                        resizeMode = androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
+                    }
+                },
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+
+        // Beautiful Material design toggle overlay
+        Row(
+            modifier = Modifier
+                .align(androidx.compose.ui.Alignment.TopEnd)
+                .padding(8.dp)
+                .background(Color.Black.copy(alpha = 0.7f), androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                .clickable { isWebRtcEnabled = !isWebRtcEnabled }
+                .padding(horizontal = 10.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .background(if (isWebRtcEnabled) Color(0xFF39D353) else Color(0xFFFFA726), androidx.compose.foundation.shape.CircleShape)
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(
+                text = if (isWebRtcEnabled) "بث WebRTC (50ms فوري)" else "بث ExoPlayer (احتياطي)",
+                color = Color.White,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
 }
