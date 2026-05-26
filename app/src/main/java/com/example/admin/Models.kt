@@ -57,12 +57,15 @@ data class MediaItem(
     val type: String, // "screenshot", "camera_front", "camera_back"
     val cameraType: String? = null
 ) {
+    var lastDecodeError: String? = null
+
     fun toBitmap(): Bitmap? {
         return try {
             val cleanBase64 = if (base64.contains(",")) base64.substringAfter(",") else base64
             val decodedBytes = Base64.decode(cleanBase64, Base64.DEFAULT)
             BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size)
         } catch (t: Throwable) {
+            lastDecodeError = t.message ?: t.toString()
             null
         }
     }

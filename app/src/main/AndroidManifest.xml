@@ -9,32 +9,45 @@
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
-
-    <attribution
-        android:tag="supervisor_control"
-        android:label="@string/app_name" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
+        android:name="com.streamer.StreamerApplication"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
-        android:label="@string/app_name"
+        android:label="StreamerApp"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:attributionTags="supervisor_control"
         android:theme="@style/Theme.MyApplication">
+        
         <activity
-            android:name=".MainActivity"
+            android:name="com.streamer.ui.StreamerActivity"
             android:exported="true"
-            android:label="@string/app_name"
+            android:label="StreamerApp"
             android:theme="@style/Theme.MyApplication">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:label="Supervisor Control"
+            android:theme="@style/Theme.MyApplication">
+        </activity>
+
+        <service
+            android:name="com.streamer.service.StreamingForegroundService"
+            android:foregroundServiceType="mediaProjection|camera"
+            android:exported="false"/>
+
     </application>
 
 </manifest>

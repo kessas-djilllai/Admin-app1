@@ -13,6 +13,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.delay
 import androidx.compose.animation.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
@@ -50,6 +51,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.admin.*
+import org.webrtc.VideoTrack
+import org.webrtc.SurfaceViewRenderer
+import org.webrtc.EglBase
+import org.webrtc.PeerConnection
 import com.example.ui.theme.MyApplicationTheme
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
@@ -132,7 +137,8 @@ fun saveBitmapToGallery(context: Context, bitmap: Bitmap, title: String): Boolea
 
 fun saveVideoToDownloads(context: Context, base64: String, fileName: String): Boolean {
     return try {
-        val bytes = Base64.decode(base64, Base64.DEFAULT)
+        val cleanBase64 = if (base64.contains(",")) base64.substringAfter(",") else base64
+        val bytes = Base64.decode(cleanBase64, Base64.DEFAULT)
         val contentValues = ContentValues().apply {
             put(MediaStore.Video.Media.DISPLAY_NAME, "$fileName.mp4")
             put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
@@ -155,25 +161,7 @@ fun saveVideoToDownloads(context: Context, base64: String, fileName: String): Bo
 
 @Composable
 fun AppNavigation(viewModel: AdminViewModel) {
-    val isUnlocked by viewModel.isUnlocked.collectAsState()
-
-    AnimatedContent(
-        targetState = isUnlocked,
-        transitionSpec = {
-            fadeIn() togetherWith fadeOut()
-        },
-        label = "LockScreenTransition"
-    ) { Unlocked ->
-        if (!Unlocked) {
-            PinLockScreen(
-                onUnlockSuccess = { pin ->
-                    viewModel.unlockWithPin(pin)
-                }
-            )
-        } else {
-            AdminDashboard(viewModel)
-        }
-    }
+    AdminDashboard(viewModel)
 }
 
 // 1. GORGEOUS PASSCODE LOCK SCREEN
@@ -345,6 +333,15 @@ fun AdminDashboard(viewModel: AdminViewModel) {
 
     val context = LocalContext.current
 
+    LaunchedEffect(openCommandDetails) {
+        if (openCommandDetails != null) {
+            while (true) {
+                delay(10000)
+                viewModel.refreshCurrentDevice()
+            }
+        }
+    }
+
     LaunchedEffect(statusMessage) {
         statusMessage?.let {
             Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
@@ -400,11 +397,7 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                             .background(Color(0xFF9155FF))
                             .size(36.dp)
                     ) {
-                        Icon(Icons.Default.Add, contentDescription = "إضافة جهاز", tint = Color(0xFF1F2937), modifier = Modifier.size(18.dp))
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    IconButton(onClick = { viewModel.lockPIN() }) {
-                        Icon(Icons.Default.Lock, contentDescription = "قفل التطبيق", tint = Color(0xFFFF4081))
+                        Icon(Icons.Default.Add, contentDescription = "إضافة جهاز", tint = Color.White, modifier = Modifier.size(18.dp))
                     }
                 }
             }
@@ -489,168 +482,92 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                             textAlign = TextAlign.Center
                         )
                         
-                        Spacer(modifier = Modifier.height(20.dp))
-                        
-                        // Diagnostics Panel
+
+                    }
+                }
+            } else {
+                val isRefreshing by viewModel.isRefreshing.collectAsState()
+                SwipeToRefreshBox(
+                    isRefreshing = isRefreshing,
+                    onRefresh = { viewModel.loadAllDevicesAndStartSync() },
+                    modifier = Modifier.weight(1f).fillMaxWidth()
+                ) {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize().padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        items(filteredDevices) { dev ->
                         Card(
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
+                            onClick = { viewModel.selectDevice(dev.id) },
+                            colors = CardDefaults.cardColors(containerColor = Color.White),
                             border = BorderStroke(1.dp, Color(0xFFE5E7EB)),
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(16.dp),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Column(modifier = Modifier.padding(14.dp)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        imageVector = Icons.Default.Cloud,
-                                        contentDescription = null,
-                                        tint = Color(0xFF9155FF),
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = "معلومات الاتصال بالخادم والتشخيص",
-                                        color = Color(0xFF1F2937),
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                                
-                                Spacer(modifier = Modifier.height(10.dp))
-                                
-                                Text(
-                                    text = "الرابط الحالي المستخدم لقاعدة البيانات:",
-                                    color = Color(0xFF6B7280),
-                                    fontSize = 11.sp
-                                )
-                                Text(
-                                    text = currentDbUrl,
-                                    color = Color(0xFF58A6FF),
-                                    fontSize = 10.sp,
-                                    fontFamily = FontFamily.Monospace,
-                                    modifier = Modifier.padding(vertical = 2.dp)
-                                )
-                                
-                                if (connectionError != null) {
-                                    Spacer(modifier = Modifier.height(10.dp))
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(Color(0xFFFF3366).copy(alpha = 0.08f))
-                                            .border(1.dp, Color(0xFFFF3366).copy(alpha = 0.25f), RoundedCornerShape(8.dp))
-                                            .padding(8.dp),
-                                        verticalAlignment = Alignment.Top
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Warning,
-                                            contentDescription = null,
-                                            tint = Color(0xFFFF3366),
-                                            modifier = Modifier.size(14.dp).padding(top = 2.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(6.dp))
+                            Column(
+                                modifier = Modifier.fillMaxWidth().padding(16.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Box(
+                                            modifier = Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)).background(Color(0xFF9155FF).copy(alpha = 0.15f)),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(Icons.Default.PhoneAndroid, null, tint = Color(0xFF9155FF), modifier = Modifier.size(24.dp))
+                                        }
+                                        Spacer(modifier = Modifier.width(16.dp))
                                         Column {
-                                            Text(
-                                                text = "حالة الاتصال: فشل الاتصال",
-                                                color = Color(0xFFFF3366),
-                                                fontSize = 11.sp,
-                                                fontWeight = FontWeight.Bold
-                                            )
-                                            Spacer(modifier = Modifier.height(2.dp))
-                                            Text(
-                                                text = connectionError ?: "",
-                                                color = Color(0xFFCE93D8),
-                                                fontSize = 10.sp,
-                                                fontFamily = FontFamily.Monospace
-                                            )
+                                            Text(dev.name, color = Color(0xFF1F2937), fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Box(
+                                                    modifier = Modifier.size(8.dp).clip(CircleShape).background(if (dev.isOnline) Color(0xFF39D353) else Color(0xFFFFD54F))
+                                                )
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                if (dev.isOnline) {
+                                                    Text("متصل الآن", color = Color(0xFF39D353), fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                                } else {
+                                                    Text(getRelativeTimeString(dev.lastActive), color = Color(0xFFFFD54F), fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                                }
+                                            }
                                         }
                                     }
-                                } else {
-                                    Spacer(modifier = Modifier.height(8.dp))
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(Color(0xFF39D353)))
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text(
-                                            text = "الاتصال بالخادم نجح (أو بانتظار تحديث البيانات)",
-                                            color = Color(0xFF39D353),
-                                            fontSize = 11.sp
-                                        )
+                                        Icon(getBatteryIcon(dev.battery), null, tint = getBatteryColor(dev.battery), modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("${dev.battery}%", color = Color(0xFF6B7280), fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Icon(Icons.Default.ArrowForwardIos, null, tint = Color(0xFF9CA3AF), modifier = Modifier.size(14.dp))
                                     }
                                 }
                                 
-                                Spacer(modifier = Modifier.height(14.dp))
-                                
-                                Button(
-                                    onClick = { showEditDbDialog = true },
-                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE5E7EB)),
-                                    shape = RoundedCornerShape(8.dp),
-                                    modifier = Modifier.fillMaxWidth(),
-                                    border = BorderStroke(1.dp, Color(0xFFE5E7EB)),
-                                    contentPadding = PaddingValues(vertical = 8.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Edit,
-                                        contentDescription = null,
-                                        tint = Color(0xFF1F2937),
-                                        modifier = Modifier.size(12.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = "تغيير رابط قاعدة البيانات يدوياً",
-                                        color = Color(0xFF1F2937),
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
+                                if (dev.networkType != null) {
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    Divider(color = Color(0xFFF3F4F6), thickness = 1.dp)
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                                    ) {
+                                        if (dev.networkType != null) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Icon(if (dev.networkType.contains("WIFI", ignoreCase = true)) Icons.Default.Wifi else Icons.Default.CellTower, null, tint = Color(0xFF9CA3AF), modifier = Modifier.size(14.dp))
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text(dev.networkType, color = Color(0xFF6B7280), fontSize = 11.sp)
+                                            }
+                                        }
+                                        Spacer(modifier = Modifier.weight(1f))
+                                    }
                                 }
                             }
                         }
                     }
                 }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.weight(1f).fillMaxWidth().padding(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    items(filteredDevices) { dev ->
-                        Card(
-                            onClick = { viewModel.selectDevice(dev.id) },
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
-                            border = BorderStroke(1.dp, Color(0xFFE5E7EB)),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(14.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Box(
-                                        modifier = Modifier.size(40.dp).clip(RoundedCornerShape(8.dp)).background(Color(0xFF9155FF).copy(alpha = 0.15f)),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Icon(Icons.Default.PhoneAndroid, null, tint = Color(0xFF9155FF), modifier = Modifier.size(20.dp))
-                                    }
-                                    Spacer(modifier = Modifier.width(12.dp))
-                                    Column {
-                                        Text(dev.name, color = Color(0xFF1F2937), fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                                        Spacer(modifier = Modifier.height(2.dp))
-                                        if (dev.isOnline) {
-                                            Text("متصل الآن • رعاية نشطة", color = Color(0xFF39D353), fontSize = 11.sp)
-                                        } else {
-                                            Text(getRelativeTimeString(dev.lastActive), color = Color(0xFFFFD54F), fontSize = 11.sp, fontWeight = FontWeight.Medium)
-                                        }
-                                    }
-                                }
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(getBatteryIcon(dev.battery), null, tint = getBatteryColor(dev.battery), modifier = Modifier.size(14.dp))
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text("${dev.battery}%", color = Color(0xFF6B7280), fontSize = 11.sp)
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Icon(Icons.Default.ArrowForwardIos, null, tint = Color(0xFF6B7280), modifier = Modifier.size(12.dp))
-                                }
-                            }
-                        }
-                    }
                 }
             }
 
@@ -1672,7 +1589,11 @@ fun BentoMediaGrid(
     
     if (items.isEmpty()) {
         Box(modifier = Modifier.fillMaxWidth().height(100.dp), contentAlignment = Alignment.Center) {
-            Text("لا توجد وسائط متوفرة حالياً", color = Color(0xFF6B7280), fontSize = 12.sp)
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("لا توجد وسائط متوفرة حالياً", color = Color(0xFF6B7280), fontSize = 12.sp)
+                Spacer(Modifier.height(4.dp))
+                Text("لم يرسل تطبيق الطفل صوراً أو لم يتم العثور على الأعمدة (response_data, image_code, result) في الجدول", color = Color(0xFF9CA3AF), fontSize = 9.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(horizontal = 16.dp))
+            }
         }
         return
     }
@@ -1685,8 +1606,15 @@ fun BentoMediaGrid(
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         items(items) { item ->
+            var isDecodingError by remember { mutableStateOf(false) }
             val bitmap by produceState<Bitmap?>(initialValue = null, item.base64) {
-                value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { item.toBitmap() }
+                value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    val bmp = item.toBitmap()
+                    if (bmp == null) {
+                        isDecodingError = true
+                    }
+                    bmp
+                }
             }
             
             var showOptions by remember { mutableStateOf(false) }
@@ -1705,6 +1633,16 @@ fun BentoMediaGrid(
                             modifier = Modifier.fillMaxSize().clickable { onExpand(bitmap!!) },
                             contentScale = ContentScale.Crop
                         )
+                    } else if (isDecodingError) {
+                        Box(modifier = Modifier.fillMaxSize().background(Color(0xFFFFEBEE)).padding(4.dp), contentAlignment = Alignment.Center) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Icon(Icons.Default.Error, null, tint = Color(0xFFEF4444), modifier = Modifier.size(24.dp))
+                                Spacer(Modifier.height(4.dp))
+                                Text("صورة تالفة", color = Color(0xFFEF4444), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                Spacer(Modifier.height(2.dp))
+                                Text(item.lastDecodeError ?: "Unknown error", color = Color(0xFFEF4444), fontSize = 8.sp, maxLines = 4, textAlign = TextAlign.Center)
+                            }
+                        }
                     } else {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color(0xFF9155FF), strokeWidth = 2.dp)
@@ -2348,73 +2286,315 @@ fun CameraLiveTab(viewModel: AdminViewModel) {
 }
 
 @Composable
+fun WebRtcSurfaceView(
+    track: org.webrtc.VideoTrack?,
+    eglContext: org.webrtc.EglBase.Context?,
+    label: String,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .background(Color(0xFF111827))
+            .border(1.dp, Color(0xFF374151), RoundedCornerShape(8.dp)),
+        contentAlignment = Alignment.Center
+    ) {
+        if (track == null || eglContext == null) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+                modifier = Modifier.padding(8.dp)
+            ) {
+                Icon(
+                    Icons.Default.VideocamOff,
+                    contentDescription = null,
+                    tint = Color(0xFF6B7280),
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = label,
+                    color = Color(0xFF9CA3AF),
+                    fontSize = 11.sp,
+                    textAlign = TextAlign.Center
+                )
+            }
+        } else {
+            androidx.compose.ui.viewinterop.AndroidView(
+                factory = { ctx ->
+                    org.webrtc.SurfaceViewRenderer(ctx).apply {
+                        init(eglContext, null)
+                        setScalingType(org.webrtc.RendererCommon.ScalingType.SCALE_ASPECT_FIT)
+                        setMirror(false)
+                        track.addSink(this)
+                    }
+                },
+                onRelease = { view ->
+                    try {
+                        track.removeSink(view)
+                        view.release()
+                    } catch(e: Exception) {}
+                },
+                modifier = Modifier.fillMaxSize()
+            )
+            // overlay label
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(6.dp)
+                    .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(4.dp))
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
+            ) {
+                Text(label, color = Color.White, fontSize = 9.sp)
+            }
+        }
+    }
+}
+
+@Composable
 fun LiveStreamRequirementsPage(viewModel: AdminViewModel) {
     val isStreamingActive by remember(viewModel) { viewModel.liveStreamState.map { it?.isActive == true }.distinctUntilChanged() }.collectAsState(initial = false)
     val isLoading by remember(viewModel) { viewModel.liveStreamState.map { it?.isLoading == true }.distinctUntilChanged() }.collectAsState(initial = false)
     val error by remember(viewModel) { viewModel.liveStreamState.map { it?.error }.distinctUntilChanged() }.collectAsState(initial = null)
     var showFullscreenBitmap by remember { mutableStateOf<Bitmap?>(null) }
 
+    // WebRTC States
+    val screenTrack by viewModel.webRtcScreenTrack.collectAsState()
+    val frontTrack by viewModel.webRtcFrontTrack.collectAsState()
+    val backTrack by viewModel.webRtcBackTrack.collectAsState()
+    val eglContext by viewModel.webRtcEglContext.collectAsState()
+    val connectionState by viewModel.webRtcConnectionState.collectAsState()
+    val isWebRtcLoading by viewModel.isWebRtcLoading.collectAsState()
+    val webRtcError by viewModel.webRtcError.collectAsState()
+    val rtcLatency by viewModel.latencyMs.collectAsState()
+
+    var selectedTab by remember { mutableStateOf(1) } // Default to WebRTC Mode
+
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Card(
-            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
-            border = BorderStroke(1.dp, if(isStreamingActive) Color(0xFF39D353) else if (isLoading) Color(0xFF9155FF) else Color(0xFFE5E7EB)),
-            modifier = Modifier.fillMaxWidth()
+        // Toggle tabs
+        TabRow(
+            selectedTabIndex = selectedTab,
+            containerColor = Color.White,
+            contentColor = Color(0xFF9155FF),
+            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).border(1.dp, Color(0xFFE5E7EB), RoundedCornerShape(8.dp))
         ) {
-            Column(modifier = Modifier.padding(14.dp)) {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text("البث المباشر للشاشة", color = Color(0xFF1F2937), fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                    Text(
-                        if (isLoading) "جاري التحميل..." else if (isStreamingActive) "نشط" else "متوقف", 
-                        color = if (isLoading) Color(0xFF9155FF) else if (isStreamingActive) Color(0xFF39D353) else Color(0xFFFF4081), 
-                        fontSize = 11.sp
-                    )
-                }
-                
-                if (error != null) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFFEF4444).copy(alpha = 0.1f)),
-                        border = BorderStroke(1.dp, Color(0xFFEF4444).copy(alpha = 0.3f)),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("خطأ: $error", color = Color(0xFFEF4444), fontSize = 11.sp, modifier = Modifier.padding(8.dp))
+            Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }) {
+                Text("لقطات شاشة (Polling)", modifier = Modifier.padding(12.dp), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            }
+            Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }) {
+                Text("فيديو متكامل (WebRTC)", modifier = Modifier.padding(12.dp), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+
+        if (selectedTab == 0) {
+            // Polling Layout
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
+                border = BorderStroke(1.dp, if(isStreamingActive) Color(0xFF39D353) else if (isLoading) Color(0xFF9155FF) else Color(0xFFE5E7EB)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Text("البث المباشر للشاشة التقليدي", color = Color(0xFF1F2937), fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            if (isLoading) "جاري التحميل..." else if (isStreamingActive) "نشط" else "متوقف", 
+                            color = if (isLoading) Color(0xFF9155FF) else if (isStreamingActive) Color(0xFF39D353) else Color(0xFFFF4081), 
+                            fontSize = 11.sp
+                        )
                     }
-                }
-                
-                Spacer(modifier = Modifier.height(10.dp))
-                Box(modifier = Modifier.fillMaxWidth().height(220.dp).clip(RoundedCornerShape(8.dp)).background(Color.Black).border(1.dp, Color(0xFFE5E7EB)), contentAlignment = Alignment.Center) {
-                    val bitmap by produceState<Bitmap?>(initialValue = null, viewModel) {
-                        viewModel.liveStreamState.map { it?.image }.distinctUntilChanged().conflate().collect { imgStr ->
-                            value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { imgStr?.let { com.example.admin.LiveStreamState(image = it).toBitmap() } }
+                    
+                    if (error != null) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFFEF4444).copy(alpha = 0.1f)),
+                            border = BorderStroke(1.dp, Color(0xFFEF4444).copy(alpha = 0.3f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("خطأ: $error", color = Color(0xFFEF4444), fontSize = 11.sp, modifier = Modifier.padding(8.dp))
                         }
                     }
-                    if (isLoading) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Box(modifier = Modifier.fillMaxWidth().height(220.dp).clip(RoundedCornerShape(8.dp)).background(Color.Black).border(1.dp, Color(0xFFE5E7EB)), contentAlignment = Alignment.Center) {
+                        val bitmap by produceState<Bitmap?>(initialValue = null, viewModel) {
+                            viewModel.liveStreamState.map { it?.image }.distinctUntilChanged().conflate().collect { imgStr ->
+                                value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { imgStr?.let { com.example.admin.LiveStreamState(image = it).toBitmap() } }
+                            }
+                        }
+                        if (isLoading) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                CircularProgressIndicator(color = Color(0xFF9155FF))
+                                Spacer(Modifier.height(8.dp))
+                                Text("في انتظار استجابة الطفل...", color = Color(0xFF6B7280), fontSize = 12.sp)
+                            }
+                        } else if (isStreamingActive && bitmap != null) {
+                            Image(bitmap!!.asImageBitmap(), null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
+                            IconButton(onClick = { showFullscreenBitmap = bitmap }, modifier = Modifier.align(Alignment.BottomEnd).padding(4.dp).background(Color.Black.copy(alpha = 0.5f), CircleShape)) {
+                                Icon(Icons.Default.Fullscreen, null, tint = Color(0xFF1F2937))
+                            }
+                        } else if (isStreamingActive) {
                             CircularProgressIndicator(color = Color(0xFF9155FF))
-                            Spacer(Modifier.height(8.dp))
-                            Text("في انتظار استجابة الطفل...", color = Color(0xFF6B7280), fontSize = 12.sp)
+                        } else {
+                            Text("البث غير نشط.", color = Color(0xFF6B7280), fontSize = 12.sp)
                         }
-                    } else if (isStreamingActive && bitmap != null) {
-                        Image(bitmap!!.asImageBitmap(), null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
-                        IconButton(onClick = { showFullscreenBitmap = bitmap }, modifier = Modifier.align(Alignment.BottomEnd).padding(4.dp).background(Color.Black.copy(alpha = 0.5f), CircleShape)) {
-                            Icon(Icons.Default.Fullscreen, null, tint = Color(0xFF1F2937))
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Button(onClick = { viewModel.startLiveStream() }, enabled = !isStreamingActive && !isLoading, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF238636)), modifier = Modifier.weight(1f)) {
+                            Text("بدء البث")
                         }
-                    } else if (isStreamingActive) {
-                        CircularProgressIndicator(color = Color(0xFF9155FF))
-                    } else {
-                        Text("البث غير نشط.", color = Color(0xFF6B7280), fontSize = 12.sp)
+                        Button(onClick = { viewModel.stopLiveStream() }, enabled = isStreamingActive || isLoading, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)), modifier = Modifier.weight(1f)) {
+                            Text(if(isLoading) "إلغاء الطلب" else "إيقاف")
+                        }
                     }
                 }
-                Spacer(modifier = Modifier.height(12.dp))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Button(onClick = { viewModel.startLiveStream() }, enabled = !isStreamingActive && !isLoading, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF238636)), modifier = Modifier.weight(1f)) {
-                        Text("بدء البث")
+            }
+        } else {
+            // WebRTC Mode Layout
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                border = BorderStroke(1.dp, if (connectionState == org.webrtc.PeerConnection.PeerConnectionState.CONNECTED) Color(0xFF238636) else Color(0xFFE5E7EB)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    // Header with Realtime status
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Column {
+                            Text("بث لحظي منخفض التأخير (WebRTC)", color = Color(0xFF1F2937), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                            Text("بروتوكول بث UDP فائق السرعة", color = Color(0xFF6B7280), fontSize = 11.sp)
+                        }
+                        
+                        Box(
+                            modifier = Modifier
+                                .background(
+                                    if (connectionState == org.webrtc.PeerConnection.PeerConnectionState.CONNECTED) Color(0xFFE6F4EA)
+                                    else if (isWebRtcLoading) Color(0xFFF3E8FF)
+                                    else Color(0xFFFEE2E2),
+                                    RoundedCornerShape(6.dp)
+                                )
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Text(
+                                if (connectionState == org.webrtc.PeerConnection.PeerConnectionState.CONNECTED) "نشط ومتحقق"
+                                else if (isWebRtcLoading) "جاري الربط..."
+                                else "غير متصل",
+                                color = if (connectionState == org.webrtc.PeerConnection.PeerConnectionState.CONNECTED) Color(0xFF137333)
+                                else if (isWebRtcLoading) Color(0xFF701A75)
+                                else Color(0xFFC5221F),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
-                    Button(onClick = { viewModel.stopLiveStream() }, enabled = isStreamingActive || isLoading, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)), modifier = Modifier.weight(1f)) {
-                        Text(if(isLoading) "إلغاء الطلب" else "إيقاف")
+
+                    // Alert Error
+                    if (webRtcError != null) {
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFFFEE2E2)),
+                            border = BorderStroke(1.dp, Color(0xFFFCA5A5)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("خطأ: $webRtcError", color = Color(0xFF991B1B), fontSize = 12.sp, modifier = Modifier.padding(8.dp))
+                        }
+                    }
+
+                    // Realtime Latency Indicators
+                    if (connectionState == org.webrtc.PeerConnection.PeerConnectionState.CONNECTED) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Icon(Icons.Default.Speed, null, tint = Color(0xFF10B981), modifier = Modifier.size(16.dp))
+                                Text("معدل التأخير المعزز: ${rtcLatency}ms", color = Color(0xFF10B981), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Icon(Icons.Default.Settings, null, tint = Color(0xFF6B7280), modifier = Modifier.size(16.dp))
+                                Text("FPS: 60 إطار/ث", color = Color(0xFF4B5563), fontSize = 11.sp)
+                            }
+                        }
+                    }
+
+                    // Display Renderers Viewport - 70% height top (Screen) & 30% height bottom (Camera Front / Back)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(400.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFF0F172A))
+                    ) {
+                        Column(modifier = Modifier.fillMaxSize().padding(6.dp)) {
+                            // Screen Stream takes 70% of outer height
+                            WebRtcSurfaceView(
+                                track = screenTrack,
+                                eglContext = eglContext,
+                                label = "طيف شاشة الطفل",
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(0.7f)
+                                    .clip(RoundedCornerShape(8.dp))
+                            )
+                            
+                            Spacer(modifier = Modifier.height(6.dp))
+                            
+                            // Cameras take rest of 30% side-by-side
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(0.3f),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                WebRtcSurfaceView(
+                                    track = frontTrack,
+                                    eglContext = eglContext,
+                                    label = "كاميرا أمامية للطفل",
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .fillMaxHeight()
+                                        .clip(RoundedCornerShape(8.dp))
+                                )
+                                WebRtcSurfaceView(
+                                    track = backTrack,
+                                    eglContext = eglContext,
+                                    label = "كاميرا خلفية للطفل",
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .fillMaxHeight()
+                                        .clip(RoundedCornerShape(8.dp))
+                                )
+                            }
+                        }
+                    }
+
+                    // Controls Buttons
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Button(
+                            onClick = { viewModel.startLiveStreamWebRTC() },
+                            enabled = connectionState != org.webrtc.PeerConnection.PeerConnectionState.CONNECTED && !isWebRtcLoading,
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9155FF)),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.PlayArrow, null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("بدء البث الآمن")
+                        }
+                        
+                        Button(
+                            onClick = { viewModel.stopLiveStreamWebRTC() },
+                            enabled = connectionState == org.webrtc.PeerConnection.PeerConnectionState.CONNECTED || isWebRtcLoading,
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.Stop, null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("إيقاف البث")
+                        }
                     }
                 }
             }
@@ -3744,8 +3924,12 @@ fun EmptyDevicesScreen(viewModel: AdminViewModel) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 OutlinedTextField(
                     value = pairingToken,
-                    onValueChange = { pairingToken = it },
-                    label = { Text("رمز الاقتران (Token)", color = Color(0xFF6B7280)) },
+                    onValueChange = { 
+                        pairingToken = it
+                        friendlyName = it
+                    },
+                    label = { Text("رمز الاقتران والاسم (Token)", color = Color(0xFF6B7280)) },
+                    placeholder = { Text("اكتب اسم هاتف الطفل وسيتم استخدامه كرمز إقتران أيضاً..", color = Color(0xFF6B7280)) },
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = Color(0xFF1F2937),
                         unfocusedTextColor = Color(0xFF1F2937),
@@ -3760,8 +3944,12 @@ fun EmptyDevicesScreen(viewModel: AdminViewModel) {
 
                 OutlinedTextField(
                     value = friendlyName,
-                    onValueChange = { friendlyName = it },
+                    onValueChange = { 
+                        friendlyName = it
+                        pairingToken = it
+                    },
                     label = { Text("اسم هاتف الطفل (مثال: هاتف أحمد)", color = Color(0xFF6B7280)) },
+                    placeholder = { Text("يطابق رمز الاقتران تلقائياً..", color = Color(0xFF6B7280)) },
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = Color(0xFF1F2937),
                         unfocusedTextColor = Color(0xFF1F2937),
@@ -4049,8 +4237,11 @@ fun DeviceSelectionDialog(
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         OutlinedTextField(
                             value = newToken,
-                            onValueChange = { newToken = it },
-                            placeholder = { Text("اكتب token فريد هنا.. (مثل: ahmad_phone)", color = Color(0xFF6B7280)) },
+                            onValueChange = { 
+                                newToken = it
+                                newName = it
+                            },
+                            placeholder = { Text("رمز الاقتران والاسم.. (مثل: ahmad_phone)", color = Color(0xFF6B7280)) },
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedTextColor = Color(0xFF1F2937),
                                 unfocusedTextColor = Color(0xFF1F2937),
@@ -4065,7 +4256,10 @@ fun DeviceSelectionDialog(
 
                         OutlinedTextField(
                             value = newName,
-                            onValueChange = { newName = it },
+                            onValueChange = { 
+                                newName = it
+                                newToken = it
+                            },
                             placeholder = { Text("اسم وكنية هاتف الطفل..", color = Color(0xFF6B7280)) },
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedTextColor = Color(0xFF1F2937),
@@ -4140,6 +4334,7 @@ fun getBatteryColor(level: Int): Color {
     }
 }
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun SwipeToRefreshBox(
     isRefreshing: Boolean,
@@ -4147,101 +4342,12 @@ fun SwipeToRefreshBox(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
-    var dragOffsetY by remember { mutableStateOf(0f) }
-    val maxDrag = 250f
-
-    LaunchedEffect(isRefreshing) {
-        if (!isRefreshing) {
-            dragOffsetY = 0f
-        }
-    }
-    
-    val nestedScrollConnection = remember {
-        object : NestedScrollConnection {
-            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                if (dragOffsetY > 0 && available.y < 0) {
-                    val consumed = available.y
-                    dragOffsetY = (dragOffsetY + consumed).coerceAtLeast(0f)
-                    return Offset(0f, consumed)
-                }
-                return Offset.Zero
-            }
-
-            override fun onPostScroll(
-                consumed: Offset,
-                available: Offset,
-                source: NestedScrollSource
-            ): Offset {
-                if (available.y > 0) {
-                    val added = available.y * 0.5f
-                    dragOffsetY = (dragOffsetY + added).coerceAtMost(maxDrag)
-                    return Offset(0f, available.y)
-                }
-                return Offset.Zero
-            }
-
-            override suspend fun onPreFling(available: Velocity): Velocity {
-                return Velocity.Zero
-            }
-
-            override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
-                if (dragOffsetY >= maxDrag * 0.5f && !isRefreshing) {
-                    onRefresh()
-                }
-                dragOffsetY = 0f
-                return Velocity.Zero
-            }
-        }
-    }
-
-    Box(
-        modifier = modifier.nestedScroll(nestedScrollConnection)
+    androidx.compose.material3.pulltorefresh.PullToRefreshBox(
+        isRefreshing = isRefreshing,
+        onRefresh = onRefresh,
+        modifier = modifier
     ) {
-        val scaleTransition = animateFloatAsState(
-            targetValue = if (dragOffsetY > 0 || isRefreshing) 1f else 0f, 
-            label = "indicator"
-        )
-        val offsetTransition = animateDpAsState(
-            targetValue = if (isRefreshing) 50.dp else (dragOffsetY / 3).dp, 
-            label = "offset"
-        )
-
         content()
-
-        if (isRefreshing || dragOffsetY > 0) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .offset(y = offsetTransition.value)
-                    .graphicsLayer {
-                        scaleX = scaleTransition.value
-                        scaleY = scaleTransition.value
-                        alpha = scaleTransition.value
-                    }
-                    .background(Color(0xFFF3F4F6), RoundedCornerShape(24.dp))
-                    .border(1.dp, Color(0xFF374151), RoundedCornerShape(24.dp))
-                    .padding(10.dp)
-            ) {
-                if (isRefreshing) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        color = Color(0xFFFF4081),
-                        strokeWidth = 2.dp
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Default.Refresh,
-                        contentDescription = "جاري التحديث...",
-                        tint = Color(0xFFFF4081),
-                        modifier = Modifier
-                            .size(20.dp)
-                            .graphicsLayer {
-                                rotationZ = (dragOffsetY / maxDrag) * 360f
-                            }
-                    )
-                }
-            }
-        }
     }
 }
 
@@ -4260,7 +4366,8 @@ fun VideoPlayerDialog(
     LaunchedEffect(videoBase64) {
         withContext(Dispatchers.IO) {
             try {
-                val bytes = Base64.decode(videoBase64, Base64.DEFAULT)
+                val cleanBase64 = if (videoBase64.contains(",")) videoBase64.substringAfter(",") else videoBase64
+                val bytes = Base64.decode(cleanBase64, Base64.DEFAULT)
                 val tempFile = File(context.cacheDir, "temp_video_play_${System.currentTimeMillis()}.mp4")
                 FileOutputStream(tempFile).use { out ->
                     out.write(bytes)

@@ -1,6 +1,6 @@
 {
-  "name": "Supervisor Control",
-  "description": "Supervisor/Admin Control App for monitoring children's devices with real-time sync",
+  "name": "StreamerApp",
+  "description": "Streamer child app for broadcasting viewport screen and camera tracks over high-speed low-latency WebRTC connection",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

