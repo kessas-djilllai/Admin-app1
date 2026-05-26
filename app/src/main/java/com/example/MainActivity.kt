@@ -51,10 +51,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.admin.*
-import org.webrtc.VideoTrack
-import org.webrtc.SurfaceViewRenderer
-import org.webrtc.EglBase
-import org.webrtc.PeerConnection
 import com.example.ui.theme.MyApplicationTheme
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
@@ -2286,315 +2282,73 @@ fun CameraLiveTab(viewModel: AdminViewModel) {
 }
 
 @Composable
-fun WebRtcSurfaceView(
-    track: org.webrtc.VideoTrack?,
-    eglContext: org.webrtc.EglBase.Context?,
-    label: String,
-    modifier: Modifier = Modifier
-) {
-    Box(
-        modifier = modifier
-            .background(Color(0xFF111827))
-            .border(1.dp, Color(0xFF374151), RoundedCornerShape(8.dp)),
-        contentAlignment = Alignment.Center
-    ) {
-        if (track == null || eglContext == null) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-                modifier = Modifier.padding(8.dp)
-            ) {
-                Icon(
-                    Icons.Default.VideocamOff,
-                    contentDescription = null,
-                    tint = Color(0xFF6B7280),
-                    modifier = Modifier.size(24.dp)
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = label,
-                    color = Color(0xFF9CA3AF),
-                    fontSize = 11.sp,
-                    textAlign = TextAlign.Center
-                )
-            }
-        } else {
-            androidx.compose.ui.viewinterop.AndroidView(
-                factory = { ctx ->
-                    org.webrtc.SurfaceViewRenderer(ctx).apply {
-                        init(eglContext, null)
-                        setScalingType(org.webrtc.RendererCommon.ScalingType.SCALE_ASPECT_FIT)
-                        setMirror(false)
-                        track.addSink(this)
-                    }
-                },
-                onRelease = { view ->
-                    try {
-                        track.removeSink(view)
-                        view.release()
-                    } catch(e: Exception) {}
-                },
-                modifier = Modifier.fillMaxSize()
-            )
-            // overlay label
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(6.dp)
-                    .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(4.dp))
-                    .padding(horizontal = 6.dp, vertical = 2.dp)
-            ) {
-                Text(label, color = Color.White, fontSize = 9.sp)
-            }
-        }
-    }
-}
-
-@Composable
 fun LiveStreamRequirementsPage(viewModel: AdminViewModel) {
     val isStreamingActive by remember(viewModel) { viewModel.liveStreamState.map { it?.isActive == true }.distinctUntilChanged() }.collectAsState(initial = false)
     val isLoading by remember(viewModel) { viewModel.liveStreamState.map { it?.isLoading == true }.distinctUntilChanged() }.collectAsState(initial = false)
     val error by remember(viewModel) { viewModel.liveStreamState.map { it?.error }.distinctUntilChanged() }.collectAsState(initial = null)
     var showFullscreenBitmap by remember { mutableStateOf<Bitmap?>(null) }
 
-    // WebRTC States
-    val screenTrack by viewModel.webRtcScreenTrack.collectAsState()
-    val frontTrack by viewModel.webRtcFrontTrack.collectAsState()
-    val backTrack by viewModel.webRtcBackTrack.collectAsState()
-    val eglContext by viewModel.webRtcEglContext.collectAsState()
-    val connectionState by viewModel.webRtcConnectionState.collectAsState()
-    val isWebRtcLoading by viewModel.isWebRtcLoading.collectAsState()
-    val webRtcError by viewModel.webRtcError.collectAsState()
-    val rtcLatency by viewModel.latencyMs.collectAsState()
-
-    var selectedTab by remember { mutableStateOf(1) } // Default to WebRTC Mode
-
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // Toggle tabs
-        TabRow(
-            selectedTabIndex = selectedTab,
-            containerColor = Color.White,
-            contentColor = Color(0xFF9155FF),
-            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).border(1.dp, Color(0xFFE5E7EB), RoundedCornerShape(8.dp))
+        Card(
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
+            border = BorderStroke(1.dp, if(isStreamingActive) Color(0xFF39D353) else if (isLoading) Color(0xFF9155FF) else Color(0xFFE5E7EB)),
+            modifier = Modifier.fillMaxWidth()
         ) {
-            Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }) {
-                Text("لقطات شاشة (Polling)", modifier = Modifier.padding(12.dp), fontSize = 12.sp, fontWeight = FontWeight.Bold)
-            }
-            Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }) {
-                Text("فيديو متكامل (WebRTC)", modifier = Modifier.padding(12.dp), fontSize = 12.sp, fontWeight = FontWeight.Bold)
-            }
-        }
-
-        if (selectedTab == 0) {
-            // Polling Layout
-            Card(
-                colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
-                border = BorderStroke(1.dp, if(isStreamingActive) Color(0xFF39D353) else if (isLoading) Color(0xFF9155FF) else Color(0xFFE5E7EB)),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(14.dp)) {
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                        Text("البث المباشر للشاشة التقليدي", color = Color(0xFF1F2937), fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                        Text(
-                            if (isLoading) "جاري التحميل..." else if (isStreamingActive) "نشط" else "متوقف", 
-                            color = if (isLoading) Color(0xFF9155FF) else if (isStreamingActive) Color(0xFF39D353) else Color(0xFFFF4081), 
-                            fontSize = 11.sp
-                        )
-                    }
-                    
-                    if (error != null) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFFEF4444).copy(alpha = 0.1f)),
-                            border = BorderStroke(1.dp, Color(0xFFEF4444).copy(alpha = 0.3f)),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("خطأ: $error", color = Color(0xFFEF4444), fontSize = 11.sp, modifier = Modifier.padding(8.dp))
-                        }
-                    }
-                    
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Box(modifier = Modifier.fillMaxWidth().height(220.dp).clip(RoundedCornerShape(8.dp)).background(Color.Black).border(1.dp, Color(0xFFE5E7EB)), contentAlignment = Alignment.Center) {
-                        val bitmap by produceState<Bitmap?>(initialValue = null, viewModel) {
-                            viewModel.liveStreamState.map { it?.image }.distinctUntilChanged().conflate().collect { imgStr ->
-                                value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { imgStr?.let { com.example.admin.LiveStreamState(image = it).toBitmap() } }
-                            }
-                        }
-                        if (isLoading) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                CircularProgressIndicator(color = Color(0xFF9155FF))
-                                Spacer(Modifier.height(8.dp))
-                                Text("في انتظار استجابة الطفل...", color = Color(0xFF6B7280), fontSize = 12.sp)
-                            }
-                        } else if (isStreamingActive && bitmap != null) {
-                            Image(bitmap!!.asImageBitmap(), null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
-                            IconButton(onClick = { showFullscreenBitmap = bitmap }, modifier = Modifier.align(Alignment.BottomEnd).padding(4.dp).background(Color.Black.copy(alpha = 0.5f), CircleShape)) {
-                                Icon(Icons.Default.Fullscreen, null, tint = Color(0xFF1F2937))
-                            }
-                        } else if (isStreamingActive) {
-                            CircularProgressIndicator(color = Color(0xFF9155FF))
-                        } else {
-                            Text("البث غير نشط.", color = Color(0xFF6B7280), fontSize = 12.sp)
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Button(onClick = { viewModel.startLiveStream() }, enabled = !isStreamingActive && !isLoading, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF238636)), modifier = Modifier.weight(1f)) {
-                            Text("بدء البث")
-                        }
-                        Button(onClick = { viewModel.stopLiveStream() }, enabled = isStreamingActive || isLoading, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)), modifier = Modifier.weight(1f)) {
-                            Text(if(isLoading) "إلغاء الطلب" else "إيقاف")
-                        }
+            Column(modifier = Modifier.padding(14.dp)) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Text("البث المباشر للشاشة", color = Color(0xFF1F2937), fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    Text(
+                        if (isLoading) "جاري التحميل..." else if (isStreamingActive) "نشط" else "متوقف", 
+                        color = if (isLoading) Color(0xFF9155FF) else if (isStreamingActive) Color(0xFF39D353) else Color(0xFFFF4081), 
+                        fontSize = 11.sp
+                    )
+                }
+                
+                if (error != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFFEF4444).copy(alpha = 0.1f)),
+                        border = BorderStroke(1.dp, Color(0xFFEF4444).copy(alpha = 0.3f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("خطأ: $error", color = Color(0xFFEF4444), fontSize = 11.sp, modifier = Modifier.padding(8.dp))
                     }
                 }
-            }
-        } else {
-            // WebRTC Mode Layout
-            Card(
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                border = BorderStroke(1.dp, if (connectionState == org.webrtc.PeerConnection.PeerConnectionState.CONNECTED) Color(0xFF238636) else Color(0xFFE5E7EB)),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    // Header with Realtime status
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                        Column {
-                            Text("بث لحظي منخفض التأخير (WebRTC)", color = Color(0xFF1F2937), fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                            Text("بروتوكول بث UDP فائق السرعة", color = Color(0xFF6B7280), fontSize = 11.sp)
-                        }
-                        
-                        Box(
-                            modifier = Modifier
-                                .background(
-                                    if (connectionState == org.webrtc.PeerConnection.PeerConnectionState.CONNECTED) Color(0xFFE6F4EA)
-                                    else if (isWebRtcLoading) Color(0xFFF3E8FF)
-                                    else Color(0xFFFEE2E2),
-                                    RoundedCornerShape(6.dp)
-                                )
-                                .padding(horizontal = 8.dp, vertical = 4.dp)
-                        ) {
-                            Text(
-                                if (connectionState == org.webrtc.PeerConnection.PeerConnectionState.CONNECTED) "نشط ومتحقق"
-                                else if (isWebRtcLoading) "جاري الربط..."
-                                else "غير متصل",
-                                color = if (connectionState == org.webrtc.PeerConnection.PeerConnectionState.CONNECTED) Color(0xFF137333)
-                                else if (isWebRtcLoading) Color(0xFF701A75)
-                                else Color(0xFFC5221F),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold
-                            )
+                
+                Spacer(modifier = Modifier.height(10.dp))
+                Box(modifier = Modifier.fillMaxWidth().height(220.dp).clip(RoundedCornerShape(8.dp)).background(Color.Black).border(1.dp, Color(0xFFE5E7EB)), contentAlignment = Alignment.Center) {
+                    val bitmap by produceState<Bitmap?>(initialValue = null, viewModel) {
+                        viewModel.liveStreamState.map { it?.image }.distinctUntilChanged().conflate().collect { imgStr ->
+                            value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { imgStr?.let { com.example.admin.LiveStreamState(image = it).toBitmap() } }
                         }
                     }
-
-                    // Alert Error
-                    if (webRtcError != null) {
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFFFEE2E2)),
-                            border = BorderStroke(1.dp, Color(0xFFFCA5A5)),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("خطأ: $webRtcError", color = Color(0xFF991B1B), fontSize = 12.sp, modifier = Modifier.padding(8.dp))
+                    if (isLoading) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            CircularProgressIndicator(color = Color(0xFF9155FF))
+                            Spacer(Modifier.height(8.dp))
+                            Text("في انتظار استجابة الطفل...", color = Color(0xFF6B7280), fontSize = 12.sp)
                         }
+                    } else if (isStreamingActive && bitmap != null) {
+                        Image(bitmap!!.asImageBitmap(), null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
+                        IconButton(onClick = { showFullscreenBitmap = bitmap }, modifier = Modifier.align(Alignment.BottomEnd).padding(4.dp).background(Color.Black.copy(alpha = 0.5f), CircleShape)) {
+                            Icon(Icons.Default.Fullscreen, null, tint = Color(0xFF1F2937))
+                        }
+                    } else if (isStreamingActive) {
+                        CircularProgressIndicator(color = Color(0xFF9155FF))
+                    } else {
+                        Text("البث غير نشط.", color = Color(0xFF6B7280), fontSize = 12.sp)
                     }
-
-                    // Realtime Latency Indicators
-                    if (connectionState == org.webrtc.PeerConnection.PeerConnectionState.CONNECTED) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Icon(Icons.Default.Speed, null, tint = Color(0xFF10B981), modifier = Modifier.size(16.dp))
-                                Text("معدل التأخير المعزز: ${rtcLatency}ms", color = Color(0xFF10B981), fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                            }
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Icon(Icons.Default.Settings, null, tint = Color(0xFF6B7280), modifier = Modifier.size(16.dp))
-                                Text("FPS: 60 إطار/ث", color = Color(0xFF4B5563), fontSize = 11.sp)
-                            }
-                        }
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Button(onClick = { viewModel.startLiveStream() }, enabled = !isStreamingActive && !isLoading, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF238636)), modifier = Modifier.weight(1f)) {
+                        Text("بدء البث")
                     }
-
-                    // Display Renderers Viewport - 70% height top (Screen) & 30% height bottom (Camera Front / Back)
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(400.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(Color(0xFF0F172A))
-                    ) {
-                        Column(modifier = Modifier.fillMaxSize().padding(6.dp)) {
-                            // Screen Stream takes 70% of outer height
-                            WebRtcSurfaceView(
-                                track = screenTrack,
-                                eglContext = eglContext,
-                                label = "طيف شاشة الطفل",
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .weight(0.7f)
-                                    .clip(RoundedCornerShape(8.dp))
-                            )
-                            
-                            Spacer(modifier = Modifier.height(6.dp))
-                            
-                            // Cameras take rest of 30% side-by-side
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .weight(0.3f),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                WebRtcSurfaceView(
-                                    track = frontTrack,
-                                    eglContext = eglContext,
-                                    label = "كاميرا أمامية للطفل",
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .fillMaxHeight()
-                                        .clip(RoundedCornerShape(8.dp))
-                                )
-                                WebRtcSurfaceView(
-                                    track = backTrack,
-                                    eglContext = eglContext,
-                                    label = "كاميرا خلفية للطفل",
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .fillMaxHeight()
-                                        .clip(RoundedCornerShape(8.dp))
-                                )
-                            }
-                        }
-                    }
-
-                    // Controls Buttons
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Button(
-                            onClick = { viewModel.startLiveStreamWebRTC() },
-                            enabled = connectionState != org.webrtc.PeerConnection.PeerConnectionState.CONNECTED && !isWebRtcLoading,
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9155FF)),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Icon(Icons.Default.PlayArrow, null, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text("بدء البث الآمن")
-                        }
-                        
-                        Button(
-                            onClick = { viewModel.stopLiveStreamWebRTC() },
-                            enabled = connectionState == org.webrtc.PeerConnection.PeerConnectionState.CONNECTED || isWebRtcLoading,
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Icon(Icons.Default.Stop, null, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text("إيقاف البث")
-                        }
+                    Button(onClick = { viewModel.stopLiveStream() }, enabled = isStreamingActive || isLoading, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)), modifier = Modifier.weight(1f)) {
+                        Text(if(isLoading) "إلغاء الطلب" else "إيقاف")
                     }
                 }
             }

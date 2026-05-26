@@ -17,15 +17,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import java.io.File
 import java.io.FileOutputStream
-import org.webrtc.VideoTrack
-import org.webrtc.PeerConnection
-import org.webrtc.EglBase
 
 enum class CommandStepStatus {
     IDLE,
@@ -103,42 +97,6 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _liveStreamState = MutableStateFlow<LiveStreamState?>(null)
     val liveStreamState: StateFlow<LiveStreamState?> = _liveStreamState.asStateFlow()
-
-    // WebRTC Streaming States
-    private var webRtcReceiver: WebRTCReceiver? = null
-    private var signalingManager: SignalingManager? = null
-    private var webRtcJob: Job? = null
-    
-    private val _isWebRtcMode = MutableStateFlow(true)
-    val isWebRtcMode: StateFlow<Boolean> = _isWebRtcMode.asStateFlow()
-
-    private val _webRtcScreenTrack = MutableStateFlow<VideoTrack?>(null)
-    val webRtcScreenTrack: StateFlow<VideoTrack?> = _webRtcScreenTrack.asStateFlow()
-
-    private val _webRtcFrontTrack = MutableStateFlow<VideoTrack?>(null)
-    val webRtcFrontTrack: StateFlow<VideoTrack?> = _webRtcFrontTrack.asStateFlow()
-
-    private val _webRtcBackTrack = MutableStateFlow<VideoTrack?>(null)
-    val webRtcBackTrack: StateFlow<VideoTrack?> = _webRtcBackTrack.asStateFlow()
-
-    private val _webRtcEglContext = MutableStateFlow<org.webrtc.EglBase.Context?>(null)
-    val webRtcEglContext: StateFlow<org.webrtc.EglBase.Context?> = _webRtcEglContext.asStateFlow()
-
-    private val _webRtcConnectionState = MutableStateFlow<PeerConnection.PeerConnectionState>(PeerConnection.PeerConnectionState.NEW)
-    val webRtcConnectionState: StateFlow<PeerConnection.PeerConnectionState> = _webRtcConnectionState.asStateFlow()
-
-    private val _isWebRtcLoading = MutableStateFlow(false)
-    val isWebRtcLoading: StateFlow<Boolean> = _isWebRtcLoading.asStateFlow()
-
-    private val _webRtcError = MutableStateFlow<String?>(null)
-    val webRtcError: StateFlow<String?> = _webRtcError.asStateFlow()
-
-    private val _latencyMs = MutableStateFlow(0L)
-    val latencyMs: StateFlow<Long> = _latencyMs.asStateFlow()
-
-    fun setWebRtcMode(enabled: Boolean) {
-        _isWebRtcMode.value = enabled
-    }
 
     private val _cameraStreamState = MutableStateFlow<CameraStreamState?>(null)
     val cameraStreamState: StateFlow<CameraStreamState?> = _cameraStreamState.asStateFlow()
@@ -920,118 +878,6 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
         _liveStreamState.value = _liveStreamState.value?.copy(isActive = false)
     }
 
-    fun startLiveStreamWebRTC() {
-        val token = _selectedDeviceToken.value ?: return
-        stopLiveStreamWebRTC()
-        
-        _isWebRtcLoading.value = true
-        _webRtcError.value = null
-        _webRtcConnectionState.value = PeerConnection.PeerConnectionState.NEW
-        
-        // Ensure webRtc tracks are empty
-        _webRtcScreenTrack.value = null
-        _webRtcFrontTrack.value = null
-        _webRtcBackTrack.value = null
-
-        // 1. Initialize Signaling Manager
-        val dbUrl = _currentDatabaseUrl.value
-        val sig = SignalingManager(dbUrl)
-        signalingManager = sig
-        
-        val context = getApplication<Application>().applicationContext
-        
-        viewModelScope.launch {
-            try {
-                // Clear signaling room for this roomId = token
-                sig.clearRoom(token)
-                
-                // Initialize WebRTC Receiver
-                val receiver = WebRTCReceiver(
-                    context = context,
-                    onScreenTrack = { track -> _webRtcScreenTrack.value = track },
-                    onFrontCameraTrack = { track -> _webRtcFrontTrack.value = track },
-                    onBackCameraTrack = { track -> _webRtcBackTrack.value = track },
-                    onIceCandidateReady = { candidate ->
-                        viewModelScope.launch {
-                            sig.sendIceCandidate(token, candidate, isLocalAdmin = true)
-                        }
-                    },
-                    onConnectionStateChange = { state ->
-                        _webRtcConnectionState.value = state
-                        if (state == PeerConnection.PeerConnectionState.CONNECTED) {
-                            _isWebRtcLoading.value = false
-                        }
-                    }
-                )
-                
-                webRtcReceiver = receiver
-                _webRtcEglContext.value = receiver.getEglContext()
-                
-                receiver.createPeerConnection()
-                
-                // 2. Dispatch start_stream action to the child app via Supabase
-                val startTime = System.currentTimeMillis()
-                connector.clearCommandResponse(token)
-                val sentCommand = connector.sendCommandToChild(token, "start_stream", emptyMap(), startTime)
-                if (!sentCommand) {
-                    _isWebRtcLoading.value = false
-                    _webRtcError.value = "فشل في إرسال أمر بدء البث للطفل"
-                    return@launch
-                }
-                
-                // 3. Listen for Offer and ICE Candidates
-                webRtcJob = launch {
-                    launch {
-                        sig.listenForOffer(token).collect { offerSdp ->
-                            if (offerSdp != null) {
-                                Log.d("AdminViewModel", "Received remote Offer SDP. Generating Answer...")
-                                receiver.handleOffer(offerSdp) { answerSdp ->
-                                    viewModelScope.launch {
-                                        sig.sendAnswer(token, answerSdp)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    
-                    launch {
-                        sig.listenForChildIceCandidates(token).collect { candidate ->
-                            receiver.addIceCandidate(candidate)
-                        }
-                    }
-                    
-                    // Track measured latency every second
-                    launch {
-                        while (true) {
-                            _latencyMs.value = (35..65).random().toLong()
-                            delay(1000)
-                        }
-                    }
-                }
-                
-            } catch (e: Exception) {
-                Log.e("AdminViewModel", "Error in startLiveStreamWebRTC", e)
-                _isWebRtcLoading.value = false
-                _webRtcError.value = "حدث خطأ أثناء تهيئة البث: ${e.message}"
-            }
-        }
-    }
-
-    fun stopLiveStreamWebRTC() {
-        val token = _selectedDeviceToken.value ?: return
-        runCommand("stop_stream")
-        webRtcJob?.cancel()
-        webRtcJob = null
-        webRtcReceiver?.close()
-        webRtcReceiver = null
-        _webRtcScreenTrack.value = null
-        _webRtcFrontTrack.value = null
-        _webRtcBackTrack.value = null
-        _webRtcEglContext.value = null
-        _webRtcConnectionState.value = PeerConnection.PeerConnectionState.DISCONNECTED
-        _isWebRtcLoading.value = false
-    }
-
     fun startCameraStream(isFront: Boolean) {
         val token = _selectedDeviceToken.value ?: return
         val command = if (isFront) "start_camera_stream_front" else "start_camera_stream_back"
@@ -1268,8 +1114,5 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
         syncJob?.cancel()
         streamPollingJob?.cancel()
         stopAudio()
-        try {
-            stopLiveStreamWebRTC()
-        } catch(e: Exception) {}
     }
 }
