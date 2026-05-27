@@ -43,6 +43,8 @@ class SupabaseAdminConnector {
         return this.header("apikey", anonKey)
             .header("Authorization", "Bearer $anonKey")
             .header("Content-Profile", "public")
+            .header("Cache-Control", "no-cache")
+            .header("Pragma", "no-cache")
     }
 
     // Devices
@@ -74,6 +76,7 @@ class SupabaseAdminConnector {
                                 storageTotal = childObj.optLong("storage_total", 64L * 1024 * 1024 * 1024),
                                 isLocked = childObj.optBoolean("is_locked", false),
                                 networkType = childObj.optString("network_type").takeIf { it.isNotBlank() && it != "null" },
+                                carrierName = childObj.optString("carrier_name").takeIf { it.isNotBlank() && it != "null" },
                                 isCharging = childObj.optBoolean("is_charging", false)
                             )
                         )
@@ -470,9 +473,43 @@ class SupabaseAdminConnector {
         } catch (e: Exception) { return@withContext false }
     }
 
+    suspend fun getCameraStreamState(deviceToken: String): CameraStreamState? = withContext(Dispatchers.IO) {
+        val request = Request.Builder()
+            .url("$rootUrl/rest/v1/camera_stream?device_token=eq.$deviceToken&order=timestamp.desc&limit=1")
+            .addSupabaseHeaders()
+            .get()
+            .build()
+        try {
+            client.newCall(request).execute().use { response ->
+                val bodyStr = response.body?.string() ?: return@withContext null
+                if (bodyStr.startsWith("[")) {
+                    val arr = JSONArray(bodyStr)
+                    if (arr.length() > 0) {
+                        val obj = arr.optJSONObject(0)
+                        
+                        val imageBase64 = obj.optString("image").takeIf { it.isNotBlank() && it != "null" }
+                        val streamUrlVal = obj.optString("stream_url").takeIf { it.isNotBlank() && it != "null" }
+                        val actualStreamUrl = if (imageBase64?.startsWith("rtsp://") == true || imageBase64?.startsWith("http") == true) imageBase64 else streamUrlVal
+                        val actualImage = if (actualStreamUrl != null && actualStreamUrl == imageBase64) null else imageBase64
+
+                        return@withContext CameraStreamState(
+                            isActive = obj.optBoolean("is_active"),
+                            image = actualImage,
+                            streamUrl = actualStreamUrl,
+                            cameraType = obj.optString("camera_type", "back"),
+                            timestamp = obj.optLong("timestamp"),
+                            error = obj.optString("error").takeIf { it.isNotBlank() && it != "null" }
+                        )
+                    }
+                }
+                return@withContext null
+            }
+        } catch (e: Exception) { return@withContext null }
+    }
+
     suspend fun getLiveStreamState(deviceToken: String): LiveStreamState? = withContext(Dispatchers.IO) {
         val request = Request.Builder()
-            .url("$rootUrl/rest/v1/live_streams?device_token=eq.$deviceToken&limit=1")
+            .url("$rootUrl/rest/v1/live_streams?device_token=eq.$deviceToken&order=timestamp.desc&limit=1")
             .addSupabaseHeaders()
             .get()
             .build()
@@ -502,7 +539,7 @@ class SupabaseAdminConnector {
         while (isStreaming && isActive) {
             try {
                 val request = Request.Builder()
-                    .url("$rootUrl/rest/v1/camera_streams?device_token=eq.$deviceToken&limit=1")
+                    .url("$rootUrl/rest/v1/camera_stream?device_token=eq.$deviceToken&order=timestamp.desc&limit=1")
                     .addSupabaseHeaders()
                     .get()
                     .build()
@@ -514,11 +551,17 @@ class SupabaseAdminConnector {
                         if (arr.length() > 0) {
                             val obj = arr.optJSONObject(0)
                             val isActiveVal = obj.optBoolean("is_active")
+                            
+                            val imageBase64 = obj.optString("image").takeIf { it.isNotBlank() && it != "null" }
+                            val streamUrlVal = obj.optString("stream_url").takeIf { it.isNotBlank() && it != "null" }
+                            val actualStreamUrl = if (imageBase64?.startsWith("rtsp://") == true || imageBase64?.startsWith("http") == true) imageBase64 else streamUrlVal
+                            val actualImage = if (actualStreamUrl != null && actualStreamUrl == imageBase64) null else imageBase64
+                            
                             onUpdate(
                                 CameraStreamState(
                                     isActive = isActiveVal,
-                                    image = obj.optString("image").takeIf { it.isNotBlank() && it != "null" },
-                                    streamUrl = obj.optString("stream_url").takeIf { it.isNotBlank() && it != "null" },
+                                    image = actualImage,
+                                    streamUrl = actualStreamUrl,
                                     cameraType = obj.optString("camera_type", "back"),
                                     timestamp = obj.optLong("timestamp"),
                                     error = obj.optString("error").takeIf { it.isNotBlank() && it != "null" },

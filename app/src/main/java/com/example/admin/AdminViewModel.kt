@@ -226,9 +226,58 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
         _audioRecords.value = emptyList()
         _commandResponse.value = null
         _liveStreamState.value = null
+        _cameraStreamState.value = null
         streamPollingJob?.cancel()
         stopAudio()
         
+        // Permanent websocket listener for streams
+        realtimeStreamer?.shutdown()
+        realtimeStreamer = SupabaseRealtimeStreamer(
+            deviceToken = token,
+            onLiveStreamUpdate = { state ->
+                // Don't overwrite loading state unless it's a real active update
+                if (state.isActive || !state.streamUrl.isNullOrBlank()) {
+                    _liveStreamState.value = state.copy(isLoading = false)
+                } else if (!state.isActive && _liveStreamState.value?.isActive == true) {
+                    _liveStreamState.value = state.copy(isLoading = false)
+                }
+            },
+            onCameraStreamUpdate = { state ->
+                if (state.isActive || !state.streamUrl.isNullOrBlank()) {
+                    _cameraStreamState.value = state.copy(isLoading = false)
+                } else if (!state.isActive && _cameraStreamState.value?.isActive == true) {
+                    _cameraStreamState.value = state.copy(isLoading = false)
+                }
+            }
+        ).apply {
+            connect(connector.getRootUrl(), anonKey)
+        }
+        
+        streamPollingJob = viewModelScope.launch {
+            while (true) {
+                try {
+                    val streamState = connector.getLiveStreamState(token)
+                    if (streamState != null && (streamState.isActive || !streamState.streamUrl.isNullOrBlank())) {
+                        if (_liveStreamState.value?.image != streamState.image || _liveStreamState.value?.isActive != streamState.isActive || _liveStreamState.value?.timestamp != streamState.timestamp) {
+                            _liveStreamState.value = streamState.copy(isLoading = false)
+                        }
+                    } else if (streamState != null && !streamState.isActive && _liveStreamState.value?.isActive == true) {
+                        _liveStreamState.value = streamState.copy(isLoading = false)
+                    }
+
+                    val camState = connector.getCameraStreamState(token)
+                    if (camState != null && (camState.isActive || !camState.streamUrl.isNullOrBlank())) {
+                        if (_cameraStreamState.value?.image != camState.image || _cameraStreamState.value?.isActive != camState.isActive || _cameraStreamState.value?.timestamp != camState.timestamp) {
+                            _cameraStreamState.value = camState.copy(isLoading = false)
+                        }
+                    } else if (camState != null && !camState.isActive && _cameraStreamState.value?.isActive == true) {
+                        _cameraStreamState.value = camState.copy(isLoading = false)
+                    }
+                } catch(e: Exception) {}
+                delay(1000)
+            }
+        }
+
         // Trigger intermediate fetch
         triggerSingleDeviceFetch(token)
     }
@@ -831,7 +880,13 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
             var errorMsg: String? = null
             
             for (i in 0 until maxIterations) {
-                delay(1500)
+                delay(1000)
+                // Fast exit if WebSocket already got the stream
+                if (_liveStreamState.value?.isActive == true || !(_liveStreamState.value?.streamUrl.isNullOrBlank())) {
+                    success = true
+                    break
+                }
+                
                 try {
                     val resp = connector.getCommandResponse(token)
                     if (resp != null && resp.third == startTime) {
@@ -864,34 +919,6 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                     isActive = true,
                     error = null
                 )
-                
-                // Connect Realtime Stream WebSocket for instant real-time frames
-                realtimeStreamer?.shutdown()
-                realtimeStreamer = SupabaseRealtimeStreamer(
-                    deviceToken = token,
-                    onLiveStreamUpdate = { state ->
-                        _liveStreamState.value = state
-                    },
-                    onCameraStreamUpdate = { state ->
-                        _cameraStreamState.value = state
-                    }
-                ).apply {
-                    connect(connector.getRootUrl(), anonKey)
-                }
-                
-                // Start high-frequency stream-polling as fallback/backup channel
-                streamPollingJob?.cancel()
-                streamPollingJob = viewModelScope.launch {
-                    while (true) {
-                        try {
-                            val state = connector.getLiveStreamState(token)
-                            _liveStreamState.value = state?.copy(isLoading = false) ?: _liveStreamState.value
-                        } catch (e: Exception) {
-                            Log.e("AdminViewModel", "Error in screen stream polling", e)
-                        }
-                        delay(2000) // Poll slower (every 2.0s) because websocket is the main channel
-                    }
-                }
             } else {
                 _liveStreamState.value = _liveStreamState.value?.copy(
                     isLoading = false,
@@ -904,9 +931,6 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
     fun stopLiveStream() {
         val token = _selectedDeviceToken.value ?: return
         runCommand("stop_stream")
-        streamPollingJob?.cancel()
-        realtimeStreamer?.shutdown()
-        realtimeStreamer = null
         _liveStreamState.value = _liveStreamState.value?.copy(isActive = false)
     }
 
@@ -944,12 +968,18 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
             }
             
             // Poll for command response
-            val maxIterations = 20 // 30 seconds
+            val maxIterations = 20
             var success = false
             var errorMsg: String? = null
             
             for (i in 0 until maxIterations) {
-                delay(1500)
+                delay(1000)
+                // Fast exit if WebSocket already got the stream
+                if (_cameraStreamState.value?.isActive == true || !(_cameraStreamState.value?.streamUrl.isNullOrBlank())) {
+                    success = true
+                    break
+                }
+                
                 try {
                     val resp = connector.getCommandResponse(token)
                     if (resp != null && resp.third == startTime) {
@@ -983,32 +1013,6 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                     isActive = true,
                     error = null
                 )
-                
-                // Connect Realtime Stream WebSocket for instant real-time frames
-                realtimeStreamer?.shutdown()
-                realtimeStreamer = SupabaseRealtimeStreamer(
-                    deviceToken = token,
-                    onLiveStreamUpdate = { state ->
-                        _liveStreamState.value = state
-                    },
-                    onCameraStreamUpdate = { state ->
-                        _cameraStreamState.value = state
-                    }
-                ).apply {
-                    connect(connector.getRootUrl(), anonKey)
-                }
-                
-                // Start high-frequency camera-stream-polling / SSE listener as fallback
-                streamPollingJob?.cancel()
-                streamPollingJob = viewModelScope.launch {
-                    try {
-                        connector.listenToCameraStream(token) { state ->
-                            _cameraStreamState.value = state ?: _cameraStreamState.value
-                        }
-                    } catch (e: Exception) {
-                        Log.e("AdminViewModel", "Error in camera stream listener", e)
-                    }
-                }
             } else {
                 _cameraStreamState.value = _cameraStreamState.value?.copy(
                     isLoading = false,
@@ -1021,9 +1025,6 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
     fun stopCameraStream() {
         val token = _selectedDeviceToken.value ?: return
         runCommand("stop_camera_stream")
-        streamPollingJob?.cancel()
-        realtimeStreamer?.shutdown()
-        realtimeStreamer = null
         _cameraStreamState.value = _cameraStreamState.value?.copy(isActive = false)
     }
 

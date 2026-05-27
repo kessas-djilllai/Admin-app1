@@ -79,7 +79,7 @@ class SupabaseRealtimeStreamer(
                     put(JSONObject().apply {
                         put("event", "*")
                         put("schema", "public")
-                        put("table", "camera_streams")
+                        put("table", "camera_stream")
                     })
                 }
                 put("postgres_changes", postgresChangesArray)
@@ -168,13 +168,17 @@ class SupabaseRealtimeStreamer(
                         error = errorVal
                     )
                     onLiveStreamUpdate(state)
-                } else if (table == "camera_streams") {
+                } else if (table == "camera_stream") {
                     val cameraTypeVal = record.optString("camera_type", "back")
+                    
+                    val actualStreamUrl = if (imageBase64?.startsWith("rtsp://") == true || imageBase64?.startsWith("http") == true) imageBase64 else streamUrlVal
+                    val actualImage = if (actualStreamUrl != null && actualStreamUrl == imageBase64) null else imageBase64
+                    
                     val state = CameraStreamState(
                         isActive = isActiveVal,
                         isLoading = false,
-                        image = imageBase64,
-                        streamUrl = streamUrlVal,
+                        image = actualImage,
+                        streamUrl = actualStreamUrl,
                         cameraType = cameraTypeVal,
                         timestamp = timestampVal,
                         error = errorVal

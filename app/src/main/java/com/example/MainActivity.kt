@@ -1296,8 +1296,13 @@ fun DeviceHomeTab(device: Device, viewModel: AdminViewModel) {
                 Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(networkIcon, null, tint = Color(0xFF2196F3), modifier = Modifier.size(32.dp))
                     Spacer(modifier = Modifier.height(6.dp))
+                    val networkText = if (device.networkType != null && device.carrierName != null) {
+                        "${device.networkType} (${device.carrierName})"
+                    } else {
+                        device.networkType ?: device.carrierName ?: "---"
+                    }
                     Text("الشبكة", color = Color(0xFF6B7280), fontSize = 11.sp)
-                    Text(device.networkType ?: "---", color = Color(0xFF1F2937), fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    Text(networkText, color = Color(0xFF1F2937), fontSize = 14.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, maxLines = 1)
                 }
             }
 
@@ -1888,7 +1893,8 @@ fun RemoteControlTab(viewModel: AdminViewModel) {
                     contentAlignment = Alignment.Center
                 ) {
                     val bitmap by produceState<Bitmap?>(initialValue = null, viewModel) {
-                        viewModel.liveStreamState.map { it?.image }.distinctUntilChanged().conflate().collect { imgStr ->
+                        viewModel.liveStreamState.map { Pair(it?.image, it?.timestamp) }.distinctUntilChanged().conflate().collect { pair ->
+                            val imgStr = pair.first
                             value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { imgStr?.let { com.example.admin.LiveStreamState(image = it).toBitmap() } }
                         }
                     }
@@ -2108,7 +2114,8 @@ fun CameraLiveTab(viewModel: AdminViewModel) {
     val streamUrl = cameraStreamState?.streamUrl
     
     val bitmap by produceState<Bitmap?>(initialValue = null, viewModel) {
-        viewModel.cameraStreamState.map { it?.image }.distinctUntilChanged().conflate().collect { imgStr ->
+        viewModel.cameraStreamState.map { Pair(it?.image, it?.timestamp) }.distinctUntilChanged().conflate().collect { pair ->
+            val imgStr = pair.first
             value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { 
                 imgStr?.let { 
                     com.example.admin.CameraStreamState(image = it).toBitmap() 
@@ -2233,7 +2240,8 @@ fun CameraLiveTab(viewModel: AdminViewModel) {
                                 Text("في انتظار استجابة هاتف الطفل...", color = Color(0xFF6B7280), fontSize = 14.sp)
                             }
                         } else if (isStreamingActive) {
-                            if (!streamUrl.isNullOrBlank()) {
+                            val isWebRtcSignaling = !streamUrl.isNullOrBlank() && (streamUrl.contains("webrtc") || streamUrl.contains("signaling") || streamUrl.contains("render.com"))
+                            if (!streamUrl.isNullOrBlank() && !isWebRtcSignaling) {
                                 LiveStreamPlayer(
                                     streamUrl = streamUrl,
                                     deviceToken = viewModel.selectedDeviceToken.value,
@@ -2334,7 +2342,8 @@ fun LiveStreamRequirementsPage(viewModel: AdminViewModel) {
                 Spacer(modifier = Modifier.height(10.dp))
                 Box(modifier = Modifier.fillMaxWidth().height(220.dp).clip(RoundedCornerShape(8.dp)).background(Color.Black).border(1.dp, Color(0xFFE5E7EB)), contentAlignment = Alignment.Center) {
                     val bitmap by produceState<Bitmap?>(initialValue = null, viewModel) {
-                        viewModel.liveStreamState.map { it?.image }.distinctUntilChanged().conflate().collect { imgStr ->
+                        viewModel.liveStreamState.map { Pair(it?.image, it?.timestamp) }.distinctUntilChanged().conflate().collect { pair ->
+                            val imgStr = pair.first
                             value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { imgStr?.let { com.example.admin.LiveStreamState(image = it).toBitmap() } }
                         }
                     }
@@ -2345,7 +2354,8 @@ fun LiveStreamRequirementsPage(viewModel: AdminViewModel) {
                             Text("في انتظار استجابة الطفل...", color = Color(0xFF6B7280), fontSize = 12.sp)
                         }
                     } else if (isStreamingActive) {
-                        if (!streamUrl.isNullOrBlank()) {
+                        val isWebRtcSignaling = !streamUrl.isNullOrBlank() && (streamUrl.contains("webrtc") || streamUrl.contains("signaling") || streamUrl.contains("render.com"))
+                        if (!streamUrl.isNullOrBlank() && !isWebRtcSignaling) {
                             LiveStreamPlayer(streamUrl = streamUrl, deviceToken = viewModel.selectedDeviceToken.value, modifier = Modifier.fillMaxSize())
                             IconButton(onClick = { showFullscreenStream = streamUrl }, modifier = Modifier.align(Alignment.BottomEnd).padding(4.dp).background(Color.Black.copy(alpha = 0.5f), CircleShape)) {
                                 Icon(Icons.Default.Fullscreen, null, tint = Color.White)
@@ -2390,7 +2400,12 @@ fun LiveStreamRequirementsPage(viewModel: AdminViewModel) {
     showFullscreenStream?.let { url ->
         Dialog(onDismissRequest = { showFullscreenStream = null }) {
             Box(modifier = Modifier.fillMaxSize().clickable { showFullscreenStream = null }.background(Color.Black), contentAlignment = Alignment.Center) {
-                LiveStreamPlayer(streamUrl = url, deviceToken = viewModel.selectedDeviceToken.value, modifier = Modifier.fillMaxSize())
+                val isWebRtcSignaling = !url.isNullOrBlank() && (url.contains("webrtc") || url.contains("signaling") || url.contains("render.com"))
+                if (!isWebRtcSignaling) {
+                    LiveStreamPlayer(streamUrl = url, deviceToken = viewModel.selectedDeviceToken.value, modifier = Modifier.fillMaxSize())
+                } else {
+                    Text("لا يمكن عرض البث عبر بروتوكول الإشارة", color = Color.White)
+                }
             }
         }
     }
@@ -2919,7 +2934,8 @@ fun RemoteCommandCenterTab(viewModel: AdminViewModel) {
                                 HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = Color(0xFFE5E7EB))
                                 Box(modifier = Modifier.fillMaxWidth().height(260.dp).clip(RoundedCornerShape(10.dp)).background(Color(0xFFF9FAFB)).border(1.dp, Color(0xFFE5E7EB), RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) {
                                     val bitmap by produceState<Bitmap?>(initialValue = null, viewModel) {
-                                        viewModel.liveStreamState.map { it?.image }.distinctUntilChanged().conflate().collect { imgStr ->
+                                        viewModel.liveStreamState.map { Pair(it?.image, it?.timestamp) }.distinctUntilChanged().conflate().collect { pair ->
+                                            val imgStr = pair.first
                                             value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { imgStr?.let { com.example.admin.LiveStreamState(image = it).toBitmap() } }
                                         }
                                     }
@@ -4323,12 +4339,18 @@ fun LiveStreamPlayer(
 
     Box(modifier = modifier) {
         val exoPlayer = remember(streamUrl) {
-            ExoPlayer.Builder(context).build().apply {
+            val loadControl = androidx.media3.exoplayer.DefaultLoadControl.Builder()
+                .setBufferDurationsMs(500, 2000, 500, 500)
+                .build()
+            
+            ExoPlayer.Builder(context)
+                .setLoadControl(loadControl)
+                .build().apply {
                 val mediaItem = Media3MediaItem.fromUri(streamUrl)
                 if (streamUrl.startsWith("rtsp://", ignoreCase = true)) {
                     val mediaSource = RtspMediaSource.Factory()
                         .setForceUseRtpTcp(true)
-                        .setTimeoutMs(5000)
+                        .setTimeoutMs(3000)
                         .createMediaSource(mediaItem)
                     setMediaSource(mediaSource)
                 } else {

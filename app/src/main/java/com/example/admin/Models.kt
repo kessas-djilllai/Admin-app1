@@ -15,6 +15,7 @@ data class Device(
     val storageTotal: Long, // in Bytes
     val isLocked: Boolean,
     val networkType: String? = null,
+    val carrierName: String? = null,
     val isCharging: Boolean = false
 ) {
     val isOnline: Boolean
@@ -89,7 +90,8 @@ data class LiveStreamState(
         return try {
             val cleanBase64 = if (imgStr.contains(",")) imgStr.substringAfter(",") else imgStr
             val decodedBytes = Base64.decode(cleanBase64, Base64.DEFAULT)
-            BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size)
+            val options = BitmapFactory.Options().apply { inPreferredConfig = Bitmap.Config.RGB_565 }
+            BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size, options)
         } catch (t: Throwable) {
             null
         }
@@ -112,7 +114,8 @@ data class CameraStreamState(
         return try {
             val cleanBase64 = if (imgStr.contains(",")) imgStr.substringAfter(",") else imgStr
             val decodedBytes = Base64.decode(cleanBase64, Base64.DEFAULT)
-            BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size)
+            val options = BitmapFactory.Options().apply { inPreferredConfig = Bitmap.Config.RGB_565 }
+            BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size, options)
         } catch (t: Throwable) {
             null
         }
