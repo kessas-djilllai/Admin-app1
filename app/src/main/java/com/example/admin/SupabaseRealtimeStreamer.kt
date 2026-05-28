@@ -8,18 +8,28 @@ import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
 class SupabaseRealtimeStreamer(
-    private val deviceToken: String,
-    private val onLiveStreamUpdate: (LiveStreamState) -> Unit,
-    private val onCameraStreamUpdate: (CameraStreamState) -> Unit
+    private val deviceToken: String?,
+    private val onLiveStreamUpdate: ((LiveStreamState) -> Unit)? = null,
+    private val onCameraStreamUpdate: ((CameraStreamState) -> Unit)? = null,
+    private val onDeviceUpdate: ((Device) -> Unit)? = null,
+    private val onStatusUpdate: ((Boolean) -> Unit)? = null,
+    val onPresenceSync: ((Set<String>) -> Unit)? = null,
+    val onPresenceJoin: ((String) -> Unit)? = null,
+    val onPresenceLeave: ((String) -> Unit)? = null,
+    val onHeartbeat: ((String) -> Unit)? = null
 ) {
     private val client = OkHttpClient.Builder()
-        .readTimeout(0, TimeUnit.MILLISECONDS) // Indefinite read timeout for WebSocket
+        .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+        .writeTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+        .readTimeout(0, java.util.concurrent.TimeUnit.MILLISECONDS) // Indefinite read timeout for WebSocket
+        .pingInterval(20, java.util.concurrent.TimeUnit.SECONDS) // Keepalive ping interval set to 20 seconds
         .build()
         
     private var webSocket: WebSocket? = null
-    private var scope: CoroutineScope? = null
+    private val streamerScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var isClosed = false
     private var heartbeatJob: Job? = null
+    private var reconnectJob: Job? = null
     
     fun connect(rootUrl: String, anonKey: String) {
         if (isClosed) return
@@ -37,11 +47,10 @@ class SupabaseRealtimeStreamer(
             .url(wsUrl)
             .build()
             
-        scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-        
         webSocket = client.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
                 Log.d("SupabaseRealtimeStreamer", "WebSocket opened. Joining public realtime channel...")
+                onStatusUpdate?.invoke(true)
                 // Join public schema channel for table changes
                 joinRealtimeChannel(webSocket)
                 startHeartbeats()
@@ -57,11 +66,13 @@ class SupabaseRealtimeStreamer(
             
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
                 Log.d("SupabaseRealtimeStreamer", "WebSocket closed: $code / $reason")
+                onStatusUpdate?.invoke(false)
                 reconnectIfNeed(rootUrl, anonKey)
             }
             
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
                 Log.e("SupabaseRealtimeStreamer", "WebSocket failure: ${t.localizedMessage}", t)
+                onStatusUpdate?.invoke(false)
                 reconnectIfNeed(rootUrl, anonKey)
             }
         })
@@ -81,6 +92,16 @@ class SupabaseRealtimeStreamer(
                         put("schema", "public")
                         put("table", "camera_stream")
                     })
+                    put(JSONObject().apply {
+                        put("event", "*")
+                        put("schema", "public")
+                        put("table", "device")
+                    })
+                    put(JSONObject().apply {
+                        put("event", "*")
+                        put("schema", "public")
+                        put("table", "devices")
+                    })
                 }
                 put("postgres_changes", postgresChangesArray)
             }
@@ -98,6 +119,39 @@ class SupabaseRealtimeStreamer(
             
             ws.send(joinMsg.toString())
             Log.d("SupabaseRealtimeStreamer", "Join channel request sent: $joinMsg")
+
+            // Join the specific broadcast channels for real-time device status/broadcast/presence events
+            val topicName = "realtime:device_presence"
+            val joinTopicMsg = JSONObject().apply {
+                put("topic", topicName)
+                put("event", "phx_join")
+                put("payload", JSONObject().apply {
+                    put("config", JSONObject().apply {
+                        put("presence", JSONObject().apply {
+                            put("key", "token")
+                        })
+                    })
+                })
+                put("ref", "join_ref_broadcast_device_presence")
+            }
+            ws.send(joinTopicMsg.toString())
+            Log.d("SupabaseRealtimeStreamer", "Joined broadcast presence channel: $topicName with token key custom presence state config")
+
+            val monitoringTopicName = "realtime:device-monitoring"
+            val joinMonitoringTopicMsg = JSONObject().apply {
+                put("topic", monitoringTopicName)
+                put("event", "phx_join")
+                put("payload", JSONObject().apply {
+                    put("config", JSONObject().apply {
+                        put("presence", JSONObject().apply {
+                            put("key", "token")
+                        })
+                    })
+                })
+                put("ref", "join_ref_broadcast_device_monitoring")
+            }
+            ws.send(joinMonitoringTopicMsg.toString())
+            Log.d("SupabaseRealtimeStreamer", "Joined broadcast monitoring channel: $monitoringTopicName")
         } catch (e: Exception) {
             Log.e("SupabaseRealtimeStreamer", "Error constructing join message", e)
         }
@@ -105,10 +159,10 @@ class SupabaseRealtimeStreamer(
     
     private fun startHeartbeats() {
         heartbeatJob?.cancel()
-        heartbeatJob = scope?.launch {
+        heartbeatJob = streamerScope.launch {
             var ref = 1
             while (isActive) {
-                delay(25000) // Send heartbeat every 25 seconds
+                delay(20000) // Send heartbeat every 20 seconds to align with child device config
                 try {
                     val heartbeat = JSONObject().apply {
                         put("topic", "phoenix")
@@ -131,6 +185,142 @@ class SupabaseRealtimeStreamer(
             val event = json.optString("event")
             val topic = json.optString("topic")
             
+            // Standard Phoenix Presence Event Dispatching
+            if (topic == "realtime:device_presence" || topic == "realtime:device-monitoring") {
+                if (event == "presence_state") {
+                    val payload = json.optJSONObject("payload")
+                    if (payload != null) {
+                        val activeTokens = mutableSetOf<String>()
+                        val iterator = payload.keys()
+                        while (iterator.hasNext()) {
+                            val token = iterator.next()
+                            if (token.isNotBlank() && token != "null") {
+                                activeTokens.add(token)
+                            }
+                        }
+                        Log.d("SupabaseRealtimeStreamer", "Presence State synced ($topic): $activeTokens")
+                        onPresenceSync?.invoke(activeTokens)
+                    }
+                } else if (event == "presence_diff") {
+                    val payload = json.optJSONObject("payload")
+                    if (payload != null) {
+                        val joins = payload.optJSONObject("joins")
+                        if (joins != null) {
+                            val iterator = joins.keys()
+                            while (iterator.hasNext()) {
+                                val token = iterator.next()
+                                if (token.isNotBlank() && token != "null") {
+                                    Log.d("SupabaseRealtimeStreamer", "Presence Join ($topic): $token")
+                                    onPresenceJoin?.invoke(token)
+                                }
+                            }
+                        }
+                        val leaves = payload.optJSONObject("leaves")
+                        if (leaves != null) {
+                            val iterator = leaves.keys()
+                            while (iterator.hasNext()) {
+                                val token = iterator.next()
+                                if (token.isNotBlank() && token != "null") {
+                                    Log.d("SupabaseRealtimeStreamer", "Presence Leave ($topic): $token")
+                                    onPresenceLeave?.invoke(token)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Check for broadcast 'heartbeat' event
+            val topPayloadCheck = json.optJSONObject("payload")
+            if (topPayloadCheck != null) {
+                val pType = topPayloadCheck.optString("type")
+                val pEvent = topPayloadCheck.optString("event")
+                if ((pType == "broadcast" && pEvent == "heartbeat") || event == "heartbeat") {
+                    val innerPayload = topPayloadCheck.optJSONObject("payload")
+                    val tokenVal = innerPayload?.optString("token") ?: innerPayload?.optString("device_token") 
+                        ?: topPayloadCheck.optString("token") ?: topPayloadCheck.optString("device_token")
+                        ?: json.optString("ref")
+                    if (!tokenVal.isNullOrBlank() && tokenVal != "null") {
+                        Log.d("SupabaseRealtimeStreamer", "Broadcast heartbeat pulse detected from child ($topic): $tokenVal")
+                        onHeartbeat?.invoke(tokenVal)
+                    }
+                }
+            }
+            
+            // Check if this topic or event corresponds to a broadcast from the targeted devices
+            val isBroadcastTopic = topic == "realtime:device_presence" || topic == "realtime:device-monitoring"
+            
+            if ((isBroadcastTopic && event != "presence_state" && event != "presence_diff") || event == "device_update" || event == "device_presence") {
+                val topPayload = json.optJSONObject("payload")
+                var devicePayload: JSONObject? = null
+                
+                if (topPayload != null) {
+                    val pType = topPayload.optString("type")
+                    val pEvent = topPayload.optString("event")
+                    
+                    // Option A: If wrapped in standard phoenix/supabase broadcast envelope
+                    if (pType == "broadcast" && (pEvent == "device_update" || pEvent == "device_presence")) {
+                        devicePayload = topPayload.optJSONObject("payload")
+                    }
+                    
+                    // Option B: If the top level payload is directly the device data
+                    if (devicePayload == null) {
+                        if (topPayload.has("token") || topPayload.has("device_name")) {
+                            devicePayload = topPayload
+                        }
+                    }
+                }
+                
+                if (devicePayload != null) {
+                    val tokenVal = devicePayload.optString("token").takeIf { it.isNotBlank() && it != "null" }
+                    if (tokenVal != null) {
+                        val deviceNameVal = devicePayload.optString("device_name", "Unknown Device")
+                        val batteryVal = devicePayload.optInt("battery", 0)
+                        val netTypeVal = devicePayload.optString("net_type").takeIf { it.isNotBlank() && it != "null" }
+                        val netNameVal = devicePayload.optString("net_name").takeIf { it.isNotBlank() && it != "null" }
+                        val statusVal = devicePayload.optString("status")
+                        val storageTotalVal = devicePayload.optLong("storage_total", 0L)
+                        val storageUsedVal = devicePayload.optLong("storage_used", 0L)
+                        val lastUpdatedStr = devicePayload.optString("last_updated")
+                        
+                        var lastActiveMs = System.currentTimeMillis()
+                        if (!lastUpdatedStr.isNullOrBlank() && lastUpdatedStr != "null") {
+                            try {
+                                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                                    val instant = java.time.Instant.parse(lastUpdatedStr.replace(" ", "T"))
+                                    lastActiveMs = instant.toEpochMilli()
+                                } else {
+                                    val sdf = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.US)
+                                    sdf.timeZone = java.util.TimeZone.getTimeZone("UTC")
+                                    lastActiveMs = sdf.parse(lastUpdatedStr.replace("Z", ""))?.time ?: System.currentTimeMillis()
+                                }
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+                        }
+                        
+                        val parsedDevice = Device(
+                            id = tokenVal,
+                            name = deviceNameVal,
+                            battery = batteryVal,
+                            lastActive = lastActiveMs,
+                            storageUsed = storageUsedVal,
+                            storageTotal = storageTotalVal,
+                            isLocked = false,
+                            networkType = netTypeVal,
+                            carrierName = netNameVal,
+                            isCharging = statusVal == "charging",
+                            isRealtimeUpdated = true, // Explicitly true indicating high-speed real-time websocket update receipt
+                            status = statusVal
+                        )
+                        Log.d("SupabaseRealtimeStreamer", "Received broadcast device update on topic $topic for ${parsedDevice.name}")
+                        onDeviceUpdate?.invoke(parsedDevice)
+                        return
+                    }
+                }
+            }
+            
+            // Standard Postgres real-time fallback listening
             if (topic == "realtime:public" && event == "postgres_changes") {
                 val payload = json.optJSONObject("payload") ?: return
                 val table = payload.optString("table").takeIf { it.isNotBlank() } ?: "live_streams"
@@ -142,48 +332,93 @@ class SupabaseRealtimeStreamer(
                     ?: payload.optJSONObject("new") 
                     ?: payload
                 
-                var recordDeviceToken = record.optString("device_token")
-                if (recordDeviceToken.isBlank()) {
-                    recordDeviceToken = record.optString("deviceToken")
-                }
-                
-                if (recordDeviceToken != deviceToken) {
-                    // Not for this device
-                    return
-                }
-                
-                val isActiveVal = record.optBoolean("is_active", record.optBoolean("isActive", false))
-                val imageBase64 = record.optString("image").takeIf { it.isNotBlank() && it != "null" }
-                val streamUrlVal = record.optString("stream_url", record.optString("streamUrl", "")).takeIf { it.isNotBlank() && it != "null" }
-                val timestampVal = record.optLong("timestamp", 0L)
-                val errorVal = record.optString("error").takeIf { it.isNotBlank() && it != "null" }
-                
-                if (table == "live_streams") {
-                    val state = LiveStreamState(
-                        isActive = isActiveVal,
-                        isLoading = false,
-                        image = imageBase64,
-                        streamUrl = streamUrlVal,
-                        timestamp = timestampVal,
-                        error = errorVal
-                    )
-                    onLiveStreamUpdate(state)
-                } else if (table == "camera_stream") {
-                    val cameraTypeVal = record.optString("camera_type", "back")
+                if (table == "device" || table == "devices") {
+                    val tokenVal = (if (record.has("token")) record.optString("token") else record.optString("device_token"))
+                        .takeIf { !it.isNullOrBlank() && it != "null" } ?: return
+                    val deviceNameVal = record.optString("device_name", "Unknown Device")
+                    val batteryVal = record.optInt("battery", 0)
+                    val netTypeVal = record.optString("net_type").takeIf { it.isNotBlank() && it != "null" }
+                    val netNameVal = record.optString("net_name").takeIf { it.isNotBlank() && it != "null" }
+                    val statusVal = record.optString("status")
+                    val storageTotalVal = record.optLong("storage_total", 0L)
+                    val storageUsedVal = record.optLong("storage_used", 0L)
+                    val lastUpdatedStr = record.optString("last_updated")
                     
-                    val actualStreamUrl = if (imageBase64?.startsWith("rtsp://") == true || imageBase64?.startsWith("http") == true) imageBase64 else streamUrlVal
-                    val actualImage = if (actualStreamUrl != null && actualStreamUrl == imageBase64) null else imageBase64
+                    var lastActiveMs = 0L
+                    if (lastUpdatedStr.isNotBlank() && lastUpdatedStr != "null") {
+                        try {
+                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                                val instant = java.time.Instant.parse(lastUpdatedStr.replace(" ", "T"))
+                                lastActiveMs = instant.toEpochMilli()
+                            } else {
+                                val sdf = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.US)
+                                sdf.timeZone = java.util.TimeZone.getTimeZone("UTC")
+                                lastActiveMs = sdf.parse(lastUpdatedStr.replace("Z", ""))?.time ?: 0L
+                            }
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                    }
                     
-                    val state = CameraStreamState(
-                        isActive = isActiveVal,
-                        isLoading = false,
-                        image = actualImage,
-                        streamUrl = actualStreamUrl,
-                        cameraType = cameraTypeVal,
-                        timestamp = timestampVal,
-                        error = errorVal
+                    val parsedDevice = Device(
+                        id = tokenVal,
+                        name = deviceNameVal,
+                        battery = batteryVal,
+                        lastActive = lastActiveMs,
+                        storageUsed = storageUsedVal,
+                        storageTotal = storageTotalVal,
+                        isLocked = false,
+                        networkType = netTypeVal,
+                        carrierName = netNameVal,
+                        isCharging = statusVal == "charging",
+                        isRealtimeUpdated = true, // Also true here
+                        status = statusVal
                     )
-                    onCameraStreamUpdate(state)
+                    onDeviceUpdate?.invoke(parsedDevice)
+                } else {
+                    var recordDeviceToken = record.optString("device_token")
+                    if (recordDeviceToken.isBlank()) {
+                        recordDeviceToken = record.optString("deviceToken")
+                    }
+                    
+                    if (recordDeviceToken != deviceToken) {
+                        // Not for this device
+                        return
+                    }
+                    
+                    val isActiveVal = record.optBoolean("is_active", record.optBoolean("isActive", false))
+                    val imageBase64 = record.optString("image").takeIf { it.isNotBlank() && it != "null" }
+                    val streamUrlVal = record.optString("stream_url", record.optString("streamUrl", "")).takeIf { it.isNotBlank() && it != "null" }
+                    val timestampVal = record.optLong("timestamp", 0L)
+                    val errorVal = record.optString("error").takeIf { it.isNotBlank() && it != "null" }
+                    
+                    if (table == "live_streams") {
+                        val state = LiveStreamState(
+                            isActive = isActiveVal,
+                            isLoading = false,
+                            image = imageBase64,
+                            streamUrl = streamUrlVal,
+                            timestamp = timestampVal,
+                            error = errorVal
+                        )
+                        onLiveStreamUpdate?.invoke(state)
+                    } else if (table == "camera_stream") {
+                        val cameraTypeVal = record.optString("camera_type", "back")
+                        
+                        val actualStreamUrl = if (imageBase64?.startsWith("rtsp://") == true || imageBase64?.startsWith("http") == true) imageBase64 else streamUrlVal
+                        val actualImage = if (actualStreamUrl != null && actualStreamUrl == imageBase64) null else imageBase64
+                        
+                        val state = CameraStreamState(
+                            isActive = isActiveVal,
+                            isLoading = false,
+                            image = actualImage,
+                            streamUrl = actualStreamUrl,
+                            cameraType = cameraTypeVal,
+                            timestamp = timestampVal,
+                            error = errorVal
+                        )
+                        onCameraStreamUpdate?.invoke(state)
+                    }
                 }
             }
         } catch (e: Exception) {
@@ -193,7 +428,8 @@ class SupabaseRealtimeStreamer(
     
     private fun reconnectIfNeed(rootUrl: String, anonKey: String) {
         if (isClosed) return
-        scope?.launch {
+        reconnectJob?.cancel()
+        reconnectJob = streamerScope.launch {
             delay(5000) // Wait 5 seconds before reconnecting
             if (isActive && !isClosed) {
                 Log.d("SupabaseRealtimeStreamer", "Attempting reconnection...")
@@ -205,18 +441,20 @@ class SupabaseRealtimeStreamer(
     fun disconnect() {
         heartbeatJob?.cancel()
         heartbeatJob = null
+        reconnectJob?.cancel()
+        reconnectJob = null
         try {
             webSocket?.close(1000, "Normal closure")
         } catch (e: Exception) {
             // Ignore
         }
         webSocket = null
-        scope?.cancel()
-        scope = null
+        onStatusUpdate?.invoke(false)
     }
     
     fun shutdown() {
         isClosed = true
         disconnect()
+        streamerScope.cancel()
     }
 }

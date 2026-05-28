@@ -16,10 +16,18 @@ data class Device(
     val isLocked: Boolean,
     val networkType: String? = null,
     val carrierName: String? = null,
-    val isCharging: Boolean = false
+    val isCharging: Boolean = false,
+    val isRealtimeUpdated: Boolean = false,
+    val isOnlineOverride: Boolean? = null,
+    val status: String? = null
 ) {
     val isOnline: Boolean
-        get() = lastActive == 0L || (System.currentTimeMillis() - lastActive) < 15 * 60 * 1000 // 15 mins threshold or 0L fallback
+        get() = when {
+            status == "disconnected" -> false
+            isOnlineOverride == false -> false
+            isOnlineOverride == true -> true
+            else -> lastActive == 0L || (System.currentTimeMillis() - lastActive) < 15 * 60 * 1000
+        }
 }
 
 data class SmsLog(

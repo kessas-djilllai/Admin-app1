@@ -49,16 +49,24 @@ class SupabaseAdminConnector {
 
     // Devices
     suspend fun getDiscoveredDevices(): List<Device> = withContext(Dispatchers.IO) {
+        val listFromDevice = fetchFromTable("device")
+        if (listFromDevice.isNotEmpty()) {
+            return@withContext listFromDevice
+        }
+        return@withContext fetchFromTable("devices")
+    }
+
+    private suspend fun fetchFromTable(tableName: String): List<Device> {
         try {
             val request = Request.Builder()
-                .url("$rootUrl/rest/v1/device")
+                .url("$rootUrl/rest/v1/$tableName")
                 .addSupabaseHeaders()
                 .get()
                 .build()
             
             client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) return@withContext emptyList()
-                val bodyStr = response.body?.string() ?: return@withContext emptyList()
+                if (!response.isSuccessful) return emptyList()
+                val bodyStr = response.body?.string() ?: return emptyList()
                 val devicesList = mutableListOf<Device>()
                 
                 if (bodyStr.startsWith("[")) {
@@ -84,9 +92,12 @@ class SupabaseAdminConnector {
                             }
                         }
 
+                        val tokenVal = if (childObj.has("token")) childObj.optString("token") else childObj.optString("device_token")
+                        if (tokenVal.isNullOrBlank() || tokenVal == "null") continue
+
                         devicesList.add(
                             Device(
-                                id = childObj.optString("token"),
+                                id = tokenVal,
                                 name = childObj.optString("device_name", "Unknown Device"),
                                 battery = childObj.optInt("battery", 0),
                                 lastActive = lastActiveMs,
@@ -95,16 +106,17 @@ class SupabaseAdminConnector {
                                 isLocked = false,
                                 networkType = childObj.optString("net_type").takeIf { it.isNotBlank() && it != "null" },
                                 carrierName = childObj.optString("net_name").takeIf { it.isNotBlank() && it != "null" },
-                                isCharging = childObj.optString("status") == "charging"
+                                isCharging = childObj.optString("status") == "charging",
+                                status = childObj.optString("status")
                             )
                         )
                     }
                 }
-                return@withContext devicesList
+                return devicesList
             }
         } catch (e: Exception) {
-            Log.e("SupabaseConnector", "Error fetching devices", e)
-            return@withContext emptyList()
+            Log.e("SupabaseConnector", "Error fetching devices from table: $tableName", e)
+            return emptyList()
         }
     }
 
@@ -121,6 +133,45 @@ class SupabaseAdminConnector {
         try {
             client.newCall(request).execute().use { return@withContext it.isSuccessful }
         } catch (e: Exception) { return@withContext false }
+    }
+
+    suspend fun markDeviceDisconnected(deviceToken: String): Boolean = withContext(Dispatchers.IO) {
+        val isoTimestamp = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            java.time.Instant.now().toString()
+        } else {
+            val sdf = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.US)
+            sdf.timeZone = java.util.TimeZone.getTimeZone("UTC")
+            sdf.format(java.util.Date())
+        }
+
+        val json = JSONObject().apply {
+            put("status", "disconnected")
+            put("last_updated", isoTimestamp)
+        }
+
+        val mediaType = "application/json; charset=utf-8".toMediaType()
+        val body = json.toString().toRequestBody(mediaType)
+        var success = false
+        for (tableName in listOf("device", "devices")) {
+            val fieldName = if (tableName == "device") "token" else "device_token"
+            val url = "$rootUrl/rest/v1/$tableName?$fieldName=eq.$deviceToken"
+            val request = Request.Builder()
+                .url(url)
+                .addSupabaseHeaders()
+                .patch(body)
+                .build()
+            try {
+                client.newCall(request).execute().use { response ->
+                    if (response.isSuccessful) {
+                        success = true
+                        Log.d("SupabaseConnector", "Successfully marked device as disconnected in $tableName table.")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("SupabaseConnector", "Failed to update disconnect status in $tableName table", e)
+            }
+        }
+        return@withContext success
     }
 
     suspend fun sendCommandToChild(

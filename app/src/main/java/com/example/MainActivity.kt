@@ -58,8 +58,7 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.Velocity
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.*
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.Offset
 import java.text.SimpleDateFormat
@@ -312,6 +311,73 @@ fun getRelativeTimeString(lastActive: Long): String {
 }
 
 @Composable
+fun SkeletonDeviceItem() {
+    val infiniteTransition = rememberInfiniteTransition(label = "skeleton_shimmer")
+    val alpha by infiniteTransition.animateFloat(
+        initialValue = 0.3f,
+        targetValue = 0.8f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 800, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "shimmer_alpha"
+    )
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        border = BorderStroke(1.dp, Color(0xFFE5E7EB))
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(46.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0xFFE5E7EB).copy(alpha = alpha))
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(0.6f)
+                            .height(16.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(Color(0xFFE5E7EB).copy(alpha = alpha))
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(0.35f)
+                            .height(12.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(Color(0xFFE5E7EB).copy(alpha = alpha))
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(14.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                repeat(3) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(36.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFFF3F4F6).copy(alpha = alpha))
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 fun AdminDashboard(viewModel: AdminViewModel) {
     val devices by viewModel.devices.collectAsState()
     val selectedToken by viewModel.selectedDeviceToken.collectAsState()
@@ -417,6 +483,151 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                 }
             }
 
+            // Realtime WebSocket Status & Data Log Card
+            val websocketConnected by viewModel.devicesWebSocketConnected.collectAsState()
+            val websocketEvents by viewModel.websocketReceivedEvents.collectAsState()
+            var showEventsLogs by remember { mutableStateOf(false) }
+
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = if (websocketConnected) Color(0xFFEDFBF0) else Color(0xFFFEF2F2)),
+                border = BorderStroke(1.dp, if (websocketConnected) Color(0xFFB1EED1) else Color(0xFFFECACA))
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(10.dp)
+                                    .clip(CircleShape)
+                                    .background(if (websocketConnected) Color(0xFF10B981) else Color(0xFFEF4444))
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = if (websocketConnected) "توصيل البث الحي والـ WebSocket نشط" else "انقطع الاتصال بالبث الحي والـ WebSocket",
+                                color = if (websocketConnected) Color(0xFF065F46) else Color(0xFF991B1B),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        IconButton(
+                            onClick = { showEventsLogs = !showEventsLogs },
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (showEventsLogs) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                contentDescription = "عرض سجل البيانات والمزامنة",
+                                tint = if (websocketConnected) Color(0xFF065F46) else Color(0xFF991B1B)
+                            )
+                        }
+                    }
+
+                    if (showEventsLogs) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        HorizontalDivider(color = if (websocketConnected) Color(0xFFD1FAE5) else Color(0xFFFEE2E2))
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "سجل التحديثات المستلمة من الأجهزة بالخادم:",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.DarkGray
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        
+                        if (websocketEvents.isEmpty()) {
+                            Text(
+                                text = "بانتظار تلقي أي تحديثات تلقائية من جهاز الطفل الآن...",
+                                fontSize = 11.sp,
+                                color = Color.Gray,
+                                modifier = Modifier.padding(vertical = 4.dp)
+                            )
+                        } else {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(max = 120.dp)
+                                    .verticalScroll(rememberScrollState())
+                            ) {
+                                websocketEvents.forEach { logMessage ->
+                                    Text(
+                                        text = logMessage,
+                                        fontSize = 11.sp,
+                                        color = Color(0xFF374151),
+                                        modifier = Modifier.padding(vertical = 2.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Bento Stats Light Grid
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                // Bento Box 1: Total Children Devices
+                Card(
+                    modifier = Modifier.weight(1.5f),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    border = BorderStroke(1.dp, Color(0xFFE5E7EB)),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Box(
+                            modifier = Modifier
+                                .size(34.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(Color(0xFFEFF6FF)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.PhoneAndroid, contentDescription = null, tint = Color(0xFF3B82F6), modifier = Modifier.size(18.dp))
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(text = "إجمالي الهواتف والـ Presence", color = Color(0xFF6B7280), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(text = "${devices.size} أجهزة مسجلة", color = Color(0xFF111827), fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
+                    }
+                }
+
+                // Bento Box 2: Online Status Counter
+                val onlineCountValue = devices.count { it.isOnline }
+                Card(
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    border = BorderStroke(1.dp, Color(0xFFE5E7EB)),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Box(
+                            modifier = Modifier
+                                .size(34.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(Color(0xFFEFFFEC)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.Wifi, contentDescription = null, tint = Color(0xFF39D353), modifier = Modifier.size(18.dp))
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(text = "متصل بالبث", color = Color(0xFF6B7280), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(text = "$onlineCountValue أونلاين", color = Color(0xFF39D353), fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
+                    }
+                }
+            }
 
             Row(
                 modifier = Modifier
@@ -471,7 +682,27 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                 else -> devices.filter { !it.isOnline }
             }.sortedByDescending { it.isOnline }
 
-            if (filteredDevices.isEmpty()) {
+            if (devices.isEmpty()) {
+                // Skeleton Waiting State (مؤشر تحميل الهيكل عند البدء وبانتظار بيانات البث حضور Presence)
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = "بانتظار تلقي اتصال الأجهزة والبث الحي (Presence Sync)...",
+                        color = Color(0xFF6B7280),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 4.dp)
+                    )
+                    repeat(3) {
+                        SkeletonDeviceItem()
+                    }
+                }
+            } else if (filteredDevices.isEmpty()) {
                 Box(modifier = Modifier.weight(1f).fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -498,12 +729,12 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                             fontWeight = FontWeight.Medium,
                             textAlign = TextAlign.Center
                         )
-                        
-
                     }
                 }
             } else {
                 val isRefreshing by viewModel.isRefreshing.collectAsState()
+                val heartbeats by viewModel.deviceHeartbeats.collectAsState()
+
                 SwipeToRefreshBox(
                     isRefreshing = isRefreshing,
                     onRefresh = { viewModel.refreshAllDevices() },
@@ -511,100 +742,209 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                 ) {
                     LazyColumn(
                         modifier = Modifier.fillMaxSize().padding(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         items(filteredDevices) { dev ->
-                        Card(
-                            onClick = { viewModel.selectDevice(dev.id) },
-                            colors = CardDefaults.cardColors(containerColor = Color.White),
-                            border = BorderStroke(1.5.dp, Color(0xFFE5E7EB)),
-                            shape = RoundedCornerShape(16.dp),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                            modifier = Modifier.fillMaxWidth().shadow(
-                                elevation = 4.dp, 
-                                shape = RoundedCornerShape(16.dp), 
-                                clip = false, 
-                                spotColor = Color(0xFF9155FF).copy(alpha = 0.05f), 
-                                ambientColor = Color(0xFF9155FF).copy(alpha = 0.05f)
+                            val lastHbTime = heartbeats[dev.id] ?: 0L
+                            val isPulsing = System.currentTimeMillis() - lastHbTime < 1500
+
+                            val cardScale by animateFloatAsState(
+                                targetValue = if (isPulsing) 1.03f else 1.0f,
+                                animationSpec = keyframes {
+                                    durationMillis = 500
+                                    1.03f at 150 with FastOutLinearInEasing
+                                    1.0f at 500 with LinearOutSlowInEasing
+                                },
+                                label = "cardScale"
                             )
-                        ) {
-                            Column(
-                                modifier = Modifier.fillMaxWidth().padding(16.dp)
+                            val cardBorderColor by animateColorAsState(
+                                targetValue = if (isPulsing) Color(0xFFFF4D94) else Color(0xFFE5E7EB),
+                                animationSpec = tween(durationMillis = 350),
+                                label = "cardBorderColor"
+                            )
+                            val cardBgColor by animateColorAsState(
+                                targetValue = if (isPulsing) Color(0xFFFFF5F8) else Color.White,
+                                animationSpec = tween(durationMillis = 350),
+                                label = "cardBgColor"
+                            )
+
+                            Card(
+                                onClick = { viewModel.selectDevice(dev.id) },
+                                colors = CardDefaults.cardColors(containerColor = cardBgColor),
+                                border = BorderStroke(if (isPulsing) 2.dp else 1.5.dp, cardBorderColor),
+                                shape = RoundedCornerShape(20.dp),
+                                elevation = CardDefaults.cardElevation(defaultElevation = if (isPulsing) 4.dp else 0.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .graphicsLayer {
+                                        scaleX = cardScale
+                                        scaleY = cardScale
+                                    }
+                                    .shadow(
+                                        elevation = if (isPulsing) 12.dp else 4.dp, 
+                                        shape = RoundedCornerShape(20.dp), 
+                                        clip = false, 
+                                        spotColor = if (isPulsing) Color(0xFFFF4D94).copy(alpha = 0.25f) else Color(0xFF9155FF).copy(alpha = 0.05f), 
+                                        ambientColor = if (isPulsing) Color(0xFFFF4D94).copy(alpha = 0.25f) else Color(0xFF9155FF).copy(alpha = 0.05f)
+                                    )
                             ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
+                                Column(
+                                    modifier = Modifier.fillMaxWidth().padding(16.dp)
                                 ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                                        Box(
-                                            modifier = Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)).background(
-                                                Brush.linearGradient(
-                                                    colors = listOf(Color(0xFF9155FF).copy(alpha = 0.15f), Color(0xFF9155FF).copy(alpha = 0.05f))
-                                                )
-                                            ),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Icon(Icons.Default.PhoneAndroid, null, tint = Color(0xFF9155FF), modifier = Modifier.size(24.dp))
-                                        }
-                                        Spacer(modifier = Modifier.width(12.dp))
-                                        Column {
-                                            Text(dev.name, color = Color(0xFF111827), fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                            Spacer(modifier = Modifier.height(4.dp))
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Box(
-                                                    modifier = Modifier.size(8.dp).clip(CircleShape).background(if (dev.isOnline) Color(0xFF10B981) else Color(0xFFF59E0B))
-                                                )
-                                                Spacer(modifier = Modifier.width(6.dp))
-                                                Text(
-                                                    if (dev.isOnline) "متصل الآن" else getRelativeTimeString(dev.lastActive), 
-                                                    color = if (dev.isOnline) Color(0xFF10B981) else Color(0xFFF59E0B), 
-                                                    fontSize = 12.sp, 
-                                                    fontWeight = FontWeight.Medium
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                            Box(
+                                                modifier = Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)).background(
+                                                    Brush.linearGradient(
+                                                        colors = if (isPulsing) {
+                                                            listOf(Color(0xFFFF4D94).copy(alpha = 0.25f), Color(0xFFFF4D94).copy(alpha = 0.1f))
+                                                        } else {
+                                                            listOf(Color(0xFF9155FF).copy(alpha = 0.15f), Color(0xFF9155FF).copy(alpha = 0.05f))
+                                                        }
+                                                    )
+                                                ),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Icon(
+                                                    imageVector = if (isPulsing) Icons.Default.Favorite else Icons.Default.PhoneAndroid, 
+                                                    contentDescription = null, 
+                                                    tint = if (isPulsing) Color(0xFFFF4D94) else Color(0xFF9155FF), 
+                                                    modifier = Modifier.size(24.dp)
                                                 )
                                             }
+                                            Spacer(modifier = Modifier.width(12.dp))
+                                            Column {
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    Text(
+                                                        text = dev.name,
+                                                        color = Color(0xFF111827),
+                                                        fontSize = 16.sp,
+                                                        fontWeight = FontWeight.ExtraBold,
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis,
+                                                        modifier = Modifier.weight(1f, fill = false)
+                                                    )
+                                                    if (dev.isRealtimeUpdated) {
+                                                        Spacer(modifier = Modifier.width(6.dp))
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .clip(RoundedCornerShape(6.dp))
+                                                                .background(Color(0xFFE0F2FE))
+                                                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                                                        ) {
+                                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                                Box(
+                                                                    modifier = Modifier
+                                                                        .size(6.dp)
+                                                                        .clip(CircleShape)
+                                                                        .background(Color(0xFF0284C7))
+                                                                )
+                                                                Spacer(modifier = Modifier.width(4.dp))
+                                                                Text(
+                                                                    text = "بث فوري",
+                                                                    color = Color(0xFF0369A1),
+                                                                    fontSize = 9.sp,
+                                                                    fontWeight = FontWeight.Bold
+                                                                )
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                                Spacer(modifier = Modifier.height(4.dp))
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    Box(
+                                                        modifier = Modifier.size(8.dp).clip(CircleShape).background(if (dev.isOnline) Color(0xFF10B981) else Color(0xFFF59E0B))
+                                                    )
+                                                    Spacer(modifier = Modifier.width(6.dp))
+                                                    Text(
+                                                        if (dev.isOnline) "متصل الآن" else getRelativeTimeString(dev.lastActive), 
+                                                        color = if (dev.isOnline) Color(0xFF10B981) else Color(0xFFF59E0B), 
+                                                        fontSize = 12.sp, 
+                                                        fontWeight = FontWeight.Medium
+                                                    )
+                                                }
+                                            }
+                                        }
+                                        
+                                        Box(
+                                            modifier = Modifier.size(36.dp).clip(CircleShape).background(Color(0xFFF9FAFB)),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(Icons.Default.KeyboardArrowLeft, null, tint = Color(0xFF9CA3AF), modifier = Modifier.size(20.dp))
                                         }
                                     }
                                     
-                                    Box(
-                                        modifier = Modifier.size(36.dp).clip(CircleShape).background(Color(0xFFF9FAFB)),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Icon(Icons.Default.KeyboardArrowLeft, null, tint = Color(0xFF9CA3AF), modifier = Modifier.size(20.dp))
-                                    }
-                                }
-                                
-                                Spacer(modifier = Modifier.height(16.dp))
-                                
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.Start,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(getBatteryIcon(dev.battery), null, tint = getBatteryColor(dev.battery), modifier = Modifier.size(16.dp))
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text("${dev.battery}%", color = Color(0xFF4B5563), fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                    }
+                                    Spacer(modifier = Modifier.height(14.dp))
                                     
-                                    if (dev.networkType != null) {
-                                        Spacer(modifier = Modifier.width(16.dp))
-                                        Box(modifier = Modifier.width(1.dp).height(12.dp).background(Color(0xFFE5E7EB)))
-                                        Spacer(modifier = Modifier.width(16.dp))
-                                        
-                                        val displayNetType = if (dev.networkType.contains("cellular", ignoreCase = true)) "Phone data" else dev.networkType
-                                        val networkText = if (dev.carrierName != null) "${displayNetType} (${dev.carrierName})" else displayNetType
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Icon(if (dev.networkType.contains("WIFI", ignoreCase = true)) Icons.Default.Wifi else Icons.Default.CellTower, null, tint = Color(0xFF9CA3AF), modifier = Modifier.size(14.dp))
-                                            Spacer(modifier = Modifier.width(4.dp))
-                                            Text(networkText ?: "", color = Color(0xFF6B7280), fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    // Bento Details Grid Row 
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        // Bento Compartment 1: Battery block
+                                        Box(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .background(Color(0xFFF9FAFB), RoundedCornerShape(12.dp))
+                                                .border(1.dp, Color(0xFFF0FDF4), RoundedCornerShape(12.dp))
+                                                .padding(10.dp)
+                                        ) {
+                                            Column {
+                                                Text("البطارية", color = Color.Gray, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                                Spacer(modifier = Modifier.height(4.dp))
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    Icon(getBatteryIcon(dev.battery), null, tint = getBatteryColor(dev.battery), modifier = Modifier.size(14.dp))
+                                                    Spacer(modifier = Modifier.width(4.dp))
+                                                    Text("${dev.battery}%", color = Color(0xFF111827), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                                }
+                                            }
+                                        }
+                                        // Bento Compartment 2: Network block
+                                        Box(
+                                            modifier = Modifier
+                                                .weight(1.3f)
+                                                .background(Color(0xFFF9FAFB), RoundedCornerShape(12.dp))
+                                                .border(1.dp, Color(0xFFEFF6FF), RoundedCornerShape(12.dp))
+                                                .padding(10.dp)
+                                        ) {
+                                            Column {
+                                                Text("الشبكة والاتصال", color = Color.Gray, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                                Spacer(modifier = Modifier.height(4.dp))
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    val isWifi = dev.networkType?.contains("WIFI", ignoreCase = true) == true
+                                                    Icon(if (isWifi) Icons.Default.Wifi else Icons.Default.CellTower, null, tint = Color(0xFF9155FF), modifier = Modifier.size(13.dp))
+                                                    Spacer(modifier = Modifier.width(4.dp))
+                                                    Text(dev.networkType ?: "غير معروف", color = Color(0xFF111827), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                                }
+                                            }
+                                        }
+                                        // Bento Compartment 3: Signal Alert Type
+                                        Box(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .background(Color(0xFFF9FAFB), RoundedCornerShape(12.dp))
+                                                .border(1.dp, Color(0xFFFFF7ED), RoundedCornerShape(12.dp))
+                                                .padding(10.dp)
+                                        ) {
+                                            Column {
+                                                Text("الحالة", color = Color.Gray, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                                Spacer(modifier = Modifier.height(4.dp))
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(if (dev.isOnline) Color(0xFF10B981) else Color(0xFFF59E0B)))
+                                                    Spacer(modifier = Modifier.width(4.dp))
+                                                    Text(if (dev.isOnline) "نشط" else "مغلق", color = Color(0xFF111827), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                }
+                                            }
                                         }
                                     }
                                 }
                             }
                         }
                     }
-                }
                 }
             }
 
@@ -741,11 +1081,33 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                         modifier = Modifier.weight(1f),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Text(activeDevice.name, color = Color(0xFF1F2937), fontSize = 14.sp, fontWeight = FontWeight.Bold)
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(modifier = Modifier.size(5.dp).clip(CircleShape).background(if (activeDevice.isOnline) Color(0xFF39D353) else Color(0xFF6B7280)))
+                            Text(activeDevice.name, color = Color(0xFF1F2937), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                            if (activeDevice.isRealtimeUpdated) {
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .size(6.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFF0369A1))
+                                )
+                            }
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            val isRealtime = activeDevice.isRealtimeUpdated
+                            Box(
+                                modifier = Modifier
+                                    .size(5.dp)
+                                    .clip(CircleShape)
+                                    .background(if (isRealtime) Color(0xFF0284C7) else if (activeDevice.isOnline) Color(0xFF39D353) else Color(0xFF6B7280))
+                            )
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text(if (activeDevice.isOnline) "متصل الآن" else "غير متصل", color = if (activeDevice.isOnline) Color(0xFF39D353) else Color(0xFF6B7280), fontSize = 10.sp)
+                            Text(
+                                text = if (isRealtime) "بث حي فوري WebSocket نشط" else if (activeDevice.isOnline) "متصل الآن" else "غير متصل", 
+                                color = if (isRealtime) Color(0xFF0369A1) else if (activeDevice.isOnline) Color(0xFF39D353) else Color(0xFF6B7280), 
+                                fontSize = 10.sp,
+                                fontWeight = if (isRealtime) FontWeight.Bold else FontWeight.Normal
+                            )
                         }
                     }
                     
