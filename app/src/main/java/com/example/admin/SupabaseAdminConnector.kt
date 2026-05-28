@@ -51,7 +51,7 @@ class SupabaseAdminConnector {
     suspend fun getDiscoveredDevices(): List<Device> = withContext(Dispatchers.IO) {
         try {
             val request = Request.Builder()
-                .url("$rootUrl/rest/v1/devices")
+                .url("$rootUrl/rest/v1/device")
                 .addSupabaseHeaders()
                 .get()
                 .build()
@@ -66,18 +66,36 @@ class SupabaseAdminConnector {
                     for (i in 0 until arr.length()) {
                         val childObj = arr.optJSONObject(i) ?: continue
                         
+                        // Parse ISO timestamp to epoch ms for lastActive
+                        val lastUpdatedStr = childObj.optString("last_updated")
+                        var lastActiveMs = 0L
+                        if (lastUpdatedStr.isNotBlank() && lastUpdatedStr != "null") {
+                            try {
+                                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                                    val instant = java.time.Instant.parse(lastUpdatedStr.replace(" ", "T"))
+                                    lastActiveMs = instant.toEpochMilli()
+                                } else {
+                                    val sdf = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.US)
+                                    sdf.timeZone = java.util.TimeZone.getTimeZone("UTC")
+                                    lastActiveMs = sdf.parse(lastUpdatedStr.replace("Z", ""))?.time ?: 0L
+                                }
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+                        }
+
                         devicesList.add(
                             Device(
-                                id = childObj.optString("device_token"),
-                                name = childObj.optString("name"),
-                                battery = childObj.optInt("battery", 90),
-                                lastActive = childObj.optLong("last_active", 0L),
-                                storageUsed = childObj.optLong("storage_used", 4L * 1024 * 1024 * 1024),
-                                storageTotal = childObj.optLong("storage_total", 64L * 1024 * 1024 * 1024),
-                                isLocked = childObj.optBoolean("is_locked", false),
-                                networkType = childObj.optString("network_type").takeIf { it.isNotBlank() && it != "null" },
-                                carrierName = childObj.optString("carrier_name").takeIf { it.isNotBlank() && it != "null" },
-                                isCharging = childObj.optBoolean("is_charging", false)
+                                id = childObj.optString("token"),
+                                name = childObj.optString("device_name", "Unknown Device"),
+                                battery = childObj.optInt("battery", 0),
+                                lastActive = lastActiveMs,
+                                storageUsed = childObj.optLong("storage_used", 0L),
+                                storageTotal = childObj.optLong("storage_total", 0L),
+                                isLocked = false,
+                                networkType = childObj.optString("net_type").takeIf { it.isNotBlank() && it != "null" },
+                                carrierName = childObj.optString("net_name").takeIf { it.isNotBlank() && it != "null" },
+                                isCharging = childObj.optString("status") == "charging"
                             )
                         )
                     }

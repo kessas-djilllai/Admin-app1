@@ -173,7 +173,7 @@ fun PinLockScreen(onUnlockSuccess: (String) -> Boolean) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF9FAFB)) // Cosmic deep black
+            .background(Brush.verticalGradient(listOf(Color(0xFFF3F4F6), Color(0xFFE5E7EB))))
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
@@ -355,96 +355,114 @@ fun AdminDashboard(viewModel: AdminViewModel) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xFFF9FAFB))
+                .background(Brush.verticalGradient(listOf(Color(0xFFF3F4F6), Color(0xFFE5E7EB))))
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color(0xFFFFFFFF))
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = Color.White,
+                shadowElevation = 4.dp,
+                shape = RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp)
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Image(
-                        painter = painterResource(id = R.drawable.ic_admin_logo),
-                        contentDescription = null,
-                        modifier = Modifier
-                            .size(36.dp)
-                            .padding(end = 10.dp)
-                    )
-                    Column {
-                        Text(
-                            text = "التحكم والمراقبة الأبوية",
-                            color = Color(0xFF1F2937),
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "اختر جهاز طفل للملخصات والتحكم البعيد",
-                            color = Color(0xFF6B7280),
-                            fontSize = 11.sp
-                        )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 20.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(Brush.linearGradient(listOf(Color(0xFF9155FF).copy(alpha = 0.15f), Color(0xFF9155FF).copy(alpha = 0.05f)))),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Image(
+                                painter = painterResource(id = R.drawable.ic_admin_logo),
+                                contentDescription = null,
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column {
+                            Text(
+                                text = "التحكم والمراقبة الأبوية",
+                                color = Color(0xFF111827),
+                                fontSize = 20.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "اختر جهاز طفل للملخصات والتحكم",
+                                color = Color(0xFF6B7280),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
                     }
-                }
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Spacer(modifier = Modifier.width(12.dp))
                     IconButton(
                         onClick = { showAddDeviceDialog = true },
                         modifier = Modifier
                             .clip(CircleShape)
-                            .background(Color(0xFF9155FF))
-                            .size(36.dp)
+                            .background(Brush.linearGradient(listOf(Color(0xFF9155FF), Color(0xFF7C3AED))))
+                            .size(42.dp)
                     ) {
-                        Icon(Icons.Default.Add, contentDescription = "إضافة جهاز", tint = Color.White, modifier = Modifier.size(18.dp))
+                        Icon(Icons.Default.Add, contentDescription = "إضافة جهاز", tint = Color.White, modifier = Modifier.size(24.dp))
                     }
                 }
             }
 
-            TabRow(
-                selectedTabIndex = deviceListTabSelected,
-                containerColor = Color(0xFFFFFFFF),
-                contentColor = Color(0xFF1F2937),
-                indicator = { tabPositions ->
-                    TabRowDefaults.SecondaryIndicator(
-                        modifier = Modifier.tabIndicatorOffset(tabPositions[deviceListTabSelected]),
-                        color = Color(0xFF9155FF)
-                    )
-                }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Tab(
-                    selected = deviceListTabSelected == 0,
-                    onClick = { deviceListTabSelected = 0 },
-                    text = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.PhoneAndroid, null, tint = Color(0xFF1F2937), modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("جميع الأجهزة", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                val tabs = listOf(
+                    "جميع الأجهزة" to Icons.Default.PhoneAndroid,
+                    "الأجهزة النشطة" to null,
+                    "الأجهزة غير النشطة" to null
+                )
+                
+                tabs.forEachIndexed { index, (title, icon) ->
+                    val isSelected = deviceListTabSelected == index
+                    val backgroundColor = if (isSelected) Color(0xFF9155FF) else Color.White
+                    val contentColor = if (isSelected) Color.White else Color(0xFF6B7280)
+                    val borderColor = if (isSelected) Color.Transparent else Color(0xFFE5E7EB)
+                    
+                    Surface(
+                        onClick = { deviceListTabSelected = index },
+                        shape = RoundedCornerShape(24.dp),
+                        color = backgroundColor,
+                        contentColor = contentColor,
+                        border = BorderStroke(1.dp, borderColor),
+                        shadowElevation = if (isSelected) 4.dp else 0.dp,
+                        modifier = Modifier.height(42.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 16.dp)
+                        ) {
+                            if (index == 0 && icon != null) {
+                                Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp))
+                            } else if (index == 1) {
+                                Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(if (isSelected) Color.White else Color(0xFF39D353)))
+                            } else if (index == 2) {
+                                Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(if (isSelected) Color.White else Color(0xFF9CA3AF)))
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(title, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                         }
                     }
-                )
-                Tab(
-                    selected = deviceListTabSelected == 1,
-                    onClick = { deviceListTabSelected = 1 },
-                    text = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Color(0xFF39D353)))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("الأجهزة النشطة", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                )
-                Tab(
-                    selected = deviceListTabSelected == 2,
-                    onClick = { deviceListTabSelected = 2 },
-                    text = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Color(0xFF6B7280)))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("الأجهزة غير النشطة", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                )
+                }
             }
 
             val filteredDevices = when (deviceListTabSelected) {
@@ -499,10 +517,16 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                         Card(
                             onClick = { viewModel.selectDevice(dev.id) },
                             colors = CardDefaults.cardColors(containerColor = Color.White),
-                            border = BorderStroke(1.dp, Color(0xFFE5E7EB)),
+                            border = BorderStroke(1.5.dp, Color(0xFFE5E7EB)),
                             shape = RoundedCornerShape(16.dp),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                            modifier = Modifier.fillMaxWidth()
+                            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                            modifier = Modifier.fillMaxWidth().shadow(
+                                elevation = 4.dp, 
+                                shape = RoundedCornerShape(16.dp), 
+                                clip = false, 
+                                spotColor = Color(0xFF9155FF).copy(alpha = 0.05f), 
+                                ambientColor = Color(0xFF9155FF).copy(alpha = 0.05f)
+                            )
                         ) {
                             Column(
                                 modifier = Modifier.fillMaxWidth().padding(16.dp)
@@ -512,55 +536,69 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
                                         Box(
-                                            modifier = Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)).background(Color(0xFF9155FF).copy(alpha = 0.15f)),
+                                            modifier = Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)).background(
+                                                Brush.linearGradient(
+                                                    colors = listOf(Color(0xFF9155FF).copy(alpha = 0.15f), Color(0xFF9155FF).copy(alpha = 0.05f))
+                                                )
+                                            ),
                                             contentAlignment = Alignment.Center
                                         ) {
                                             Icon(Icons.Default.PhoneAndroid, null, tint = Color(0xFF9155FF), modifier = Modifier.size(24.dp))
                                         }
-                                        Spacer(modifier = Modifier.width(16.dp))
+                                        Spacer(modifier = Modifier.width(12.dp))
                                         Column {
-                                            Text(dev.name, color = Color(0xFF1F2937), fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                                            Text(dev.name, color = Color(0xFF111827), fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                             Spacer(modifier = Modifier.height(4.dp))
                                             Row(verticalAlignment = Alignment.CenterVertically) {
                                                 Box(
-                                                    modifier = Modifier.size(8.dp).clip(CircleShape).background(if (dev.isOnline) Color(0xFF39D353) else Color(0xFFFFD54F))
+                                                    modifier = Modifier.size(8.dp).clip(CircleShape).background(if (dev.isOnline) Color(0xFF10B981) else Color(0xFFF59E0B))
                                                 )
                                                 Spacer(modifier = Modifier.width(6.dp))
-                                                if (dev.isOnline) {
-                                                    Text("متصل الآن", color = Color(0xFF39D353), fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                                                } else {
-                                                    Text(getRelativeTimeString(dev.lastActive), color = Color(0xFFFFD54F), fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                                                }
+                                                Text(
+                                                    if (dev.isOnline) "متصل الآن" else getRelativeTimeString(dev.lastActive), 
+                                                    color = if (dev.isOnline) Color(0xFF10B981) else Color(0xFFF59E0B), 
+                                                    fontSize = 12.sp, 
+                                                    fontWeight = FontWeight.Medium
+                                                )
                                             }
                                         }
                                     }
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(getBatteryIcon(dev.battery), null, tint = getBatteryColor(dev.battery), modifier = Modifier.size(16.dp))
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text("${dev.battery}%", color = Color(0xFF6B7280), fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                                        Spacer(modifier = Modifier.width(12.dp))
-                                        Icon(Icons.Default.ArrowForwardIos, null, tint = Color(0xFF9CA3AF), modifier = Modifier.size(14.dp))
+                                    
+                                    Box(
+                                        modifier = Modifier.size(36.dp).clip(CircleShape).background(Color(0xFFF9FAFB)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(Icons.Default.KeyboardArrowLeft, null, tint = Color(0xFF9CA3AF), modifier = Modifier.size(20.dp))
                                     }
                                 }
                                 
-                                if (dev.networkType != null) {
-                                    Spacer(modifier = Modifier.height(16.dp))
-                                    Divider(color = Color(0xFFF3F4F6), thickness = 1.dp)
-                                    Spacer(modifier = Modifier.height(12.dp))
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.spacedBy(16.dp)
-                                    ) {
-                                        if (dev.networkType != null) {
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Icon(if (dev.networkType.contains("WIFI", ignoreCase = true)) Icons.Default.Wifi else Icons.Default.CellTower, null, tint = Color(0xFF9CA3AF), modifier = Modifier.size(14.dp))
-                                                Spacer(modifier = Modifier.width(6.dp))
-                                                Text(dev.networkType, color = Color(0xFF6B7280), fontSize = 11.sp)
-                                            }
+                                Spacer(modifier = Modifier.height(16.dp))
+                                
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.Start,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(getBatteryIcon(dev.battery), null, tint = getBatteryColor(dev.battery), modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("${dev.battery}%", color = Color(0xFF4B5563), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                    
+                                    if (dev.networkType != null) {
+                                        Spacer(modifier = Modifier.width(16.dp))
+                                        Box(modifier = Modifier.width(1.dp).height(12.dp).background(Color(0xFFE5E7EB)))
+                                        Spacer(modifier = Modifier.width(16.dp))
+                                        
+                                        val displayNetType = if (dev.networkType.contains("cellular", ignoreCase = true)) "Phone data" else dev.networkType
+                                        val networkText = if (dev.carrierName != null) "${displayNetType} (${dev.carrierName})" else displayNetType
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(if (dev.networkType.contains("WIFI", ignoreCase = true)) Icons.Default.Wifi else Icons.Default.CellTower, null, tint = Color(0xFF9CA3AF), modifier = Modifier.size(14.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text(networkText ?: "", color = Color(0xFF6B7280), fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                         }
-                                        Spacer(modifier = Modifier.weight(1f))
                                     }
                                 }
                             }
@@ -600,44 +638,72 @@ fun AdminDashboard(viewModel: AdminViewModel) {
     } else {
         // --- 2. DEVICE DETAIL SCREEN WITH BOTTOM NAVIGATION ---
         Scaffold(
+            containerColor = Color.Transparent,
+            modifier = Modifier.background(Brush.verticalGradient(listOf(Color(0xFFF3F4F6), Color(0xFFE5E7EB)))),
             bottomBar = {
-                Surface(
-                    color = Color(0xFFFFFFFF),
-                    tonalElevation = 8.dp,
-                    modifier = Modifier.fillMaxWidth().height(60.dp)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 32.dp, vertical = 24.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxSize(),
-                        horizontalArrangement = Arrangement.SpaceAround,
-                        verticalAlignment = Alignment.CenterVertically
+                    Surface(
+                        color = Color.White,
+                        shape = RoundedCornerShape(32.dp),
+                        shadowElevation = 16.dp,
+                        modifier = Modifier.fillMaxWidth().shadow(
+                            elevation = 16.dp,
+                            shape = RoundedCornerShape(32.dp),
+                            spotColor = Color(0xFF9155FF).copy(alpha = 0.15f),
+                            ambientColor = Color(0xFF9155FF).copy(alpha = 0.15f)
+                        )
                     ) {
-                        listOf(
-                            Triple(0, Icons.Default.Home, "الرئيسية"),
-                            Triple(1, Icons.Default.List, "الأوامر")
-                        ).forEach { (index, icon, label) ->
-                            val isSelected = bottomNavSelectedTab == index
-                            Column(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clickable {
-                                        bottomNavSelectedTab = index
-                                        if (index == 0) openCommandDetails = null
-                                    },
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.Center
-                            ) {
-                                Icon(
-                                    imageVector = icon,
-                                    contentDescription = null,
-                                    tint = if (isSelected) Color(0xFF9155FF) else Color(0xFF6B7280),
-                                    modifier = Modifier.size(20.dp)
-                                )
-                                Text(
-                                    text = label,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (isSelected) Color(0xFF9155FF) else Color(0xFF6B7280)
-                                )
+                        Row(
+                            modifier = Modifier.fillMaxWidth().height(64.dp),
+                            horizontalArrangement = Arrangement.SpaceEvenly,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            listOf(
+                                Triple(0, Icons.Default.Home, "الرئيسية"),
+                                Triple(1, Icons.Default.GridView, "الأوامر")
+                            ).forEach { (index, icon, label) ->
+                                val isSelected = bottomNavSelectedTab == index
+                                val contentColor = if (isSelected) Color(0xFF9155FF) else Color(0xFF9CA3AF)
+                                val backgroundColor = if (isSelected) Color(0xFF9155FF).copy(alpha = 0.1f) else Color.Transparent
+
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .padding(horizontal = 8.dp, vertical = 8.dp)
+                                        .clip(RoundedCornerShape(24.dp))
+                                        .background(backgroundColor)
+                                        .clickable {
+                                            bottomNavSelectedTab = index
+                                            if (index == 0) openCommandDetails = null
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.Center,
+                                        modifier = Modifier.padding(vertical = 8.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = icon,
+                                            contentDescription = null,
+                                            tint = contentColor,
+                                            modifier = Modifier.size(22.dp)
+                                        )
+                                        if (isSelected) {
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(
+                                                text = label,
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = contentColor
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -647,16 +713,20 @@ fun AdminDashboard(viewModel: AdminViewModel) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color(0xFFF9FAFB))
                     .padding(innerPadding)
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Color(0xFFFFFFFF))
-                        .padding(horizontal = 4.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = Color.White.copy(alpha = 0.85f),
+                    shadowElevation = 8.dp,
+                    shape = RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp)
                 ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 4.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                     IconButton(onClick = { 
                         if (openCommandDetails != null) {
                             openCommandDetails = null
@@ -680,6 +750,7 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                     }
                     
                     Spacer(modifier = Modifier.width(48.dp)) // To center title
+                }
                 }
 
                 commandResponse?.let { resp ->
@@ -1192,9 +1263,15 @@ fun DeviceHomeTab(device: Device, viewModel: AdminViewModel) {
     ) {
         Card(
             colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
-            shape = RoundedCornerShape(12.dp),
-            border = BorderStroke(1.dp, Color(0xFFE5E7EB)),
-            modifier = Modifier.fillMaxWidth()
+            shape = RoundedCornerShape(20.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+            border = BorderStroke(0.5.dp, Color(0xFFF3F4F6)),
+            modifier = Modifier.fillMaxWidth().shadow(
+                elevation = 8.dp, 
+                shape = RoundedCornerShape(20.dp), 
+                spotColor = Color(0xFF9155FF).copy(alpha = 0.08f), 
+                ambientColor = Color(0xFF9155FF).copy(alpha = 0.08f)
+            )
         ) {
             Column(modifier = Modifier.padding(14.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1206,58 +1283,105 @@ fun DeviceHomeTab(device: Device, viewModel: AdminViewModel) {
                     )
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {
-                        Text(if (device.isLocked) "الجهاز مقفل حالياً" else "الجهاز حر ومفتوح", color = Color(0xFF1F2937), fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                        Text("قفل أو فك قفل شاشة الطفل لمنع استخدامه", color = Color(0xFF6B7280), fontSize = 10.sp)
+                        Text(if (device.isLocked) "الجهاز مقفل حالياً" else "الجهاز حر ومفتوح", color = Color(0xFF111827), fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                        Text("قفل أو فك قفل شاشة الطفل لمنع استخدامه", color = Color(0xFF6B7280), fontSize = 11.sp, fontWeight = FontWeight.Medium)
                     }
                 }
-                Spacer(modifier = Modifier.height(12.dp))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Spacer(modifier = Modifier.height(16.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Button(
                         onClick = { viewModel.changeLockStatus(true) },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF4081)),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.weight(1f).height(38.dp)
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+                        contentPadding = PaddingValues(),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.weight(1f).height(44.dp)
                     ) {
-                        Text("قفل الهاتف", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Brush.linearGradient(listOf(Color(0xFFFF4B8B), Color(0xFFFF7A55))))
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("قفل الهاتف", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        }
                     }
                     Button(
                         onClick = { viewModel.changeLockStatus(false) },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF238636)),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.weight(1f).height(38.dp)
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+                        contentPadding = PaddingValues(),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.weight(1f).height(44.dp)
                     ) {
-                        Text("فك القفل", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Brush.linearGradient(listOf(Color(0xFF10B981), Color(0xFF059669))))
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("فك القفل", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        }
                     }
                 }
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(12.dp))
                 Button(
                     onClick = { viewModel.runCommand("ACTION_LOCK_SCREEN") },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9155FF)),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.fillMaxWidth().height(38.dp)
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+                    contentPadding = PaddingValues(),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth().height(44.dp)
                 ) {
-                    Icon(Icons.Default.PowerSettingsNew, null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("إطفاء شاشة الهاتف", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Brush.linearGradient(listOf(Color(0xFF9155FF), Color(0xFF7C3AED))))
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.PowerSettingsNew, null, modifier = Modifier.size(18.dp), tint = Color.White)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("إطفاء شاشة الهاتف", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        }
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Button(
                         onClick = { viewModel.runCommand("hide_app", mapOf("packageName" to "com.aistudio.commander.bxyz", "hidden" to true)) },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF4081)),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.weight(1f).height(38.dp)
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+                        contentPadding = PaddingValues(),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.weight(1f).height(44.dp)
                     ) {
-                        Text("إخفاء أيقونة الطفل", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Brush.linearGradient(listOf(Color(0xFFFF4B8B), Color(0xFFFF7A55))))
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("إخفاء أيقونة الطفل", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        }
                     }
                     Button(
                         onClick = { viewModel.runCommand("hide_app", mapOf("packageName" to "com.aistudio.commander.bxyz", "hidden" to false)) },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF238636)),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.weight(1f).height(38.dp)
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+                        contentPadding = PaddingValues(),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.weight(1f).height(44.dp)
                     ) {
-                        Text("إظهار أيقونة الطفل", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Brush.linearGradient(listOf(Color(0xFF10B981), Color(0xFF059669))))
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("إظهار أيقونة الطفل", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        }
                     }
                 }
             }
@@ -1266,8 +1390,15 @@ fun DeviceHomeTab(device: Device, viewModel: AdminViewModel) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             Card(
                 colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
-                border = BorderStroke(1.dp, Color(0xFFE5E7EB)),
-                modifier = Modifier.weight(1f)
+                shape = RoundedCornerShape(16.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                border = BorderStroke(0.5.dp, Color(0xFFF3F4F6)),
+                modifier = Modifier.weight(1f).shadow(
+                    elevation = 8.dp, 
+                    shape = RoundedCornerShape(16.dp), 
+                    spotColor = Color(0xFF9155FF).copy(alpha = 0.08f), 
+                    ambientColor = Color(0xFF9155FF).copy(alpha = 0.08f)
+                )
             ) {
                 Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Box(contentAlignment = Alignment.Center) {
@@ -1284,8 +1415,15 @@ fun DeviceHomeTab(device: Device, viewModel: AdminViewModel) {
 
             Card(
                 colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
-                border = BorderStroke(1.dp, Color(0xFFE5E7EB)),
-                modifier = Modifier.weight(1f)
+                shape = RoundedCornerShape(16.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                border = BorderStroke(0.5.dp, Color(0xFFF3F4F6)),
+                modifier = Modifier.weight(1f).shadow(
+                    elevation = 8.dp, 
+                    shape = RoundedCornerShape(16.dp), 
+                    spotColor = Color(0xFF9155FF).copy(alpha = 0.08f), 
+                    ambientColor = Color(0xFF9155FF).copy(alpha = 0.08f)
+                )
             ) {
                 val networkIcon = when (device.networkType?.uppercase()) {
                     "WIFI" -> Icons.Default.Wifi
@@ -1296,10 +1434,11 @@ fun DeviceHomeTab(device: Device, viewModel: AdminViewModel) {
                 Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(networkIcon, null, tint = Color(0xFF2196F3), modifier = Modifier.size(32.dp))
                     Spacer(modifier = Modifier.height(6.dp))
-                    val networkText = if (device.networkType != null && device.carrierName != null) {
-                        "${device.networkType} (${device.carrierName})"
+                    val displayNetType = if (device.networkType?.contains("cellular", ignoreCase = true) == true) "Phone data" else device.networkType
+                    val networkText = if (displayNetType != null && device.carrierName != null) {
+                        "${displayNetType} (${device.carrierName})"
                     } else {
-                        device.networkType ?: device.carrierName ?: "---"
+                        displayNetType ?: device.carrierName ?: "---"
                     }
                     Text("الشبكة", color = Color(0xFF6B7280), fontSize = 11.sp)
                     Text(networkText, color = Color(0xFF1F2937), fontSize = 14.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, maxLines = 1)
@@ -1308,8 +1447,15 @@ fun DeviceHomeTab(device: Device, viewModel: AdminViewModel) {
 
             Card(
                 colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
-                border = BorderStroke(1.dp, Color(0xFFE5E7EB)),
-                modifier = Modifier.weight(1f)
+                shape = RoundedCornerShape(16.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                border = BorderStroke(0.5.dp, Color(0xFFF3F4F6)),
+                modifier = Modifier.weight(1f).shadow(
+                    elevation = 8.dp, 
+                    shape = RoundedCornerShape(16.dp), 
+                    spotColor = Color(0xFF9155FF).copy(alpha = 0.08f), 
+                    ambientColor = Color(0xFF9155FF).copy(alpha = 0.08f)
+                )
             ) {
                 val usagePercentage = if (device.storageTotal > 0) ((device.storageUsed.toDouble() / device.storageTotal.toDouble()) * 100).toInt() else 0
                 Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -1323,8 +1469,15 @@ fun DeviceHomeTab(device: Device, viewModel: AdminViewModel) {
 
         Card(
             colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
-            border = BorderStroke(1.dp, Color(0xFFE5E7EB)),
-            modifier = Modifier.fillMaxWidth()
+            shape = RoundedCornerShape(20.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+            border = BorderStroke(0.5.dp, Color(0xFFF3F4F6)),
+            modifier = Modifier.fillMaxWidth().shadow(
+                elevation = 8.dp, 
+                shape = RoundedCornerShape(20.dp), 
+                spotColor = Color(0xFF9155FF).copy(alpha = 0.08f), 
+                ambientColor = Color(0xFF9155FF).copy(alpha = 0.08f)
+            )
         ) {
             Column(modifier = Modifier.padding(14.dp)) {
                 Text("تفاصيل مساحة التخزين", color = Color(0xFF1F2937), fontSize = 12.sp, fontWeight = FontWeight.Bold)
@@ -1375,7 +1528,6 @@ fun DeviceCommandsTab(
             val cmdItems = listOf(
                 CommandItemInfo("screenshot", "لقطة الشاشة والكاميرات", "التقاط لقطة شاشة هاتف الطفل أو صور حية بالكاميرا", Icons.Default.Screenshot, Color(0xFF9155FF)),
                 CommandItemInfo("audio_record", "تسجيل الصوت المحيطي", "تسجيل مقطع صوتي محيطي بالوقت الحقيقي والاستماع إليه", Icons.Default.Mic, Color(0xFF00E5FF)),
-                CommandItemInfo("live_stream", "البث المباشر للشاشة", "مراقبة شاشة الهاتف لحظياً وبطريقة آمنة بالكامل", Icons.Default.Tv, Color(0xFF39D353)),
                 CommandItemInfo("file_explorer", "مستكشف ملفات الهاتف", "استكشاف وتنزيل ملفات جهاز الطفل بالكامل", Icons.Default.FolderOpen, Color(0xFFFFD54F)),
                 CommandItemInfo("apps", "قائمة التطبيقات وحزمها", "الاطلاع وفلترة التطبيقات المنصبة على الهاتف للأمان", Icons.Default.Apps, Color(0xFFFF4081)),
                 CommandItemInfo("sms", "الرسائل وتنبيهات الأمان", "مزامنة الرسائل النصية والتنبيهات المكتشفة بالهاتف", Icons.Default.Sms, Color(0xFFFF9100)),
@@ -1383,7 +1535,6 @@ fun DeviceCommandsTab(
                 CommandItemInfo("remote_control", "التحكم عن بعد (لمس)", "بث مباشر للشاشة مع إمكانية التحكم الكامل باللمس", Icons.Default.SettingsRemote, Color(0xFF2196F3)),
                 CommandItemInfo("audio_control", "التحكم في الصوت والتنبيه", "تشغيل أصوات تنبيهية والتحكم في مستوى صوت هاتف الطفل", Icons.Default.VolumeUp, Color(0xFFFFA726)),
                 CommandItemInfo("send_message", "إرسال رسالة فورية", "إرسال رسالة تظهر كإشعار على هاتف الطفل", Icons.Default.Chat, Color(0xFF00C853)),
-                CommandItemInfo("camera_live", "بث حي للكاميرا", "فتح بث مباشر لكاميرا هاتف الطفل (أمامية أو خلفية)", Icons.Default.Videocam, Color(0xFFFF5252)),
                 CommandItemInfo("change_icon", "استبدال أيقونة التطبيق", "تغيير شكل واسم أيقونة تطبيق الطفل من ضمن القائمة", Icons.Default.Apps, Color(0xFFE91E63))
             )
 
@@ -1391,9 +1542,15 @@ fun DeviceCommandsTab(
                 Card(
                     onClick = { onOpenCommand(cmd.id) },
                     colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
-                    border = BorderStroke(1.dp, Color(0xFFE5E7EB)),
-                    shape = RoundedCornerShape(10.dp),
-                    modifier = Modifier.fillMaxWidth()
+                    shape = RoundedCornerShape(16.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                    border = BorderStroke(0.5.dp, Color(0xFFF3F4F6)),
+                    modifier = Modifier.fillMaxWidth().shadow(
+                        elevation = 6.dp, 
+                        shape = RoundedCornerShape(16.dp), 
+                        spotColor = Color(0xFF9155FF).copy(alpha = 0.08f), 
+                        ambientColor = Color(0xFF9155FF).copy(alpha = 0.08f)
+                    )
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(14.dp),
@@ -3719,11 +3876,17 @@ fun EmptyDevicesScreen(viewModel: AdminViewModel) {
 
         // Card Entry Inputs
         Card(
-            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
-            shape = RoundedCornerShape(12.dp),
-            modifier = Modifier.fillMaxWidth()
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            shape = RoundedCornerShape(24.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+            border = BorderStroke(0.5.dp, Color.White),
+            modifier = Modifier.fillMaxWidth().shadow(
+                elevation = 20.dp,
+                shape = RoundedCornerShape(24.dp),
+                spotColor = Color(0xFF9155FF).copy(alpha = 0.1f)
+            )
         ) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Column(modifier = Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 OutlinedTextField(
                     value = pairingToken,
                     onValueChange = { 
@@ -3770,15 +3933,24 @@ fun EmptyDevicesScreen(viewModel: AdminViewModel) {
                             viewModel.registerDeviceManually(pairingToken, friendlyName)
                         }
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9155FF)),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent, disabledContainerColor = Color(0xFFE5E7EB)),
+                    contentPadding = PaddingValues(),
                     enabled = !isProgressing && pairingToken.isNotBlank() && friendlyName.isNotBlank(),
-                    modifier = Modifier.fillMaxWidth().height(48.dp),
-                    shape = RoundedCornerShape(8.dp)
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                    shape = RoundedCornerShape(14.dp)
                 ) {
-                    if (isProgressing) {
-                        CircularProgressIndicator(color = Color(0xFF1F2937), modifier = Modifier.size(24.dp))
-                    } else {
-                        Text("مزامنة وإقتران في قاعدة البيانات", fontWeight = FontWeight.Bold)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Brush.linearGradient(listOf(Color(0xFF9155FF), Color(0xFF7C3AED))))
+                            .padding(12.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (isProgressing) {
+                            CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                        } else {
+                            Text("مزامنة وإقتران في قاعدة البيانات", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        }
                     }
                 }
             }
@@ -3796,12 +3968,17 @@ fun EditDatabaseUrlDialog(
     
     Dialog(onDismissRequest = onClose) {
         Card(
-            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
-            shape = RoundedCornerShape(16.dp),
-            modifier = Modifier.fillMaxWidth().padding(8.dp),
-            border = BorderStroke(1.dp, Color(0xFFE5E7EB))
+            colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.95f)),
+            shape = RoundedCornerShape(24.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+            border = BorderStroke(0.5.dp, Color.White),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).shadow(
+                elevation = 20.dp,
+                shape = RoundedCornerShape(24.dp),
+                spotColor = Color.Black.copy(alpha = 0.1f)
+            )
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
+            Column(modifier = Modifier.padding(20.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -3927,12 +4104,17 @@ fun DeviceSelectionDialog(
 
     Dialog(onDismissRequest = onClose) {
         Card(
-            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
-            shape = RoundedCornerShape(16.dp),
-            modifier = Modifier.fillMaxWidth(),
-            border = BorderStroke(1.dp, Color(0xFFE5E7EB))
+            colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.95f)),
+            shape = RoundedCornerShape(24.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+            border = BorderStroke(0.5.dp, Color.White),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp).shadow(
+                elevation = 24.dp,
+                shape = RoundedCornerShape(24.dp),
+                spotColor = Color.Black.copy(alpha = 0.15f)
+            )
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
+            Column(modifier = Modifier.padding(20.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,

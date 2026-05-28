@@ -1,0 +1,208 @@
+789-                shape = RoundedCornerShape(16.dp),
+790-                colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
+791:                border = BorderStroke(1.dp, Color(0xFFE5E7EB))
+792-            ) {
+793-                Column(
+794-                    modifier = Modifier
+--
+986-                        Card(
+987-                            colors = CardDefaults.cardColors(containerColor = Color(0xFFF3F4F6)),
+988:                            border = BorderStroke(1.dp, Color(0xFFE5E7EB)),
+989-                            modifier = Modifier.fillMaxWidth()
+990-                        ) {
+991-                            Column(modifier = Modifier.padding(12.dp)) {
+--
+1039-                shape = RoundedCornerShape(16.dp),
+1040-                colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
+1041:                border = BorderStroke(1.dp, Color(0xFFE5E7EB))
+1042-            ) {
+1043-                Column(
+1044-                    modifier = Modifier
+--
+1149-                shape = RoundedCornerShape(16.dp),
+1150-                colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
+1151:                border = BorderStroke(1.dp, Color(0xFFE5E7EB))
+1152-            ) {
+1153-                Column(
+1154-                    modifier = Modifier
+--
+1259-            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
+1260-            shape = RoundedCornerShape(12.dp),
+1261:            border = BorderStroke(1.dp, Color(0xFFE5E7EB)),
+1262-            modifier = Modifier.fillMaxWidth()
+1263-        ) {
+1264-            Column(modifier = Modifier.padding(14.dp)) {
+--
+1332-            Card(
+1333-                colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
+1334:                border = BorderStroke(1.dp, Color(0xFFE5E7EB)),
+1335-                modifier = Modifier.weight(1f)
+1336-            ) {
+1337-                Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+--
+1350-            Card(
+1351-                colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
+1352:                border = BorderStroke(1.dp, Color(0xFFE5E7EB)),
+1353-                modifier = Modifier.weight(1f)
+1354-            ) {
+1355-                val networkIcon = when (device.networkType?.uppercase()) {
+--
+1375-            Card(
+1376-                colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
+1377:                border = BorderStroke(1.dp, Color(0xFFE5E7EB)),
+1378-                modifier = Modifier.weight(1f)
+1379-            ) {
+1380-                val usagePercentage = if (device.storageTotal > 0) ((device.storageUsed.toDouble() / device.storageTotal.toDouble()) * 100).toInt() else 0
+--
+1390-        Card(
+1391-            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
+1392:            border = BorderStroke(1.dp, Color(0xFFE5E7EB)),
+1393-            modifier = Modifier.fillMaxWidth()
+1394-        ) {
+1395-            Column(modifier = Modifier.padding(14.dp)) {
+--
+1458-                    onClick = { onOpenCommand(cmd.id) },
+1459-                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
+1460:                    border = BorderStroke(1.dp, Color(0xFFE5E7EB)),
+1461-                    shape = RoundedCornerShape(10.dp),
+1462-                    modifier = Modifier.fillMaxWidth()
+1463-                ) {
+--
+1594-                                modifier = Modifier.fillMaxWidth().clickable { playingVideo = video },
+1595-                                colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
+1596:                                border = BorderStroke(1.dp, Color(0xFFE5E7EB))
+1597-                            ) {
+1598-                                Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+1599-                                    Icon(Icons.Default.PlayCircle, null, tint = Color(0xFFEF4444))
+--
+1690-            Card(
+1691-                colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
+1692:                border = BorderStroke(1.dp, Color(0xFFE5E7EB)),
+1693-                shape = RoundedCornerShape(12.dp),
+1694-                modifier = Modifier.fillMaxWidth().aspectRatio(1f)
+1695-            ) {
+--
+1763-                        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
+1764-                        shape = RoundedCornerShape(16.dp),
+1765:                        border = BorderStroke(1.dp, Color(0xFFE5E7EB))
+1766-                    ) {
+1767-                        Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+1768-                            Text("خيارات الوسائط", color = Color(0xFF1F2937), fontWeight = FontWeight.Bold)
+--
+1820-        Card(
+1821-            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
+1822:            border = BorderStroke(1.dp, Color(0xFFE5E7EB)),
+1823-            shape = RoundedCornerShape(12.dp)
+1824-        ) {
+1825-            Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+--
+1852-                Card(
+1853-                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
+1854:                    border = BorderStroke(1.dp, Color(0xFFE5E7EB)),
+1855-                    modifier = Modifier.fillMaxWidth(),
+1856-                    shape = RoundedCornerShape(10.dp)
+1857-                ) {
+--
+2033-        Card(
+2034-            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
+2035:            border = BorderStroke(1.dp, Color(0xFFE5E7EB)),
+2036-            modifier = Modifier.fillMaxWidth()
+2037-        ) {
+2038-            Column(modifier = Modifier.padding(16.dp)) {
+--
+2061-        Card(
+2062-            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
+2063:            border = BorderStroke(1.dp, Color(0xFFE5E7EB)),
+2064-            modifier = Modifier.fillMaxWidth()
+2065-        ) {
+2066-            Column(modifier = Modifier.padding(16.dp)) {
+--
+2117-        Card(
+2118-            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
+2119:            border = BorderStroke(1.dp, Color(0xFFE5E7EB))
+2120-        ) {
+2121-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+2122-                Text("إرسال إشعار فوري", color = Color(0xFF1F2937), fontWeight = FontWeight.Bold)
+--
+2201-            modifier = Modifier.fillMaxWidth(),
+2202-            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
+2203:            border = BorderStroke(1.dp, Color(0xFFE5E7EB))
+2204-        ) {
+2205-            Column(
+2206-                modifier = Modifier.padding(16.dp),
+--
+3055-                                Text("لقطة شاشة", fontSize = 12.sp)
+3056-                            }
+3057:                            Button(onClick = { viewModel.requestPhoto(false) }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFFFFF)), border = BorderStroke(1.dp, Color(0xFFE5E7EB)), modifier = Modifier.weight(1f).height(48.dp), shape = RoundedCornerShape(10.dp)) {
+3058-                                Icon(Icons.Default.Camera, null, modifier = Modifier.size(18.dp), tint = Color(0xFFFF4081))
+3059-                                Spacer(modifier = Modifier.width(8.dp))
+3060-                                Text("صورة خلفية", fontSize = 12.sp)
+3061-                            }
+3062-                        }
+3063:                        Button(onClick = { viewModel.requestPhoto(true) }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFFFFF)), border = BorderStroke(1.dp, Color(0xFFE5E7EB)), modifier = Modifier.fillMaxWidth().height(44.dp), shape = RoundedCornerShape(10.dp)) {
+3064-                            Icon(Icons.Default.CameraFront, null, modifier = Modifier.size(18.dp), tint = Color.Cyan)
+3065-                            Spacer(modifier = Modifier.width(8.dp))
+3066-                            Text("صورة أمامية", fontSize = 12.sp)
+--
+3092-                    // AMBIENT SOUND TAB...
+3093-                    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+3094:                        Card(colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)), shape = RoundedCornerShape(16.dp), border = BorderStroke(1.dp, Color(0xFFE5E7EB))) {
+3095-                            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+3096-                                Row(verticalAlignment = Alignment.CenterVertically) {
+3097-                                    Icon(Icons.Default.Mic, null, tint = Color(0xFF9155FF), modifier = Modifier.size(28.dp))
+--
+3115-                        } else {
+3116-                            audioRecords.forEach { item ->
+3117:                                Card(colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)), border = BorderStroke(1.dp, Color(0xFFE5E7EB)), modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+3118-                                    Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+3119-                                        IconButton(onClick = { viewModel.loadAndPlayAudio(item.base64) }) {
+3120-                                            Icon(Icons.Default.PlayCircle, null, tint = Color.Green, modifier = Modifier.size(32.dp))
+--
+3166-                        Card(
+3167-                            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
+3168:                            border = BorderStroke(1.dp, Color(0xFFE5E7EB)),
+3169-                            shape = RoundedCornerShape(16.dp)
+3170-                        ) {
+3171-                            Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+--
+3216-                                        Card(
+3217-                                            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
+3218:                                            border = BorderStroke(1.dp, Color(0xFFE5E7EB)),
+3219-                                            shape = RoundedCornerShape(12.dp)
+3220-                                        ) {
+3221-                                            Row(
+--
+3275-                .fillMaxWidth()
+3276-                .padding(bottom = 12.dp),
+3277:            border = BorderStroke(1.dp, Color(0xFFE5E7EB))
+3278-        ) {
+3279-            Column(modifier = Modifier.padding(12.dp)) {
+3280-                Text(
+--
+3448-                    modifier = Modifier.fillMaxWidth(),
+3449-                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
+3450:                    border = BorderStroke(1.dp, Color(0xFFE5E7EB))
+3451-                ) {
+3452-                    Row(
+3453-                        modifier = Modifier.padding(12.dp),
+--
+3866-            shape = RoundedCornerShape(16.dp),
+3867-            modifier = Modifier.fillMaxWidth().padding(8.dp),
+3868:            border = BorderStroke(1.dp, Color(0xFFE5E7EB))
+3869-        ) {
+3870-            Column(modifier = Modifier.padding(16.dp)) {
+3871-                Row(
+--
+3997-            shape = RoundedCornerShape(16.dp),
+3998-            modifier = Modifier.fillMaxWidth(),
+3999:            border = BorderStroke(1.dp, Color(0xFFE5E7EB))
+4000-        ) {
+4001-            Column(modifier = Modifier.padding(16.dp)) {
+4002-                Row(
+--
+4350-            colors = CardDefaults.cardColors(containerColor = Color(0xFFF3F4F6)),
+4351-            shape = RoundedCornerShape(16.dp),
+4352:            border = BorderStroke(1.dp, Color(0xFFE5E7EB))
+4353-        ) {
+4354-            Column {
+4355-                Row(
