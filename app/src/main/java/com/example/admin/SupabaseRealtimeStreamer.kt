@@ -9,15 +9,16 @@ import java.util.concurrent.TimeUnit
 
 class SupabaseRealtimeStreamer(
     private val deviceToken: String?,
-    private val onLiveStreamUpdate: ((LiveStreamState) -> Unit)? = null,
-    private val onCameraStreamUpdate: ((CameraStreamState) -> Unit)? = null,
+    private val onLiveStreamUpdate: ((deviceToken: String, LiveStreamState) -> Unit)? = null,
+    private val onCameraStreamUpdate: ((deviceToken: String, CameraStreamState) -> Unit)? = null,
     private val onDeviceUpdate: ((Device) -> Unit)? = null,
     private val onStatusUpdate: ((Boolean) -> Unit)? = null,
     val onPresenceSync: ((Set<String>) -> Unit)? = null,
     val onPresenceJoin: ((String) -> Unit)? = null,
     val onPresenceLeave: ((String) -> Unit)? = null,
     val onHeartbeat: ((String) -> Unit)? = null,
-    val onStatusReply: ((String) -> Unit)? = null
+    val onStatusReply: ((String) -> Unit)? = null,
+    val onCommandReply: ((token: String, status: String, message: String, timestamp: Long) -> Unit)? = null
 ) {
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
@@ -137,22 +138,6 @@ class SupabaseRealtimeStreamer(
             }
             ws.send(joinTopicMsg.toString())
             Log.d("SupabaseRealtimeStreamer", "Joined broadcast presence channel: $topicName with token key custom presence state config")
-
-            val monitoringTopicName = "realtime:device-monitoring"
-            val joinMonitoringTopicMsg = JSONObject().apply {
-                put("topic", monitoringTopicName)
-                put("event", "phx_join")
-                put("payload", JSONObject().apply {
-                    put("config", JSONObject().apply {
-                        put("presence", JSONObject().apply {
-                            put("key", "token")
-                        })
-                    })
-                })
-                put("ref", "join_ref_broadcast_device_monitoring")
-            }
-            ws.send(joinMonitoringTopicMsg.toString())
-            Log.d("SupabaseRealtimeStreamer", "Joined broadcast monitoring channel: $monitoringTopicName")
         } catch (e: Exception) {
             Log.e("SupabaseRealtimeStreamer", "Error constructing join message", e)
         }
@@ -187,7 +172,7 @@ class SupabaseRealtimeStreamer(
             val topic = json.optString("topic")
             
             // Standard Phoenix Presence Event Dispatching
-            if (topic == "realtime:device_presence" || topic == "realtime:device-monitoring") {
+            if (topic == "realtime:device_presence") {
                 if (event == "presence_state") {
                     val payload = json.optJSONObject("payload")
                     if (payload != null) {
@@ -255,10 +240,27 @@ class SupabaseRealtimeStreamer(
                         onStatusReply?.invoke(tokenVal)
                     }
                 }
+                if (pType == "broadcast" && (pEvent == "command_reply" || pEvent == "command_response" || pEvent == "command_status" || pEvent == "response" || pEvent == "reply" || pEvent.contains("reply") || pEvent.contains("response"))) {
+                    val innerPayload = topPayloadCheck.optJSONObject("payload")
+                    val p = innerPayload ?: topPayloadCheck
+                    val tokenVal = p.optString("token").takeIf { it.isNotBlank() && it != "null" }
+                        ?: p.optString("device_token").takeIf { it.isNotBlank() && it != "null" }
+                    val statusVal = p.optString("status").takeIf { it.isNotBlank() && it != "null" }
+                        ?: p.optString("command_status").takeIf { it.isNotBlank() && it != "null" }
+                    val messageVal = p.optString("message") ?: p.optString("result") ?: p.optString("response_message") ?: ""
+                    val tsVal = p.optLong("timestamp", 0L).takeIf { it != 0L }
+                        ?: p.optLong("command_timestamp", 0L).takeIf { it != 0L }
+                        ?: p.optLong("cmd_timestamp", 0L)
+                    
+                    if (!tokenVal.isNullOrBlank() && statusVal != null) {
+                        Log.d("SupabaseRealtimeStreamer", "Broadcast command reply processed from child ($tokenVal): status=$statusVal, ts=$tsVal")
+                        onCommandReply?.invoke(tokenVal, statusVal, messageVal, tsVal)
+                    }
+                }
             }
             
             // Check if this topic or event corresponds to a broadcast from the targeted devices
-            val isBroadcastTopic = topic == "realtime:device_presence" || topic == "realtime:device-monitoring"
+            val isBroadcastTopic = topic == "realtime:device_presence"
             
             if ((isBroadcastTopic && event != "presence_state" && event != "presence_diff") || event == "device_update" || event == "device_presence") {
                 val topPayload = json.optJSONObject("payload")
@@ -391,7 +393,7 @@ class SupabaseRealtimeStreamer(
                         recordDeviceToken = record.optString("deviceToken")
                     }
                     
-                    if (recordDeviceToken != deviceToken) {
+                    if (deviceToken != null && recordDeviceToken != deviceToken) {
                         // Not for this device
                         return
                     }
@@ -411,7 +413,7 @@ class SupabaseRealtimeStreamer(
                             timestamp = timestampVal,
                             error = errorVal
                         )
-                        onLiveStreamUpdate?.invoke(state)
+                        onLiveStreamUpdate?.invoke(recordDeviceToken, state)
                     } else if (table == "camera_stream") {
                         val cameraTypeVal = record.optString("camera_type", "back")
                         
@@ -427,7 +429,7 @@ class SupabaseRealtimeStreamer(
                             timestamp = timestampVal,
                             error = errorVal
                         )
-                        onCameraStreamUpdate?.invoke(state)
+                        onCameraStreamUpdate?.invoke(recordDeviceToken, state)
                     }
                 }
             }

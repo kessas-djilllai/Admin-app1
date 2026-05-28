@@ -129,7 +129,6 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
     private var syncJob: Job? = null
     private var streamPollingJob: Job? = null
     private var realtimeStreamer: SupabaseRealtimeStreamer? = null
-    private var devicesRealtimeStreamer: SupabaseRealtimeStreamer? = null
     private var lastKnownAlertTime = 0L
 
     private val _devicesWebSocketConnected = MutableStateFlow(false)
@@ -293,29 +292,6 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
         streamPollingJob?.cancel()
         stopAudio()
         
-        // Permanent websocket listener for streams
-        realtimeStreamer?.shutdown()
-        realtimeStreamer = SupabaseRealtimeStreamer(
-            deviceToken = token,
-            onLiveStreamUpdate = { state ->
-                // Don't overwrite loading state unless it's a real active update
-                if (state.isActive || !state.streamUrl.isNullOrBlank()) {
-                    _liveStreamState.value = state.copy(isLoading = false)
-                } else if (!state.isActive && _liveStreamState.value?.isActive == true) {
-                    _liveStreamState.value = state.copy(isLoading = false)
-                }
-            },
-            onCameraStreamUpdate = { state ->
-                if (state.isActive || !state.streamUrl.isNullOrBlank()) {
-                    _cameraStreamState.value = state.copy(isLoading = false)
-                } else if (!state.isActive && _cameraStreamState.value?.isActive == true) {
-                    _cameraStreamState.value = state.copy(isLoading = false)
-                }
-            }
-        ).apply {
-            connect(connector.getRootUrl(), anonKey)
-        }
-        
         streamPollingJob = viewModelScope.launch {
             while (true) {
                 try {
@@ -378,9 +354,9 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                 // Expose the fresh list to our StateFlow
                 _devices.value = dbDevices
                 
-                // Send light-weight status check broadcast via our streamer's WS
-                devicesRealtimeStreamer?.sendBroadcast(
-                    topic = "realtime:device-monitoring",
+                // Send light-weight status check broadcast via our streamer's WS over the single unified channel
+                realtimeStreamer?.sendBroadcast(
+                    topic = "realtime:device_presence",
                     eventName = "check_status",
                     payload = org.json.JSONObject()
                 )
@@ -501,8 +477,8 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
 
-        devicesRealtimeStreamer?.shutdown()
-        devicesRealtimeStreamer = SupabaseRealtimeStreamer(
+        realtimeStreamer?.shutdown()
+        realtimeStreamer = SupabaseRealtimeStreamer(
             deviceToken = null,
             onDeviceUpdate = { updatedDevice ->
                 viewModelScope.launch {
@@ -568,6 +544,35 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                         }
                     }
                     _devices.value = updatedList
+                }
+            },
+            onCommandReply = { deviceToken, status, message, timestamp ->
+                viewModelScope.launch {
+                    addWebsocketEvent("رد الأمر مستلم (قناة عامة Websocket) من $deviceToken: $status - $message")
+                    val currentSelected = _selectedDeviceToken.value
+                    if (deviceToken == currentSelected) {
+                        _commandResponse.value = Triple(status, message, if (timestamp != 0L) timestamp else System.currentTimeMillis())
+                    }
+                }
+            },
+            onLiveStreamUpdate = { deviceToken, state ->
+                val currentSelected = _selectedDeviceToken.value
+                if (deviceToken == currentSelected) {
+                    if (state.isActive || !state.streamUrl.isNullOrBlank()) {
+                        _liveStreamState.value = state.copy(isLoading = false)
+                    } else if (!state.isActive && _liveStreamState.value?.isActive == true) {
+                        _liveStreamState.value = state.copy(isLoading = false)
+                    }
+                }
+            },
+            onCameraStreamUpdate = { deviceToken, state ->
+                val currentSelected = _selectedDeviceToken.value
+                if (deviceToken == currentSelected) {
+                    if (state.isActive || !state.streamUrl.isNullOrBlank()) {
+                        _cameraStreamState.value = state.copy(isLoading = false)
+                    } else if (!state.isActive && _cameraStreamState.value?.isActive == true) {
+                        _cameraStreamState.value = state.copy(isLoading = false)
+                    }
                 }
             }
         ).apply {
@@ -727,6 +732,45 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun sendBroadcastCommand(token: String, commandType: String, params: Map<String, Any> = emptyMap(), startTime: Long = System.currentTimeMillis()): Boolean {
+        return try {
+            val payload = org.json.JSONObject().apply {
+                put("device_token", token)
+                put("token", token)
+                put("command", commandType)
+                put("commandType", commandType)
+                put("timestamp", startTime)
+                val paramsJson = org.json.JSONObject()
+                params.forEach { (key, value) -> paramsJson.put(key, value) }
+                put("params", paramsJson)
+            }
+
+            // Broadcast strictly on the single unified device_presence channel topic
+            realtimeStreamer?.sendBroadcast(
+                topic = "realtime:device_presence",
+                eventName = "command",
+                payload = payload
+            )
+
+            Log.d("AdminViewModel", "Broadcasted command ($commandType) via WebSockets to device $token")
+            addWebsocketEvent("تم إرسال الأمر ($commandType) بنجاح عبر WebSocket ⚡")
+            
+            if (commandType == "lock_device" || commandType == "unlock_device") {
+                viewModelScope.launch {
+                    try {
+                        connector.updateLockInDatabase(token, commandType == "lock_device")
+                    } catch (e: Exception) {
+                        Log.e("AdminViewModel", "Error updating lock in DB: ${e.message}")
+                    }
+                }
+            }
+            true
+        } catch (e: Exception) {
+            Log.e("AdminViewModel", "Error sending broadcast command via WebSocket", e)
+            false
+        }
+    }
+
     // REMOTE COMMAND DISPATCHER
     fun runCommand(commandType: String, params: Map<String, Any> = emptyMap(), silent: Boolean = false) {
         val token = _selectedDeviceToken.value
@@ -756,32 +800,16 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             delay(100)
 
-            // Clear prior command response first in Firebase
-            try {
-                connector.clearCommandResponse(token)
-            } catch(e: Exception) {
-                Log.e("AdminViewModel", "Could not clear remote command response", e)
-            }
+            _commandResponse.value = null
 
-            // Step 1: Sending Command to child device
-            val sendSuccess = try {
-                connector.sendCommandToChild(token, commandType, params, startTime)
-            } catch (e: Exception) {
-                Log.e("AdminViewModel", "Error in sendCommandToChild", e)
+            // Step 1: Sending Command via WebSocket
+            val sendSuccess = sendBroadcastCommand(token, commandType, params, startTime)
+
+            if (!sendSuccess) {
                 if (!silent) {
                     _activeCommandProgress.value = _activeCommandProgress.value?.copy(
                         sendStatus = CommandStepStatus.FAILED,
-                        sendError = e.localizedMessage ?: e.message ?: "فشل في إرسال الأمر عبر الشبكة بسبب مشكلة في الإرسال"
-                    )
-                }
-                false
-            }
-
-            if (!sendSuccess) {
-                if (!silent && _activeCommandProgress.value?.sendError == null) {
-                    _activeCommandProgress.value = _activeCommandProgress.value?.copy(
-                        sendStatus = CommandStepStatus.FAILED,
-                        sendError = "لم يتمكن التطبيق من الكتابة بقاعدة بيانات التحكم الأبوي"
+                        sendError = "فشل في إرسال الأمر عبر وبسوكيت"
                     )
                 }
                 return@launch
@@ -805,20 +833,23 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
             for (i in 0 until maxIterations) {
                 delay(pollIntervalMs)
 
-                // Refresh command response separately to avoid heavy syncing
+                // Refresh command response separately to check WebSocket first, then DB fallback
                 try {
-                    val resp = connector.getCommandResponse(token)
-                    if (resp != null && resp.third == startTime) {
-                        _commandResponse.value = resp
-                    } else {
-                        // Check if status in commands table was updated to success directly
-                        val cmdStatus = connector.getCommandStatus(token, startTime)
-                        if (cmdStatus != null) {
-                            val (st, msg, ts) = cmdStatus
-                            if (st == "success" || st == "ok" || st == "completed") {
-                                _commandResponse.value = Triple("success", "تم تنفيذ العملية بنجاح", startTime)
-                            } else if (st == "error" || st == "failed") {
-                                _commandResponse.value = Triple("error", "التنفيذ فشل من طرف هاتف الطفل", startTime)
+                    val localResp = _commandResponse.value
+                    if (localResp == null || localResp.third != startTime) {
+                        val resp = connector.getCommandResponse(token)
+                        if (resp != null && resp.third == startTime) {
+                            _commandResponse.value = resp
+                        } else {
+                            // Check if status in commands table was updated to success directly
+                            val cmdStatus = connector.getCommandStatus(token, startTime)
+                            if (cmdStatus != null) {
+                                val (st, msg, ts) = cmdStatus
+                                if (st == "success" || st == "ok" || st == "completed") {
+                                    _commandResponse.value = Triple("success", "تم تنفيذ العملية بنجاح", startTime)
+                                } else if (st == "error" || st == "failed") {
+                                    _commandResponse.value = Triple("error", "التنفيذ فشل من طرف هاتف الطفل", startTime)
+                                }
                             }
                         }
                     }
@@ -1115,13 +1146,8 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val startTime = System.currentTimeMillis()
             
-            try {
-                connector.clearCommandResponse(token)
-            } catch(e: Exception) { }
-            
-            val sendSuccess = try {
-                connector.sendCommandToChild(token, command, emptyMap(), startTime)
-            } catch (e: Exception) { false }
+            _commandResponse.value = null
+            val sendSuccess = sendBroadcastCommand(token, command, emptyMap(), startTime)
             
             if (!sendSuccess) {
                 _liveStreamState.value = _liveStreamState.value?.copy(
@@ -1205,15 +1231,10 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val startTime = System.currentTimeMillis()
             
-            // clear response first
-            try {
-                connector.clearCommandResponse(token)
-            } catch(e: Exception) { }
+            _commandResponse.value = null
             
-            // Send command
-            val sendSuccess = try {
-                connector.sendCommandToChild(token, command, emptyMap(), startTime)
-            } catch (e: Exception) { false }
+            // Send command via WebSocket
+            val sendSuccess = sendBroadcastCommand(token, command, emptyMap(), startTime)
             
             if (!sendSuccess) {
                 _cameraStreamState.value = _cameraStreamState.value?.copy(
@@ -1420,8 +1441,6 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
         streamPollingJob?.cancel()
         realtimeStreamer?.shutdown()
         realtimeStreamer = null
-        devicesRealtimeStreamer?.shutdown()
-        devicesRealtimeStreamer = null
         stopAudio()
     }
 }
