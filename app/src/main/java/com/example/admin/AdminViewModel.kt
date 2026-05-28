@@ -387,8 +387,14 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
             onPresenceSync = { activeTokens ->
                 viewModelScope.launch {
                     _onlineDeviceTokens.value = activeTokens
+                    val now = System.currentTimeMillis()
                     val updatedList = _devices.value.map { device ->
-                        device.copy(isOnlineOverride = activeTokens.contains(device.id))
+                        val isTokenActive = activeTokens.contains(device.id)
+                        val becameOffline = device.isOnline && !isTokenActive
+                        device.copy(
+                            isOnlineOverride = isTokenActive,
+                            lastActive = if (becameOffline) now else device.lastActive
+                        )
                     }
                     _devices.value = updatedList
                     addWebsocketEvent("تزامن الحضور النشط: تم العثور على أجهزة متصلة بالبث: ${activeTokens.size}")
@@ -417,9 +423,13 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                     currentSet.remove(token)
                     _onlineDeviceTokens.value = currentSet
                     
+                    val now = System.currentTimeMillis()
                     val updatedList = _devices.value.map { device ->
                         if (device.id == token) {
-                            device.copy(isOnlineOverride = false)
+                            device.copy(
+                                isOnlineOverride = false,
+                                lastActive = now
+                            )
                         } else {
                             device
                         }

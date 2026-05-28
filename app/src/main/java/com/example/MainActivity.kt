@@ -311,6 +311,78 @@ fun getRelativeTimeString(lastActive: Long): String {
 }
 
 @Composable
+fun ConnectionStatusItem(device: Device) {
+    if (device.isOnline) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFF10B981))
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = "متصل الآن 🟢",
+                color = Color(0xFF10B981),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    } else {
+        var currentTime by remember { mutableStateOf(System.currentTimeMillis()) }
+        LaunchedEffect(device.id, device.lastActive) {
+            while (true) {
+                delay(1000L)
+                currentTime = System.currentTimeMillis()
+            }
+        }
+        val deltaMs = currentTime - device.lastActive
+        val text = when {
+            device.lastActive == 0L -> "غير متصل (لا يوجد نشاط مسجل)"
+            deltaMs <= 0L -> "غير متصل منذ ثانية"
+            else -> {
+                val diffSec = deltaMs / 1000
+                if (diffSec < 60) {
+                    "غير متصل منذ $diffSec ثانية"
+                } else {
+                    val diffMin = diffSec / 60
+                    if (diffMin < 60) {
+                        val remSec = diffSec % 60
+                        "غير متصل منذ $diffMin دقيقة و $remSec ثانية"
+                    } else {
+                        val diffHours = diffMin / 60
+                        val remMin = diffMin % 60
+                        if (diffHours < 24) {
+                            "غير متصل منذ $diffHours ساعة و $remMin دقيقة"
+                        } else {
+                            val diffDays = diffHours / 24
+                            val remHours = diffHours % 24
+                            "غير متصل منذ $diffDays يوم و $remHours ساعة"
+                        }
+                    }
+                }
+            }
+        }
+
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFFEF4444))
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = text,
+                color = Color(0xFFEF4444),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
+@Composable
 fun SkeletonDeviceItem() {
     val infiniteTransition = rememberInfiniteTransition(label = "skeleton_shimmer")
     val alpha by infiniteTransition.animateFloat(
@@ -855,18 +927,7 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                                                     }
                                                 }
                                                 Spacer(modifier = Modifier.height(4.dp))
-                                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                                    Box(
-                                                        modifier = Modifier.size(8.dp).clip(CircleShape).background(if (dev.isOnline) Color(0xFF10B981) else Color(0xFFF59E0B))
-                                                    )
-                                                    Spacer(modifier = Modifier.width(6.dp))
-                                                    Text(
-                                                        if (dev.isOnline) "متصل الآن" else getRelativeTimeString(dev.lastActive), 
-                                                        color = if (dev.isOnline) Color(0xFF10B981) else Color(0xFFF59E0B), 
-                                                        fontSize = 12.sp, 
-                                                        fontWeight = FontWeight.Medium
-                                                    )
-                                                }
+                                                ConnectionStatusItem(dev)
                                             }
                                         }
                                         
