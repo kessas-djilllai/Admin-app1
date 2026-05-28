@@ -62,14 +62,16 @@ data class FileItem(
 
 data class MediaItem(
     val id: String,
-    val base64: String,
+    val base64: String = "",
+    val url: String = "",
     val timestamp: Long,
-    val type: String, // "screenshot", "camera_front", "camera_back"
+    val type: String, // "screenshot", "camera_front", "camera_back", "audio", "video_front", "video_back"
     val cameraType: String? = null
 ) {
     var lastDecodeError: String? = null
 
     fun toBitmap(): Bitmap? {
+        if (base64.isBlank()) return null
         return try {
             val cleanBase64 = if (base64.contains(",")) base64.substringAfter(",") else base64
             val decodedBytes = Base64.decode(cleanBase64, Base64.DEFAULT)

