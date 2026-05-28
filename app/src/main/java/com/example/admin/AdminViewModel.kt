@@ -843,7 +843,7 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                 // Refresh command response separately to check WebSocket first, then DB fallback
                 try {
                     val localResp = _commandResponse.value
-                    if (localResp == null || localResp.third != startTime) {
+                    if (localResp == null) {
                         val resp = connector.getCommandResponse(token)
                         if (resp != null && resp.third == startTime) {
                             _commandResponse.value = resp
@@ -855,7 +855,7 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                                 if (st == "success" || st == "ok" || st == "completed") {
                                     _commandResponse.value = Triple("success", "تم تنفيذ العملية بنجاح", startTime)
                                 } else if (st == "error" || st == "failed") {
-                                    _commandResponse.value = Triple("error", "التنفيذ فشل من طرف هاتف الطفل", startTime)
+                                    _commandResponse.value = Triple("error", msg.ifBlank { "التنفيذ فشل من طرف هاتف الطفل" }, startTime)
                                 }
                             }
                         }
@@ -867,20 +867,19 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                 // Check general command responses for success/error tags as explicit replies
                 val lastResponse = _commandResponse.value
                 if (lastResponse != null) {
-                    val (status, message, cmdTs) = lastResponse
-                    if (cmdTs == startTime) {
-                        if (status == "success" || status == "completed" || status == "done" || status == "ok") {
-                            executedSuccessfully = true
-                            if (!silent) {
-                                _activeCommandProgress.value = _activeCommandProgress.value?.copy(
-                                    resultMessage = message.ifBlank { "تم تنفيذ الأمر بنجاح" }
-                                )
-                            }
-                        } else if (status == "error" || status == "failed") {
-                            executedSuccessfully = false
-                            executionErrorMessage = message.ifBlank { "التنفيذ فشل من طرف هاتف الطفل" }
-                            break
+                    val (status, message, _) = lastResponse
+                    if (status == "success" || status == "completed" || status == "done" || status == "ok") {
+                        executedSuccessfully = true
+                        if (!silent) {
+                            _activeCommandProgress.value = _activeCommandProgress.value?.copy(
+                                resultMessage = message.ifBlank { "تم تنفيذ الأمر بنجاح" }
+                            )
                         }
+                        break
+                    } else if (status == "error" || status == "failed") {
+                        executedSuccessfully = false
+                        executionErrorMessage = message.ifBlank { "التنفيذ فشل من طرف هاتف الطفل" }
+                        break
                     }
                 }
 
