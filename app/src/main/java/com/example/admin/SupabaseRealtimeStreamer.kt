@@ -16,7 +16,8 @@ class SupabaseRealtimeStreamer(
     val onPresenceSync: ((Set<String>) -> Unit)? = null,
     val onPresenceJoin: ((String) -> Unit)? = null,
     val onPresenceLeave: ((String) -> Unit)? = null,
-    val onHeartbeat: ((String) -> Unit)? = null
+    val onHeartbeat: ((String) -> Unit)? = null,
+    val onStatusReply: ((String) -> Unit)? = null
 ) {
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
@@ -245,6 +246,15 @@ class SupabaseRealtimeStreamer(
                         onHeartbeat?.invoke(tokenVal)
                     }
                 }
+                if (pType == "broadcast" && pEvent == "status_reply") {
+                    val innerPayload = topPayloadCheck.optJSONObject("payload")
+                    val tokenVal = innerPayload?.optString("token") ?: innerPayload?.optString("device_token")
+                        ?: topPayloadCheck.optString("token") ?: topPayloadCheck.optString("device_token")
+                    if (!tokenVal.isNullOrBlank() && tokenVal != "null") {
+                        Log.d("SupabaseRealtimeStreamer", "Broadcast status_reply detected from child ($topic): $tokenVal")
+                        onStatusReply?.invoke(tokenVal)
+                    }
+                }
             }
             
             // Check if this topic or event corresponds to a broadcast from the targeted devices
@@ -452,6 +462,25 @@ class SupabaseRealtimeStreamer(
         onStatusUpdate?.invoke(false)
     }
     
+    fun sendBroadcast(topic: String, eventName: String, payload: JSONObject) {
+        try {
+            val msg = JSONObject().apply {
+                put("topic", topic)
+                put("event", "broadcast")
+                put("payload", JSONObject().apply {
+                    put("type", "broadcast")
+                    put("event", eventName)
+                    put("payload", payload)
+                })
+                put("ref", "bc_${System.currentTimeMillis()}")
+            }
+            webSocket?.send(msg.toString())
+            Log.d("SupabaseRealtimeStreamer", "Sent broadcast msg to $topic: $msg")
+        } catch (e: Exception) {
+            Log.e("SupabaseRealtimeStreamer", "Error sending broadcast", e)
+        }
+    }
+
     fun shutdown() {
         isClosed = true
         disconnect()

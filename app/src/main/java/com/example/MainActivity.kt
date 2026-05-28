@@ -806,6 +806,7 @@ fun AdminDashboard(viewModel: AdminViewModel) {
             } else {
                 val isRefreshing by viewModel.isRefreshing.collectAsState()
                 val heartbeats by viewModel.deviceHeartbeats.collectAsState()
+                val checkingDevices by viewModel.devicesCheckingStatus.collectAsState()
 
                 SwipeToRefreshBox(
                     isRefreshing = isRefreshing,
@@ -817,7 +818,10 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         items(filteredDevices) { dev ->
-                            val lastHbTime = heartbeats[dev.id] ?: 0L
+                            if (checkingDevices.contains(dev.id)) {
+                                SkeletonDeviceItem()
+                            } else {
+                                val lastHbTime = heartbeats[dev.id] ?: 0L
                             val isPulsing = System.currentTimeMillis() - lastHbTime < 1500
 
                             val cardScale by animateFloatAsState(
@@ -1003,6 +1007,7 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                                         }
                                     }
                                 }
+                            }
                             }
                         }
                     }

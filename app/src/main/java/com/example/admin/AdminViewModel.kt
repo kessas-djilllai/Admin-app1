@@ -144,6 +144,9 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
     private val _deviceHeartbeats = MutableStateFlow<Map<String, Long>>(emptyMap())
     val deviceHeartbeats: StateFlow<Map<String, Long>> = _deviceHeartbeats.asStateFlow()
 
+    private val _devicesCheckingStatus = MutableStateFlow<Set<String>>(emptySet())
+    val devicesCheckingStatus: StateFlow<Set<String>> = _devicesCheckingStatus.asStateFlow()
+
     private fun addWebsocketEvent(event: String) {
         val currentLogs = _websocketReceivedEvents.value.toMutableList()
         val formattedTime = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())
@@ -213,6 +216,8 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
 
     private var anonKey = "YOUR_ANON_KEY"
 
+    private var heartbeatMonitorJob: Job? = null
+
     init {
         val defaultSupabase = "https://qwtkuzuuskevtptetnvb.supabase.co"
         val defaultKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF3dGt1enV1c2tldnRwdGV0bnZiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3MDU2NzUsImV4cCI6MjA5NTI4MTY3NX0.FtkcRTFxSIMgZEY0FoJ4nOwAYc0O84zeAT7vji-FHFs"
@@ -223,8 +228,11 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
         connector.updateConfig(fallbackUrl, anonKey)
         viewModelScope.launch {
             loadAllDevicesAndStartSync()
+            delay(1500) // Give WebSocket channel minor time to connect
+            refreshAllDevices()
         }
     }
+
 
     fun updateDatabaseUrl(url: String) {
         val cleanedUrl = url.trim().removeSuffix("/")
@@ -352,22 +360,147 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private var statusTimeoutJob: Job? = null
+
     fun refreshAllDevices() {
+        statusTimeoutJob?.cancel()
+        _isRefreshing.value = true
+        _connectionError.value = null
         viewModelScope.launch {
-            _isRefreshing.value = true
             try {
-                // Reconnect & refresh the WebSocket streams to listen to device statuses
-                loadAllDevicesAndStartSync()
-                _connectionError.value = null
+                // Fetch the latest registered devices list from database first
+                val dbDevices = connector.getDiscoveredDevices()
+                val currentChecking = dbDevices.map { it.id }.toSet()
+                
+                // Initialize skeleton checking states
+                _devicesCheckingStatus.value = currentChecking
+                
+                // Expose the fresh list to our StateFlow
+                _devices.value = dbDevices
+                
+                // Send light-weight status check broadcast via our streamer's WS
+                devicesRealtimeStreamer?.sendBroadcast(
+                    topic = "realtime:device-monitoring",
+                    eventName = "check_status",
+                    payload = org.json.JSONObject()
+                )
+                addWebsocketEvent("تم إرسال طلب فحص الحالة (check_status) إلى الأجهزة 📡 ... جاري فحص الاتصال")
+
+                // Start 5-second timer
+                statusTimeoutJob = launch {
+                    delay(5000)
+                    val remaining = _devicesCheckingStatus.value
+                    if (remaining.isNotEmpty()) {
+                        val currentList = _devices.value.map { dev ->
+                            if (remaining.contains(dev.id)) {
+                                dev.copy(
+                                    isOnlineOverride = false,
+                                    status = "disconnected"
+                                )
+                            } else {
+                                dev
+                            }
+                        }
+                        _devices.value = currentList
+                        _devicesCheckingStatus.value = emptySet()
+                        addWebsocketEvent("انتهى وقت فحص الاتصال (5 ثوانٍ) ⏱️. الأجهزة التي لم تستجب تظهر غير متصلة الآن 🔴")
+                    }
+                    _isRefreshing.value = false
+                }
             } catch (e: Exception) {
-                Log.e("AdminViewModel", "Error refreshing all", e)
-            } finally {
+                Log.e("AdminViewModel", "Error in manual refresh status", e)
+                _devicesCheckingStatus.value = emptySet()
                 _isRefreshing.value = false
+                _connectionError.value = "فشل الاتصال: ${e.localizedMessage}"
+            }
+        }
+    }
+
+    private fun ensureDeviceExistsAndOnline(token: String, isOnline: Boolean) {
+        val currentList = _devices.value.toMutableList()
+        val index = currentList.indexOfFirst { it.id == token }
+        val now = System.currentTimeMillis()
+        if (index != -1) {
+            val dev = currentList[index]
+            val becameOffline = dev.isOnline && !isOnline
+            currentList[index] = dev.copy(
+                isOnlineOverride = isOnline,
+                status = if (isOnline) "connected" else "disconnected",
+                lastActive = if (becameOffline) now else if (isOnline) now else dev.lastActive
+            )
+            _devices.value = currentList
+        } else {
+            // Fetch dynamically from DB
+            viewModelScope.launch {
+                try {
+                    val dbDevices = connector.getDiscoveredDevices()
+                    val match = dbDevices.find { it.id == token }
+                    val currentListLatest = _devices.value.toMutableList()
+                    val latestIndex = currentListLatest.indexOfFirst { it.id == token }
+                    if (latestIndex != -1) {
+                        val dev = currentListLatest[latestIndex]
+                        val becameOffline = dev.isOnline && !isOnline
+                        currentListLatest[latestIndex] = dev.copy(
+                            isOnlineOverride = isOnline,
+                            status = if (isOnline) "connected" else "disconnected",
+                            lastActive = if (becameOffline) now else if (isOnline) now else dev.lastActive
+                        )
+                        _devices.value = currentListLatest
+                    } else if (match != null) {
+                        currentListLatest.add(match.copy(
+                            isOnlineOverride = isOnline,
+                            status = if (isOnline) "connected" else "disconnected",
+                            lastActive = if (isOnline) now else match.lastActive
+                        ))
+                        _devices.value = currentListLatest
+                    } else {
+                        // Create a visual placeholder so the device shows up immediately in the UI!
+                        val placeholder = Device(
+                            id = token,
+                            name = "جهاز طفل (${token.take(8)})",
+                            battery = 50,
+                            lastActive = now,
+                            isOnlineOverride = isOnline,
+                            status = if (isOnline) "connected" else "disconnected"
+                        )
+                        currentListLatest.add(placeholder)
+                        _devices.value = currentListLatest
+                    }
+                } catch (e: Exception) {
+                    val currentListLatest = _devices.value.toMutableList()
+                    if (currentListLatest.none { it.id == token }) {
+                        val placeholder = Device(
+                            id = token,
+                            name = "جهاز طفل (${token.take(8)})",
+                            battery = 50,
+                            lastActive = now,
+                            isOnlineOverride = isOnline,
+                            status = if (isOnline) "connected" else "disconnected"
+                        )
+                        currentListLatest.add(placeholder)
+                        _devices.value = currentListLatest
+                    }
+                }
             }
         }
     }
 
     fun loadAllDevicesAndStartSync() {
+        // Fetch initially registered devices from DB immediately when starting sync
+        viewModelScope.launch {
+            try {
+                val dbDevices = connector.getDiscoveredDevices()
+                val currentSet = _onlineDeviceTokens.value
+                val initialList = dbDevices.map { dev ->
+                    dev.copy(isOnlineOverride = currentSet.contains(dev.id))
+                }
+                _devices.value = initialList
+                Log.d("AdminViewModel", "Loaded initial devices from database: ${initialList.size}")
+            } catch (e: Exception) {
+                Log.e("AdminViewModel", "Error fetching initial devices from DB", e)
+            }
+        }
+
         devicesRealtimeStreamer?.shutdown()
         devicesRealtimeStreamer = SupabaseRealtimeStreamer(
             deviceToken = null,
@@ -387,16 +520,6 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
             onPresenceSync = { activeTokens ->
                 viewModelScope.launch {
                     _onlineDeviceTokens.value = activeTokens
-                    val now = System.currentTimeMillis()
-                    val updatedList = _devices.value.map { device ->
-                        val isTokenActive = activeTokens.contains(device.id)
-                        val becameOffline = device.isOnline && !isTokenActive
-                        device.copy(
-                            isOnlineOverride = isTokenActive,
-                            lastActive = if (becameOffline) now else device.lastActive
-                        )
-                    }
-                    _devices.value = updatedList
                     addWebsocketEvent("تزامن الحضور النشط: تم العثور على أجهزة متصلة بالبث: ${activeTokens.size}")
                 }
             },
@@ -405,16 +528,7 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                     val currentSet = _onlineDeviceTokens.value.toMutableSet()
                     currentSet.add(token)
                     _onlineDeviceTokens.value = currentSet
-                    
-                    val updatedList = _devices.value.map { device ->
-                        if (device.id == token) {
-                            device.copy(isOnlineOverride = true)
-                        } else {
-                            device
-                        }
-                    }
-                    _devices.value = updatedList
-                    addWebsocketEvent("تم الاتصال: دخل الجهاز (${token}) البث الآن 🟢 (متصل)")
+                    addWebsocketEvent("تم انضمام جهاز جديد لقناة البث: (${token})")
                 }
             },
             onPresenceLeave = { token ->
@@ -422,32 +536,7 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                     val currentSet = _onlineDeviceTokens.value.toMutableSet()
                     currentSet.remove(token)
                     _onlineDeviceTokens.value = currentSet
-                    
-                    val now = System.currentTimeMillis()
-                    val updatedList = _devices.value.map { device ->
-                        if (device.id == token) {
-                            device.copy(
-                                isOnlineOverride = false,
-                                lastActive = now
-                            )
-                        } else {
-                            device
-                        }
-                    }
-                    _devices.value = updatedList
-                    addWebsocketEvent("تم القطع: غادر الجهاز (${token}) البث الآن 🔴 (غير متصل)")
-  
-                    // تحديث الجدول بشكل فوري عبر REST API لـ Supabase لتصبح disconnected وتحديث وقت آخر ظهور
-                    try {
-                        val success = connector.markDeviceDisconnected(token)
-                        if (success) {
-                            addWebsocketEvent("تم تحديث قاعدة البيانات بنجاح: تم تسجيل حالة الجهاز (${token}) كـ \"غير متصل\" في الجدول.")
-                        } else {
-                            Log.d("AdminViewModel", "لم يتم العثور على الجهاز أو تحديثه في جدول الأجهزة")
-                        }
-                    } catch (e: Exception) {
-                        Log.e("AdminViewModel", "فشل تحديث حالة الفصل بنجاح: ${e.message}")
-                    }
+                    addWebsocketEvent("تم مغادرة جهاز لقناة البث: (${token})")
                 }
             },
             onHeartbeat = { token ->
@@ -455,7 +544,30 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                     val currentMap = _deviceHeartbeats.value.toMutableMap()
                     currentMap[token] = System.currentTimeMillis()
                     _deviceHeartbeats.value = currentMap
-                    addWebsocketEvent("نبضة نبضية مستلمة (Heartbeat Pulse) من جهاز (${token}) 💓")
+                    addWebsocketEvent("نبضة مستلمة صامتة (Heartbeat Check Background) من جهاز (${token}) 💓")
+                }
+            },
+            onStatusReply = { token ->
+                viewModelScope.launch {
+                    val currentlyChecking = _devicesCheckingStatus.value.toMutableSet()
+                    if (currentlyChecking.contains(token)) {
+                        currentlyChecking.remove(token)
+                        _devicesCheckingStatus.value = currentlyChecking
+                        addWebsocketEvent("وصل رد استجابة حالة الاتصال (status_reply) من الجهاز (${token}) 🟢")
+                    }
+                    // Mark as connected (green)
+                    val updatedList = _devices.value.map { device ->
+                        if (device.id == token) {
+                            device.copy(
+                                isOnlineOverride = true,
+                                status = "connected",
+                                lastActive = System.currentTimeMillis()
+                            )
+                        } else {
+                            device
+                        }
+                    }
+                    _devices.value = updatedList
                 }
             }
         ).apply {

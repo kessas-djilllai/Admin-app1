@@ -11,9 +11,9 @@ data class Device(
     val name: String,
     val battery: Int,
     val lastActive: Long,
-    val storageUsed: Long, // in Bytes
-    val storageTotal: Long, // in Bytes
-    val isLocked: Boolean,
+    val storageUsed: Long = 0L, // in Bytes
+    val storageTotal: Long = 0L, // in Bytes
+    val isLocked: Boolean = false,
     val networkType: String? = null,
     val carrierName: String? = null,
     val isCharging: Boolean = false,
@@ -23,9 +23,10 @@ data class Device(
 ) {
     val isOnline: Boolean
         get() = when {
-            status == "disconnected" -> false
             isOnlineOverride == false -> false
             isOnlineOverride == true -> true
+            status == "disconnected" -> false
+            status == "connected" -> true
             else -> lastActive == 0L || (System.currentTimeMillis() - lastActive) < 15 * 60 * 1000
         }
 }
