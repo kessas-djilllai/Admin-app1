@@ -66,7 +66,8 @@ data class MediaItem(
     val url: String = "",
     val timestamp: Long,
     val type: String, // "screenshot", "camera_front", "camera_back", "audio", "video_front", "video_back"
-    val cameraType: String? = null
+    val cameraType: String? = null,
+    val commandSource: String = ""
 ) {
     var lastDecodeError: String? = null
 

