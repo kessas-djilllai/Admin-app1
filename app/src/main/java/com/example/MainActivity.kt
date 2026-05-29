@@ -2536,6 +2536,7 @@ fun RemoteControlTab(viewModel: AdminViewModel) {
 @Composable
 fun AudioControlTab(viewModel: AdminViewModel) {
     var volume by remember { mutableFloatStateOf(50f) }
+    var playVolume by remember { mutableFloatStateOf(80f) }
     var soundName by remember { mutableStateOf("") }
     var expanded by remember { mutableStateOf(false) }
     
@@ -2610,86 +2611,122 @@ fun AudioControlTab(viewModel: AdminViewModel) {
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("تشغيل أصوات تنبيهية", color = Color(0xFF1F2937), fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                    
-                    TextButton(
-                        onClick = { viewModel.requestAvailableSounds() },
-                        colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFF2196F3))
-                    ) {
-                        Icon(Icons.Default.Refresh, contentDescription = "جلب الأصوات", modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("جلب الأصوات المتوفرة", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
+                Text(
+                    text = "تشغيل أصوات تنبيهية", 
+                    color = Color(0xFF1F2937), 
+                    fontWeight = FontWeight.Bold, 
+                    fontSize = 14.sp
+                )
                 Spacer(modifier = Modifier.height(16.dp))
 
-                Box(modifier = Modifier.fillMaxWidth()) {
-                    OutlinedTextField(
-                        value = soundName,
-                        onValueChange = { soundName = it },
-                        label = { Text("اختر أو اكتب اسم الصوت") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        trailingIcon = {
-                            IconButton(onClick = { expanded = !expanded }) {
-                                Icon(
-                                    imageVector = if (expanded) Icons.Default.ArrowDropUp else Icons.Default.ArrowDropDown,
-                                    contentDescription = "قائمة الأصوات"
-                                )
-                            }
-                        },
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFF2196F3),
-                            unfocusedBorderColor = Color(0xFFE5E7EB)
-                        ),
-                        shape = RoundedCornerShape(12.dp)
-                    )
-                    DropdownMenu(
-                        expanded = expanded,
-                        onDismissRequest = { expanded = false },
-                        modifier = Modifier.fillMaxWidth(0.9f)
-                    ) {
-                        if (availableSounds.isEmpty()) {
-                            DropdownMenuItem(
-                                text = { Text("لا توجد أصوات محملة، انقر على زر الجلب") },
-                                onClick = { expanded = false },
-                                enabled = false
-                            )
-                        } else {
-                            availableSounds.forEach { sound ->
+                // Row 1: Dropdown Box (Left) & Fetch "جلب" Button (Right)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(modifier = Modifier.weight(1f)) {
+                        OutlinedTextField(
+                            value = soundName,
+                            onValueChange = { },
+                            readOnly = true,
+                            label = { Text("اختر الصوت المتوفر") },
+                            modifier = Modifier.fillMaxWidth(),
+                            trailingIcon = {
+                                IconButton(onClick = { expanded = !expanded }) {
+                                    Icon(
+                                        imageVector = if (expanded) Icons.Default.ArrowDropUp else Icons.Default.ArrowDropDown,
+                                        contentDescription = "قائمة الأصوات"
+                                    )
+                                }
+                            },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = Color(0xFF2196F3),
+                                unfocusedBorderColor = Color(0xFFE5E7EB)
+                            ),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        // Invisible overlay to trigger dropdown on text field click
+                        Box(
+                            modifier = Modifier
+                                .matchParentSize()
+                                .clickable { expanded = !expanded }
+                        )
+                        DropdownMenu(
+                            expanded = expanded,
+                            onDismissRequest = { expanded = false },
+                            modifier = Modifier.fillMaxWidth(0.9f)
+                        ) {
+                            if (availableSounds.isEmpty()) {
                                 DropdownMenuItem(
-                                    text = { Text(sound) },
-                                    onClick = {
-                                        soundName = sound
-                                        expanded = false
-                                    }
+                                    text = { Text("لا توجد أصوات محملة، انقر على جلب") },
+                                    onClick = { expanded = false },
+                                    enabled = false
                                 )
+                            } else {
+                                availableSounds.forEach { sound ->
+                                    DropdownMenuItem(
+                                        text = { Text(sound) },
+                                        onClick = {
+                                            soundName = sound
+                                            expanded = false
+                                        }
+                                    )
+                                }
                             }
                         }
                     }
+
+                    Button(
+                        onClick = { viewModel.requestAvailableSounds() },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2196F3)),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.height(56.dp)
+                    ) {
+                        Icon(Icons.Default.Refresh, contentDescription = "جلب", modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("جلب", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
+                // Row 2: "تحديد الصوت" - independent play volume
+                Text("درجة صوت التنبيه", color = Color(0xFF4B5563), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.VolumeMute, "صامت", tint = Color(0xFF6B7280))
+                    Slider(
+                        value = playVolume,
+                        onValueChange = { playVolume = it },
+                        valueRange = 0f..100f,
+                        modifier = Modifier.weight(1f),
+                        colors = SliderDefaults.colors(
+                            thumbColor = Color(0xFF2196F3),
+                            activeTrackColor = Color(0xFF2196F3)
+                        )
+                    )
+                    Icon(Icons.Default.VolumeUp, "مرتفع", tint = Color(0xFF2196F3))
+                }
+                Text("درجة الصوت المحددة للتشغيل: ${playVolume.toInt()}%", color = Color(0xFF4B5563), fontSize = 12.sp, modifier = Modifier.align(Alignment.CenterHorizontally))
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // Row 3: Play Button & Stop Button
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Button(
                         onClick = { 
                             isPlaying = false
-                            viewModel.playRemoteSound(soundName) 
+                            viewModel.playRemoteSound(soundName, playVolume.toInt()) 
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2196F3)),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
                         modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(8.dp),
+                        shape = RoundedCornerShape(12.dp),
                         enabled = soundName.isNotBlank()
                     ) {
                         Icon(Icons.Default.PlayArrow, null)
                         Spacer(Modifier.width(8.dp))
-                        Text("تشغيل", fontSize = 12.sp)
+                        Text("تشغيل الصوت", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                     }
 
                     Button(
@@ -2702,12 +2739,12 @@ fun AudioControlTab(viewModel: AdminViewModel) {
                             contentColor = if (isPlaying) Color.White else Color(0xFF9CA3AF)
                         ),
                         modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(8.dp),
+                        shape = RoundedCornerShape(12.dp),
                         enabled = isPlaying
                     ) {
                         Icon(Icons.Default.Stop, null)
                         Spacer(Modifier.width(8.dp))
-                        Text("إيقاف", fontSize = 12.sp)
+                        Text("إيقاف", fontSize = 13.sp)
                     }
                 }
 

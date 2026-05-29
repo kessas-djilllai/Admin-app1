@@ -1030,8 +1030,12 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
         runCommand("get_contacts")
     }
 
-    fun playRemoteSound(soundName: String) {
-        runCommand("play_remote_sound", mapOf("Sound" to soundName))
+    fun playRemoteSound(soundName: String, volume: Int) {
+        runCommand("play_remote_sound", mapOf(
+            "Sound" to soundName,
+            "Volume" to volume,
+            "volume" to volume
+        ))
     }
 
     fun requestAvailableSounds() {
