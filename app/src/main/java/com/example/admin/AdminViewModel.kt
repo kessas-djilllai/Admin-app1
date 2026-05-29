@@ -365,9 +365,9 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                 )
                 addWebsocketEvent("تم إرسال طلب فحص الحالة (check_status) إلى الأجهزة 📡 ... جاري فحص الاتصال")
 
-                // Start 5-second timer
+                // Start 20-second timer
                 statusTimeoutJob = launch {
-                    delay(5000)
+                    delay(20000)
                     val remaining = _devicesCheckingStatus.value
                     if (remaining.isNotEmpty()) {
                         val currentList = _devices.value.map { dev ->
@@ -382,7 +382,7 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                         }
                         _devices.value = currentList
                         _devicesCheckingStatus.value = emptySet()
-                        addWebsocketEvent("انتهى وقت فحص الاتصال (5 ثوانٍ) ⏱️. الأجهزة التي لم تستجب تظهر غير متصلة الآن 🔴")
+                        addWebsocketEvent("انتهى وقت فحص الاتصال (20 ثانية) ⏱️. الأجهزة التي لم تستجب تظهر غير متصلة الآن 🔴")
                     }
                     _isRefreshing.value = false
                 }

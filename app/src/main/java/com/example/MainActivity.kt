@@ -854,8 +854,8 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                             Card(
                                 onClick = { viewModel.selectDevice(dev.id) },
                                 colors = CardDefaults.cardColors(containerColor = cardBgColor),
-                                border = BorderStroke(if (isPulsing) 2.dp else 1.5.dp, cardBorderColor),
-                                shape = RoundedCornerShape(20.dp),
+                                border = BorderStroke(if (isPulsing) 1.5.dp else 1.dp, cardBorderColor),
+                                shape = RoundedCornerShape(16.dp),
                                 elevation = CardDefaults.cardElevation(defaultElevation = if (isPulsing) 4.dp else 0.dp),
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -864,15 +864,15 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                                         scaleY = cardScale
                                     }
                                     .shadow(
-                                        elevation = if (isPulsing) 12.dp else 4.dp, 
-                                        shape = RoundedCornerShape(20.dp), 
+                                        elevation = if (isPulsing) 12.dp else 2.dp, 
+                                        shape = RoundedCornerShape(16.dp), 
                                         clip = false, 
                                         spotColor = if (isPulsing) Color(0xFFFF4D94).copy(alpha = 0.25f) else Color(0xFF9155FF).copy(alpha = 0.05f), 
                                         ambientColor = if (isPulsing) Color(0xFFFF4D94).copy(alpha = 0.25f) else Color(0xFF9155FF).copy(alpha = 0.05f)
                                     )
                             ) {
                                 Column(
-                                    modifier = Modifier.fillMaxWidth().padding(12.dp)
+                                    modifier = Modifier.fillMaxWidth().padding(10.dp)
                                 ) {
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
@@ -881,7 +881,7 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                                     ) {
                                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
                                             Box(
-                                                modifier = Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)).background(
+                                                modifier = Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)).background(
                                                     Brush.linearGradient(
                                                         colors = if (isPulsing) {
                                                             listOf(Color(0xFFFF4D94).copy(alpha = 0.25f), Color(0xFFFF4D94).copy(alpha = 0.1f))
@@ -896,16 +896,16 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                                                     imageVector = if (isPulsing) Icons.Default.Favorite else Icons.Default.PhoneAndroid, 
                                                     contentDescription = null, 
                                                     tint = if (isPulsing) Color(0xFFFF4D94) else Color(0xFF9155FF), 
-                                                    modifier = Modifier.size(24.dp)
+                                                    modifier = Modifier.size(20.dp)
                                                 )
                                             }
-                                            Spacer(modifier = Modifier.width(12.dp))
+                                            Spacer(modifier = Modifier.width(10.dp))
                                             Column {
                                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                                     Text(
                                                         text = dev.name,
                                                         color = Color(0xFF111827),
-                                                        fontSize = 16.sp,
+                                                        fontSize = 15.sp,
                                                         fontWeight = FontWeight.ExtraBold,
                                                         maxLines = 1,
                                                         overflow = TextOverflow.Ellipsis,
@@ -917,61 +917,61 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                                                             modifier = Modifier
                                                                 .clip(RoundedCornerShape(6.dp))
                                                                 .background(Color(0xFFE0F2FE))
-                                                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                                                                .padding(horizontal = 4.dp, vertical = 2.dp)
                                                         ) {
                                                             Row(verticalAlignment = Alignment.CenterVertically) {
                                                                 Box(
                                                                     modifier = Modifier
-                                                                        .size(6.dp)
+                                                                        .size(4.dp)
                                                                         .clip(CircleShape)
                                                                         .background(Color(0xFF0284C7))
                                                                 )
-                                                                Spacer(modifier = Modifier.width(4.dp))
+                                                                Spacer(modifier = Modifier.width(3.dp))
                                                                 Text(
                                                                     text = "بث فوري",
                                                                     color = Color(0xFF0369A1),
-                                                                    fontSize = 9.sp,
+                                                                    fontSize = 8.sp,
                                                                     fontWeight = FontWeight.Bold
                                                                 )
                                                             }
                                                         }
                                                     }
                                                 }
-                                                Spacer(modifier = Modifier.height(4.dp))
+                                                Spacer(modifier = Modifier.height(2.dp))
                                                 ConnectionStatusItem(dev)
                                             }
                                         }
                                         
                                         Box(
-                                            modifier = Modifier.size(36.dp).clip(CircleShape).background(Color(0xFFF9FAFB)),
+                                            modifier = Modifier.size(32.dp).clip(CircleShape).background(Color(0xFFF9FAFB)),
                                             contentAlignment = Alignment.Center
                                         ) {
-                                            Icon(Icons.Default.KeyboardArrowLeft, null, tint = Color(0xFF9CA3AF), modifier = Modifier.size(20.dp))
+                                            Icon(Icons.Default.KeyboardArrowLeft, null, tint = Color(0xFF9CA3AF), modifier = Modifier.size(18.dp))
                                         }
                                     }
                                     
-                                    Spacer(modifier = Modifier.height(10.dp))
+                                    Spacer(modifier = Modifier.height(8.dp))
                                     
                                     // Bento Details Grid Row 
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                                     ) {
                                         // Bento Compartment 1: Battery block
                                         Box(
                                             modifier = Modifier
                                                 .weight(1f)
-                                                .background(Color(0xFFF9FAFB), RoundedCornerShape(12.dp))
-                                                .border(1.dp, Color(0xFFF0FDF4), RoundedCornerShape(12.dp))
-                                                .padding(10.dp)
+                                                .background(Color(0xFFF9FAFB), RoundedCornerShape(10.dp))
+                                                .border(1.dp, Color(0xFFF0FDF4), RoundedCornerShape(10.dp))
+                                                .padding(8.dp)
                                         ) {
                                             Column {
-                                                Text("البطارية", color = Color.Gray, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                                                Spacer(modifier = Modifier.height(4.dp))
+                                                Text("البطارية", color = Color.Gray, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                                Spacer(modifier = Modifier.height(2.dp))
                                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                                    Icon(getBatteryIcon(dev.battery), null, tint = getBatteryColor(dev.battery), modifier = Modifier.size(14.dp))
+                                                    Icon(getBatteryIcon(dev.battery), null, tint = getBatteryColor(dev.battery), modifier = Modifier.size(12.dp))
                                                     Spacer(modifier = Modifier.width(4.dp))
-                                                    Text("${dev.battery}%", color = Color(0xFF111827), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                                    Text("${dev.battery}%", color = Color(0xFF111827), fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                                 }
                                             }
                                         }
@@ -979,13 +979,13 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                                         Box(
                                             modifier = Modifier
                                                 .weight(1f)
-                                                .background(Color(0xFFF9FAFB), RoundedCornerShape(12.dp))
-                                                .border(1.dp, Color(0xFFEFF6FF), RoundedCornerShape(12.dp))
-                                                .padding(10.dp)
+                                                .background(Color(0xFFF9FAFB), RoundedCornerShape(10.dp))
+                                                .border(1.dp, Color(0xFFEFF6FF), RoundedCornerShape(10.dp))
+                                                .padding(8.dp)
                                         ) {
                                             Column {
-                                                Text("الشبكة والاتصال", color = Color.Gray, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                                                Spacer(modifier = Modifier.height(4.dp))
+                                                Text("الشبكة والاتصال", color = Color.Gray, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                                Spacer(modifier = Modifier.height(2.dp))
                                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                                     val isWifi = dev.networkType?.contains("WIFI", ignoreCase = true) == true
                                                     Icon(if (isWifi) Icons.Default.Wifi else Icons.Default.CellTower, null, tint = Color(0xFF9155FF), modifier = Modifier.size(13.dp))
