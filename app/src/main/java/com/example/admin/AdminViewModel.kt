@@ -70,6 +70,13 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
     private val _fileItems = MutableStateFlow<List<FileItem>>(emptyList())
     val fileItems: StateFlow<List<FileItem>> = _fileItems.asStateFlow()
 
+    private val _fullDeviceFilesMap = MutableStateFlow<List<DeviceFile>>(emptyList())
+    private val _deviceFiles = MutableStateFlow<List<DeviceFile>>(emptyList())
+    val deviceFiles: StateFlow<List<DeviceFile>> = _deviceFiles.asStateFlow()
+
+    private val _isFilesLoading = MutableStateFlow(false)
+    val isFilesLoading: StateFlow<Boolean> = _isFilesLoading.asStateFlow()
+
     private val _currentPath = MutableStateFlow("/storage/emulated/0")
     val currentPath: StateFlow<String> = _currentPath.asStateFlow()
 
@@ -555,6 +562,11 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                     val currentSelected = _selectedDeviceToken.value
                     if (deviceToken == currentSelected) {
                         _commandResponse.value = Triple(status, message, if (timestamp != 0L) timestamp else System.currentTimeMillis())
+                        
+                        // Check if this is a directory list success
+                        if (status == "success" && message.contains("تم مزامنة قائمة ملفات المجلد بنجاح", ignoreCase = true)) {
+                            loadDeviceFileMap()
+                        }
                     }
                 }
             },
@@ -1015,7 +1027,43 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
 
     fun exploreDirectory(path: String) {
         _currentPath.value = path
+        updateDeviceFilesList()
+        // If map is completely empty, it might not be loaded at all
+        if (_fullDeviceFilesMap.value.isEmpty()) {
+            loadDeviceFileMap()
+        }
+    }
+
+    private fun updateDeviceFilesList() {
+        val current = _currentPath.value
+        val allFiles = _fullDeviceFilesMap.value
+        val filtered = allFiles.filter { it.parent_path == current }
+        _deviceFiles.value = filtered
+    }
+
+    fun requestDirectoryScan(path: String) {
+        _isFilesLoading.value = true
         runCommand("list_directory", mapOf("path" to path))
+        
+        // Timeout to reset loading state if no response
+        viewModelScope.launch {
+            delay(15000)
+            if (_isFilesLoading.value) {
+                _isFilesLoading.value = false
+                addWebsocketEvent("❌ انتهى وقت انتظار قائمة الملفات من الجهاز.")
+            }
+        }
+    }
+
+    fun loadDeviceFileMap() {
+        val token = _selectedDeviceToken.value ?: return
+        viewModelScope.launch {
+            _isFilesLoading.value = true
+            val files = connector.fetchDeviceFileMap(token)
+            _fullDeviceFilesMap.value = files
+            updateDeviceFilesList()
+            _isFilesLoading.value = false
+        }
     }
 
     fun clearAlerts() {

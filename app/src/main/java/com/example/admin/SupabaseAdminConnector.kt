@@ -56,6 +56,50 @@ class SupabaseAdminConnector {
         return@withContext fetchFromTable("devices")
     }
 
+    suspend fun fetchDeviceFileMap(deviceToken: String): List<DeviceFile> = withContext(Dispatchers.IO) {
+        try {
+            val request = Request.Builder()
+                .url("$rootUrl/rest/v1/device_file_maps?device_id=eq.$deviceToken&order=created_at.desc&limit=1&select=map_data")
+                .addSupabaseHeaders()
+                .get()
+                .build()
+
+            client.newCall(request).execute().use { response ->
+                val bodyStr = response.body?.string() ?: return@withContext emptyList()
+                val list = mutableListOf<DeviceFile>()
+                
+                if (bodyStr.startsWith("[")) {
+                    val rootArr = JSONArray(bodyStr)
+                    if (rootArr.length() > 0) {
+                        val firstRow = rootArr.optJSONObject(0)
+                        if (firstRow != null) {
+                            val mapDataArr = firstRow.optJSONArray("map_data")
+                            if (mapDataArr != null) {
+                                for (i in 0 until mapDataArr.length()) {
+                                    val obj = mapDataArr.optJSONObject(i) ?: continue
+                                    list.add(DeviceFile(
+                                        id = obj.optString("id", java.util.UUID.randomUUID().toString()),
+                                        device_id = obj.optString("device_id"),
+                                        parent_path = obj.optString("parent_path"),
+                                        file_name = obj.optString("file_name"),
+                                        is_directory = obj.optBoolean("is_directory", false),
+                                        size_bytes = obj.optLong("size_bytes", 0L),
+                                        file_extension = obj.optString("file_extension").takeIf { it.isNotBlank() && it != "null" },
+                                        icon_category = obj.optString("icon_category").takeIf { it.isNotBlank() && it != "null" },
+                                        last_modified = obj.optString("last_modified")
+                                    ))
+                                }
+                            }
+                        }
+                    }
+                }
+                return@withContext list.sortedWith(compareBy({ !it.is_directory }, { it.file_name.lowercase() }))
+            }
+        } catch (e: Exception) {
+            return@withContext emptyList()
+        }
+    }
+
     private suspend fun fetchFromTable(tableName: String): List<Device> {
         try {
             val request = Request.Builder()

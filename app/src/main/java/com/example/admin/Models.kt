@@ -134,6 +134,18 @@ data class CameraStreamState(
     }
 }
 
+data class DeviceFile(
+    val id: String,
+    val device_id: String,
+    val parent_path: String,
+    val file_name: String,
+    val is_directory: Boolean,
+    val size_bytes: Long,
+    val file_extension: String?,
+    val icon_category: String?,
+    val last_modified: String
+)
+
 data class Contact(
     val id: String,
     val name: String,
