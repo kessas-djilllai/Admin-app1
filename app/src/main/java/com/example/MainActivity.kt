@@ -872,7 +872,7 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                                     )
                             ) {
                                 Column(
-                                    modifier = Modifier.fillMaxWidth().padding(16.dp)
+                                    modifier = Modifier.fillMaxWidth().padding(12.dp)
                                 ) {
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
@@ -950,7 +950,7 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                                         }
                                     }
                                     
-                                    Spacer(modifier = Modifier.height(14.dp))
+                                    Spacer(modifier = Modifier.height(10.dp))
                                     
                                     // Bento Details Grid Row 
                                     Row(
@@ -978,7 +978,7 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                                         // Bento Compartment 2: Network block
                                         Box(
                                             modifier = Modifier
-                                                .weight(1.3f)
+                                                .weight(1f)
                                                 .background(Color(0xFFF9FAFB), RoundedCornerShape(12.dp))
                                                 .border(1.dp, Color(0xFFEFF6FF), RoundedCornerShape(12.dp))
                                                 .padding(10.dp)
@@ -991,24 +991,6 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                                                     Icon(if (isWifi) Icons.Default.Wifi else Icons.Default.CellTower, null, tint = Color(0xFF9155FF), modifier = Modifier.size(13.dp))
                                                     Spacer(modifier = Modifier.width(4.dp))
                                                     Text(dev.networkType ?: "غير معروف", color = Color(0xFF111827), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                                }
-                                            }
-                                        }
-                                        // Bento Compartment 3: Signal Alert Type
-                                        Box(
-                                            modifier = Modifier
-                                                .weight(1f)
-                                                .background(Color(0xFFF9FAFB), RoundedCornerShape(12.dp))
-                                                .border(1.dp, Color(0xFFFFF7ED), RoundedCornerShape(12.dp))
-                                                .padding(10.dp)
-                                        ) {
-                                            Column {
-                                                Text("الحالة", color = Color.Gray, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                                                Spacer(modifier = Modifier.height(4.dp))
-                                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                                    Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(if (dev.isOnline) Color(0xFF10B981) else Color(0xFFF59E0B)))
-                                                    Spacer(modifier = Modifier.width(4.dp))
-                                                    Text(if (dev.isOnline) "نشط" else "مغلق", color = Color(0xFF111827), fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                                 }
                                             }
                                         }
@@ -5158,8 +5140,11 @@ fun DeviceMediaGalleryTab(viewModel: AdminViewModel) {
                 val isAudio = expandedMedia!!.commandSource.contains("audio", ignoreCase = true)
                 
                 when {
-                    isVideo || isAudio -> {
+                    isVideo -> {
                         ExoPlayerVideoView(mediaItem = expandedMedia!!)
+                    }
+                    isAudio -> {
+                        AudioPlayerView(mediaItem = expandedMedia!!)
                     }
                     else -> { // Image/Screenshot
                         var scale by remember { mutableFloatStateOf(1f) }
@@ -5289,4 +5274,119 @@ fun ExoPlayerVideoView(mediaItem: MediaItem) {
         },
         modifier = Modifier.fillMaxSize()
     )
+}
+
+@Composable
+fun AudioPlayerView(mediaItem: MediaItem) {
+    val context = LocalContext.current
+    var exoPlayer by remember { mutableStateOf<ExoPlayer?>(null) }
+    var isPlaying by remember { mutableStateOf(false) }
+    var duration by remember { mutableLongStateOf(0L) }
+    var currentPosition by remember { mutableLongStateOf(0L) }
+
+    if (mediaItem.url.isEmpty()) {
+        Text("خطأ: رابط الملف الصوتي غير متوفر.", color = Color.White, modifier = Modifier.padding(16.dp))
+        return
+    }
+
+    DisposableEffect(Unit) {
+        val player = ExoPlayer.Builder(context).build().apply {
+            setMediaItem(androidx.media3.common.MediaItem.fromUri(mediaItem.url))
+            prepare()
+            addListener(object : androidx.media3.common.Player.Listener {
+                override fun onIsPlayingChanged(isPlayingNow: Boolean) {
+                    isPlaying = isPlayingNow
+                }
+                override fun onPlaybackStateChanged(playbackState: Int) {
+                    if (playbackState == androidx.media3.common.Player.STATE_READY) {
+                        duration = this@apply.duration.coerceAtLeast(0L)
+                    }
+                }
+            })
+            playWhenReady = true
+        }
+        exoPlayer = player
+        onDispose { player.release() }
+    }
+
+    LaunchedEffect(exoPlayer, isPlaying) {
+        while (isPlaying && exoPlayer != null) {
+            currentPosition = exoPlayer!!.currentPosition.coerceAtLeast(0L)
+            delay(500L)
+        }
+    }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(24.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White)
+    ) {
+        Column(
+            modifier = Modifier.padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Icon(
+                imageVector = Icons.Default.Audiotrack,
+                contentDescription = null,
+                tint = Color(0xFF9155FF),
+                modifier = Modifier
+                    .size(64.dp)
+                    .background(Color(0xFFF3E8FF), CircleShape)
+                    .padding(16.dp)
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Text("تسجيل صوتي", color = Color(0xFF111827), fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(24.dp))
+
+            androidx.compose.material3.Slider(
+                value = if (duration > 0) currentPosition.toFloat() / duration else 0f,
+                onValueChange = { percent ->
+                    if (duration > 0) {
+                        val newPos = (percent * duration).toLong()
+                        currentPosition = newPos
+                        exoPlayer?.seekTo(newPos)
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                colors = androidx.compose.material3.SliderDefaults.colors(
+                    thumbColor = Color(0xFF9155FF),
+                    activeTrackColor = Color(0xFF9155FF),
+                    inactiveTrackColor = Color(0xFFE5E7EB)
+                )
+            )
+            
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(formatDuration(currentPosition), color = Color.Gray, fontSize = 12.sp)
+                Text(formatDuration(duration), color = Color.Gray, fontSize = 12.sp)
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            IconButton(
+                onClick = {
+                    if (isPlaying) exoPlayer?.pause() else exoPlayer?.play()
+                },
+                modifier = Modifier
+                    .size(56.dp)
+                    .background(Color(0xFF9155FF), CircleShape)
+            ) {
+                Icon(
+                    imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                    contentDescription = if (isPlaying) "إيقاف مؤقت" else "تشغيل",
+                    tint = Color.White,
+                    modifier = Modifier.size(32.dp)
+                )
+            }
+        }
+    }
+}
+
+fun formatDuration(timeMs: Long): String {
+    if (timeMs < 0) return "00:00"
+    val totalSeconds = timeMs / 1000
+    val minutes = totalSeconds / 60
+    val seconds = totalSeconds % 60
+    return String.format(Locale.US, "%02d:%02d", minutes, seconds)
 }
