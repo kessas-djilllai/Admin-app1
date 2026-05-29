@@ -2537,9 +2537,11 @@ fun RemoteControlTab(viewModel: AdminViewModel) {
 fun AudioControlTab(viewModel: AdminViewModel) {
     var volume by remember { mutableFloatStateOf(50f) }
     var soundName by remember { mutableStateOf("") }
+    var expanded by remember { mutableStateOf(false) }
     
     val commandResponse by viewModel.commandResponse.collectAsState()
     val activeCommand by viewModel.activeCommandProgress.collectAsState()
+    val availableSounds by viewModel.availableSounds.collectAsState()
 
     var playingDurationSec by remember { mutableIntStateOf(0) }
     var currentPlayTimeSec by remember { mutableIntStateOf(0) }
@@ -2608,21 +2610,69 @@ fun AudioControlTab(viewModel: AdminViewModel) {
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Text("تشغيل أصوات تنبيهية", color = Color(0xFF1F2937), fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("تشغيل أصوات تنبيهية", color = Color(0xFF1F2937), fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    
+                    TextButton(
+                        onClick = { viewModel.requestAvailableSounds() },
+                        colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFF2196F3))
+                    ) {
+                        Icon(Icons.Default.Refresh, contentDescription = "جلب الأصوات", modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("جلب الأصوات المتوفرة", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
                 Spacer(modifier = Modifier.height(16.dp))
 
-                OutlinedTextField(
-                    value = soundName,
-                    onValueChange = { soundName = it },
-                    label = { Text("اسم الصوت (مثال: alarm)") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color(0xFF2196F3),
-                        unfocusedBorderColor = Color(0xFFE5E7EB)
-                    ),
-                    shape = RoundedCornerShape(12.dp)
-                )
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = soundName,
+                        onValueChange = { soundName = it },
+                        label = { Text("اختر أو اكتب اسم الصوت") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        trailingIcon = {
+                            IconButton(onClick = { expanded = !expanded }) {
+                                Icon(
+                                    imageVector = if (expanded) Icons.Default.ArrowDropUp else Icons.Default.ArrowDropDown,
+                                    contentDescription = "قائمة الأصوات"
+                                )
+                            }
+                        },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color(0xFF2196F3),
+                            unfocusedBorderColor = Color(0xFFE5E7EB)
+                        ),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    DropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false },
+                        modifier = Modifier.fillMaxWidth(0.9f)
+                    ) {
+                        if (availableSounds.isEmpty()) {
+                            DropdownMenuItem(
+                                text = { Text("لا توجد أصوات محملة، انقر على زر الجلب") },
+                                onClick = { expanded = false },
+                                enabled = false
+                            )
+                        } else {
+                            availableSounds.forEach { sound ->
+                                DropdownMenuItem(
+                                    text = { Text(sound) },
+                                    onClick = {
+                                        soundName = sound
+                                        expanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
 
                 Spacer(modifier = Modifier.height(16.dp))
 

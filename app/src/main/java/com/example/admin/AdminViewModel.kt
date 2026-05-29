@@ -102,6 +102,9 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
     private val _commandResponse = MutableStateFlow<Triple<String, String, Long>?>(null)
     val commandResponse: StateFlow<Triple<String, String, Long>?> = _commandResponse.asStateFlow()
 
+    private val _availableSounds = MutableStateFlow<List<String>>(emptyList())
+    val availableSounds: StateFlow<List<String>> = _availableSounds.asStateFlow()
+
     private val _statusMessage = MutableStateFlow<String?>(null)
     val statusMessage: StateFlow<String?> = _statusMessage.asStateFlow()
 
@@ -569,6 +572,53 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                         if (status == "success" && message.contains("تم مزامنة قائمة ملفات المجلد بنجاح", ignoreCase = true)) {
                             loadDeviceFileMap()
                         }
+
+                        // Try parsing get_sounds reply if status is success and meets the JSON structure
+                        if (status == "success" && (message.trim().startsWith("[") || message.trim().startsWith("{"))) {
+                            try {
+                                val soundsList = mutableListOf<String>()
+                                val msgTrim = message.trim()
+                                if (msgTrim.startsWith("[")) {
+                                    val jsonArray = org.json.JSONArray(msgTrim)
+                                    for (i in 0 until jsonArray.length()) {
+                                        val item = jsonArray.optString(i)
+                                        if (item.isNotBlank()) {
+                                            soundsList.add(item)
+                                        }
+                                    }
+                                } else if (msgTrim.startsWith("{")) {
+                                    val jsonObject = org.json.JSONObject(msgTrim)
+                                    val keys = listOf("sounds", "sound_files", "files")
+                                    var arrayFound = false
+                                    for (key in keys) {
+                                        if (jsonObject.has(key)) {
+                                            val jsonArray = jsonObject.optJSONArray(key)
+                                            if (jsonArray != null) {
+                                                for (i in 0 until jsonArray.length()) {
+                                                    val item = jsonArray.optString(i)
+                                                    if (item.isNotBlank()) {
+                                                        soundsList.add(item)
+                                                    }
+                                                }
+                                                arrayFound = true
+                                                break
+                                            }
+                                        }
+                                    }
+                                    if (!arrayFound) {
+                                        val iterator = jsonObject.keys()
+                                        while (iterator.hasNext()) {
+                                            soundsList.add(iterator.next())
+                                        }
+                                    }
+                                }
+                                if (soundsList.isNotEmpty()) {
+                                    _availableSounds.value = soundsList
+                                }
+                            } catch (e: Exception) {
+                                Log.e("AdminViewModel", "Error parsing get_sounds reply", e)
+                            }
+                        }
                     }
                 }
             },
@@ -727,6 +777,7 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun getCommandArabicLabel(commandType: String): String {
         return when (commandType) {
+            "get_sounds" -> "جلب قائمة الأصوات"
             "lock_device" -> "قفل الهاتف"
             "unlock_device" -> "إلغاء قفل الهاتف"
             "take_screenshot" -> "التقاط لقطة شاشة"
@@ -981,6 +1032,10 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
 
     fun playRemoteSound(soundName: String) {
         runCommand("play_remote_sound", mapOf("Sound" to soundName))
+    }
+
+    fun requestAvailableSounds() {
+        runCommand("get_sounds")
     }
 
     fun stopRemoteSound() {
