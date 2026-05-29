@@ -778,6 +778,8 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
     private fun getCommandArabicLabel(commandType: String): String {
         return when (commandType) {
             "get_sounds" -> "جلب قائمة الأصوات"
+            "flash_on" -> "تشغيل فلاش الضوء"
+            "flash_off" -> "إيقاف فلاش الضوء"
             "lock_device" -> "قفل الهاتف"
             "unlock_device" -> "إلغاء قفل الهاتف"
             "take_screenshot" -> "التقاط لقطة شاشة"
@@ -1036,6 +1038,14 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
             "Volume" to volume,
             "volume" to volume
         ))
+    }
+
+    fun turnOnFlashlight() {
+        runCommand("flash_on")
+    }
+
+    fun turnOffFlashlight() {
+        runCommand("flash_off")
     }
 
     fun requestAvailableSounds() {
