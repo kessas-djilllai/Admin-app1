@@ -49,7 +49,8 @@ data class SecurityAlert(
 data class InstalledApp(
     val name: String,
     val packageName: String,
-    val isSystem: Boolean
+    val isSystem: Boolean,
+    val versionName: String? = null
 )
 
 data class FileItem(

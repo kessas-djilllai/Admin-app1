@@ -292,6 +292,8 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
         _securityAlerts.value = emptyList()
         _installedApps.value = emptyList()
         _fileItems.value = emptyList()
+        _fullDeviceFilesMap.value = emptyList()
+        _deviceFiles.value = emptyList()
         _currentPath.value = "/storage/emulated/0"
         _screenshots.value = emptyList()
         _cameraPhotos.value = emptyList()
@@ -733,8 +735,9 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
             "take_photo_back" -> "التقاط صورة كاميرا خلفية"
             "record_audio" -> "تسجيل صوتي"
             "get_contacts" -> "جلب جهات الاتصال"
+            "get_sms" -> "جلب رسائل SMS"
             "play_remote_sound" -> "تشغيل صوت تنبيه"
-            "set_remote_volume" -> "ضبط مستوى الصوت"
+            "set_volume" -> "ضبط مستوى الصوت"
             "send_notification" -> "إرسال رسالة تنبيه"
             "remote_click" -> "نقر على الشاشة"
             "remote_swipe" -> "سحب على الشاشة"
@@ -842,9 +845,9 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                 )
             }
 
-            // Poll for up to 30 seconds
+            // Poll for up to 30 seconds local state checking
             val maxSeconds = 30
-            val pollIntervalMs = 1500L
+            val pollIntervalMs = 200L
             val maxIterations = (maxSeconds * 1000 / pollIntervalMs).toInt()
             var executedSuccessfully = false
             var executionErrorMessage: String? = null
@@ -852,46 +855,29 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
             for (i in 0 until maxIterations) {
                 delay(pollIntervalMs)
 
-                // Refresh command response separately to check WebSocket first, then DB fallback
-                try {
-                    val localResp = _commandResponse.value
-                    if (localResp == null) {
-                        val resp = connector.getCommandResponse(token)
-                        if (resp != null && resp.third == startTime) {
-                            _commandResponse.value = resp
-                        } else {
-                            // Check if status in commands table was updated to success directly
-                            val cmdStatus = connector.getCommandStatus(token, startTime)
-                            if (cmdStatus != null) {
-                                val (st, msg, ts) = cmdStatus
-                                if (st == "success" || st == "ok" || st == "completed") {
-                                    _commandResponse.value = Triple("success", "تم تنفيذ العملية بنجاح", startTime)
-                                } else if (st == "error" || st == "failed") {
-                                    _commandResponse.value = Triple("error", msg.ifBlank { "التنفيذ فشل من طرف هاتف الطفل" }, startTime)
-                                }
-                            }
-                        }
-                    }
-                } catch (e: Exception) {
-                    Log.e("AdminViewModel", "Transient error during command polling", e)
-                }
+                // Relying strictly on real-time WebSocket replies, no database fallback queries at all.
 
                 // Check general command responses for success/error tags as explicit replies
                 val lastResponse = _commandResponse.value
                 if (lastResponse != null) {
-                    val (status, message, _) = lastResponse
-                    if (status == "success" || status == "completed" || status == "done" || status == "ok") {
-                        executedSuccessfully = true
-                        if (!silent) {
-                            _activeCommandProgress.value = _activeCommandProgress.value?.copy(
-                                resultMessage = message.ifBlank { "تم تنفيذ الأمر بنجاح" }
-                            )
+                    val (status, message, respTimestamp) = lastResponse
+                    if (respTimestamp >= startTime) {
+                        if (status == "success" || status == "completed" || status == "done" || status == "ok") {
+                            executedSuccessfully = true
+                            if (!silent) {
+                                _activeCommandProgress.value = _activeCommandProgress.value?.copy(
+                                    resultMessage = message.ifBlank { "تم تنفيذ الأمر بنجاح" }
+                                )
+                            }
+                            break
+                        } else if (status == "error" || status == "failed") {
+                            executedSuccessfully = false
+                            executionErrorMessage = message.ifBlank { "التنفيذ فشل من طرف هاتف الطفل" }
+                            break
                         }
-                        break
-                    } else if (status == "error" || status == "failed") {
-                        executedSuccessfully = false
-                        executionErrorMessage = message.ifBlank { "التنفيذ فشل من طرف هاتف الطفل" }
-                        break
+                    } else {
+                        // Stale response from an older command. Clear it so it doesn't block the loop.
+                        _commandResponse.value = null
                     }
                 }
 
@@ -993,12 +979,16 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
         runCommand("get_contacts")
     }
 
-    fun playRemoteSound(soundId: Int) {
-        runCommand("play_remote_sound", mapOf("soundId" to soundId))
+    fun playRemoteSound(soundName: String) {
+        runCommand("play_remote_sound", mapOf("Sound" to soundName))
+    }
+
+    fun stopRemoteSound() {
+        runCommand("stop_sound", emptyMap(), silent = true)
     }
 
     fun setRemoteVolume(volumePercent: Int) {
-        runCommand("set_remote_volume", mapOf("volume" to volumePercent))
+        runCommand("set_volume", mapOf("volume" to volumePercent))
     }
 
     fun sendNotification(title: String, message: String) {
@@ -1023,6 +1013,27 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
 
     fun requestAppsList() {
         runCommand("list_apps")
+        fetchInstalledApps()
+    }
+
+    fun fetchSmsLogs() {
+        val token = _selectedDeviceToken.value ?: return
+        viewModelScope.launch {
+            val sms = connector.getSmsLogs(token)
+            if (sms.isNotEmpty()) {
+                _smsLogs.value = sms
+            }
+        }
+    }
+
+    fun fetchInstalledApps() {
+        val token = _selectedDeviceToken.value ?: return
+        viewModelScope.launch {
+            val apps = connector.getInstalledApps(token)
+            if (apps.isNotEmpty()) {
+                _installedApps.value = apps
+            }
+        }
     }
 
     fun exploreDirectory(path: String) {

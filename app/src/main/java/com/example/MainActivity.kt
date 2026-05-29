@@ -2536,6 +2536,39 @@ fun RemoteControlTab(viewModel: AdminViewModel) {
 @Composable
 fun AudioControlTab(viewModel: AdminViewModel) {
     var volume by remember { mutableFloatStateOf(50f) }
+    var soundName by remember { mutableStateOf("") }
+    
+    val commandResponse by viewModel.commandResponse.collectAsState()
+    val activeCommand by viewModel.activeCommandProgress.collectAsState()
+
+    var playingDurationSec by remember { mutableIntStateOf(0) }
+    var currentPlayTimeSec by remember { mutableIntStateOf(0) }
+    var isPlaying by remember { mutableStateOf(false) }
+
+    LaunchedEffect(commandResponse) {
+        val type = activeCommand?.commandType ?: ""
+        if (type == "play_remote_sound" && commandResponse?.first == "success") {
+            val msg = commandResponse?.second ?: ""
+            val extractedNumber = Regex("\\d+").find(msg)?.value?.toIntOrNull() ?: 30
+            val durationSec = if (extractedNumber > 1000) extractedNumber / 1000 else extractedNumber
+            
+            if (durationSec > 0 && !isPlaying) {
+                playingDurationSec = durationSec
+                currentPlayTimeSec = 0
+                isPlaying = true
+            }
+        }
+    }
+
+    LaunchedEffect(isPlaying) {
+        if (isPlaying) {
+            while (currentPlayTimeSec < playingDurationSec) {
+                delay(1000)
+                currentPlayTimeSec++
+            }
+            isPlaying = false
+        }
+    }
 
     Column(
         modifier = Modifier.fillMaxSize().padding(14.dp),
@@ -2578,29 +2611,78 @@ fun AudioControlTab(viewModel: AdminViewModel) {
                 Text("تشغيل أصوات تنبيهية", color = Color(0xFF1F2937), fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 Spacer(modifier = Modifier.height(16.dp))
 
+                OutlinedTextField(
+                    value = soundName,
+                    onValueChange = { soundName = it },
+                    label = { Text("اسم الصوت (مثال: alarm)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color(0xFF2196F3),
+                        unfocusedBorderColor = Color(0xFFE5E7EB)
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Button(
-                        onClick = { viewModel.playRemoteSound(1) },
+                        onClick = { 
+                            isPlaying = false
+                            viewModel.playRemoteSound(soundName) 
+                        },
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2196F3)),
                         modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(8.dp)
+                        shape = RoundedCornerShape(8.dp),
+                        enabled = soundName.isNotBlank()
                     ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(Icons.Default.NotificationsActive, null)
-                            Text("صافرة إنذار", fontSize = 11.sp, maxLines = 1)
-                        }
+                        Icon(Icons.Default.PlayArrow, null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("تشغيل", fontSize = 12.sp)
                     }
 
                     Button(
-                        onClick = { viewModel.playRemoteSound(2) },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFA726)),
+                        onClick = { 
+                            viewModel.stopRemoteSound()
+                            isPlaying = false
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (isPlaying) Color(0xFFEF4444) else Color(0xFFE5E7EB),
+                            contentColor = if (isPlaying) Color.White else Color(0xFF9CA3AF)
+                        ),
                         modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(8.dp)
+                        shape = RoundedCornerShape(8.dp),
+                        enabled = isPlaying
                     ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(Icons.Default.MusicNote, null)
-                            Text("نغمة هادئة", fontSize = 11.sp, maxLines = 1)
+                        Icon(Icons.Default.Stop, null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("إيقاف", fontSize = 12.sp)
+                    }
+                }
+
+                if (isPlaying) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text(
+                                String.format("%02d:%02d", currentPlayTimeSec / 60, currentPlayTimeSec % 60), 
+                                fontSize = 12.sp, 
+                                color = Color(0xFF2196F3)
+                            )
+                            Text(
+                                String.format("%02d:%02d", playingDurationSec / 60, playingDurationSec % 60), 
+                                fontSize = 12.sp, 
+                                color = Color(0xFF6B7280)
+                            )
                         }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        LinearProgressIndicator(
+                            progress = { if (playingDurationSec > 0) currentPlayTimeSec.toFloat() / playingDurationSec.toFloat() else 0f },
+                            modifier = Modifier.fillMaxWidth().height(6.dp),
+                            color = Color(0xFF2196F3),
+                            trackColor = Color(0xFFE5E7EB)
+                        )
                     }
                 }
             }
@@ -3071,39 +3153,56 @@ fun ChangeIconRequirementsPage(viewModel: AdminViewModel) {
 fun InstalledAppsRequirementsPage(viewModel: AdminViewModel) {
     val installedApps by viewModel.installedApps.collectAsState()
     var query by remember { mutableStateOf("") }
-    var filterSystem by remember { mutableStateOf<Boolean?>(false) }
+    var selectedTab by remember { mutableStateOf(0) } // 0: User, 1: System
     var selectedAppForDialog by remember { mutableStateOf<com.example.admin.InstalledApp?>(null) }
 
     Column(modifier = Modifier.fillMaxSize().padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Button(onClick = { viewModel.requestAppsList() }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF4081)), modifier = Modifier.fillMaxWidth()) {
-            Text("جرد وتنزيل قائمة التطبيقات")
-        }
-        OutlinedTextField(
-            value = query,
-            onValueChange = { query = it },
-            label = { Text("بحث عن تطبيق..", color = Color(0xFF6B7280)) },
+        Button(
+            onClick = {
+                viewModel.runCommand("list_apps")
+                viewModel.fetchInstalledApps() // Fetch after command if they already exist, but ideally we show what we have
+            },
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF4081)),
             modifier = Modifier.fillMaxWidth()
-        )
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf("المستخدم" to false, "النظام" to true, "الكل" to null).forEach { (lbl, valState) ->
-                Button(
-                    onClick = { filterSystem = valState },
-                    colors = ButtonDefaults.buttonColors(containerColor = if(filterSystem == valState) Color(0xFF9155FF) else Color(0xFFFFFFFF)),
-                    modifier = Modifier.weight(1f).height(34.dp)
+        ) {
+            Text("تحديث قائمة التطبيقات", color = Color.White, fontWeight = FontWeight.Bold)
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth().background(Color(0xFFF3F4F6), RoundedCornerShape(8.dp)).padding(4.dp),
+            horizontalArrangement = Arrangement.Center
+        ) {
+            listOf("تطبيقات المستخدم", "تطبيقات النظام").forEachIndexed { index, title ->
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(if(selectedTab == index) Color(0xFF9155FF) else Color.Transparent)
+                        .clickable { selectedTab = index }
+                        .padding(vertical = 8.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Text(lbl, fontSize = 11.sp)
+                    Text(title, color = if(selectedTab == index) Color.White else Color(0xFF6B7280), fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                 }
             }
         }
 
+        OutlinedTextField(
+            value = query,
+            onValueChange = { query = it },
+            label = { Text("بحث عن تطبيق..", color = Color(0xFF6B7280)) },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true
+        )
+
         val list = installedApps.filter {
-            (query.isBlank() || it.name.contains(query, true)) && (filterSystem == null || it.isSystem == filterSystem)
+            (query.isBlank() || it.name.contains(query, true)) && (it.isSystem == (selectedTab == 1))
         }
 
         LazyColumn(modifier = Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             items(list) { app ->
                 Card(
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)), 
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
                     modifier = Modifier
                         .fillMaxWidth()
                         .combinedClickable(
@@ -3112,11 +3211,14 @@ fun InstalledAppsRequirementsPage(viewModel: AdminViewModel) {
                         )
                 ) {
                     Row(modifier = Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(if(app.isSystem) Icons.Default.Settings else Icons.Default.PlayArrow, null, tint = if(app.isSystem) Color.Gray else Color.Green, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Column {
-                            Text(app.name, color = Color(0xFF1F2937), fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                            Text(app.packageName, color = Color(0xFF6B7280), fontSize = 10.sp)
+                        Icon(if(app.isSystem) Icons.Default.Settings else Icons.Default.PlayArrow, null, tint = if(app.isSystem) Color.Gray else Color.Green, modifier = Modifier.size(24.dp))
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(app.name, color = Color(0xFF1F2937), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                            Text(app.packageName, color = Color(0xFF6B7280), fontSize = 11.sp)
+                        }
+                        if (app.versionName != null) {
+                            Text(app.versionName, color = Color(0xFF9155FF), fontSize = 10.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.background(Color(0xFFF3E8FF), RoundedCornerShape(4.dp)).padding(horizontal = 6.dp, vertical = 2.dp))
                         }
                     }
                 }
@@ -3939,52 +4041,109 @@ fun RemoteFileExplorerTab(viewModel: AdminViewModel) {
 @Composable
 fun ContactsTab(viewModel: AdminViewModel) {
     val contacts by viewModel.contacts.collectAsState()
+    var searchQuery by remember { mutableStateOf("") }
+    
+    val filteredContacts = remember(contacts, searchQuery) {
+        if (searchQuery.isBlank()) {
+            contacts
+        } else {
+            contacts.filter { 
+                it.name.contains(searchQuery, ignoreCase = true) || 
+                it.number.contains(searchQuery, ignoreCase = true) 
+            }
+        }
+    }
+
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Button(
             onClick = { viewModel.requestContacts() },
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9155FF))
         ) {
             Icon(Icons.Default.Refresh, null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
-            Text("تحديث جهات الاتصال")
+            Text("جلب جهات الاتصال", fontWeight = FontWeight.Bold)
         }
-        Spacer(Modifier.height(16.dp))
+
+        OutlinedTextField(
+            value = searchQuery,
+            onValueChange = { searchQuery = it },
+            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+            placeholder = { Text("البحث في جهات الاتصال...") },
+            leadingIcon = { Icon(Icons.Default.Search, null) },
+            singleLine = true,
+            shape = RoundedCornerShape(12.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = Color(0xFF9155FF),
+                unfocusedBorderColor = Color(0xFFE5E7EB)
+            )
+        )
+
         LazyColumn(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            items(contacts) { contact ->
+            items(filteredContacts) { contact ->
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
-                    border = BorderStroke(1.dp, Color(0xFFE5E7EB))
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    border = BorderStroke(1.dp, Color(0xFFE5E7EB)),
+                    shape = RoundedCornerShape(12.dp)
                 ) {
                     Row(
-                        modifier = Modifier.padding(12.dp),
+                        modifier = Modifier.padding(16.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Surface(
-                            modifier = Modifier.size(40.dp),
-                            shape = CircleShape,
-                            color = Color(0xFF9155FF).copy(alpha = 0.2f)
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFFF3E8FF)),
+                            contentAlignment = Alignment.Center
                         ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(Icons.Default.Person, null, tint = Color(0xFF9155FF), modifier = Modifier.size(20.dp))
-                            }
+                            val firstChar = contact.name.trim().firstOrNull()?.toString()?.uppercase() ?: "?"
+                            Text(
+                                text = firstChar,
+                                color = Color(0xFF9155FF),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 20.sp
+                            )
                         }
-                        Spacer(Modifier.width(12.dp))
-                        Column {
-                            Text(contact.name, color = Color(0xFF1F2937), fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                            Text(contact.number, color = Color(0xFF6B7280), fontSize = 12.sp)
+                        Spacer(Modifier.width(16.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = contact.name.takeIf { it.isNotBlank() } ?: "بدون اسم", 
+                                color = Color(0xFF1F2937), 
+                                fontSize = 16.sp, 
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                text = contact.number, 
+                                color = Color(0xFF6B7280), 
+                                fontSize = 14.sp
+                            )
+                        }
+                        IconButton(onClick = { /* No action needed */ }) {
+                            Icon(Icons.Default.Phone, null, tint = Color(0xFF39D353))
                         }
                     }
                 }
             }
             if (contacts.isEmpty()) {
                 item {
-                    Box(Modifier.fillMaxWidth().height(100.dp), contentAlignment = Alignment.Center) {
-                        Text("لا توجد جهات اتصال متاحة، جرب التحديث.", color = Color(0xFF6B7280), fontSize = 12.sp)
+                    Box(Modifier.fillMaxWidth().height(150.dp), contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(Icons.Default.PersonSearch, contentDescription = null, modifier = Modifier.size(48.dp), tint = Color(0xFFE5E7EB))
+                            Spacer(Modifier.height(8.dp))
+                            Text("لا توجد جهات اتصال متاحة، انقر على زر الجلب.", color = Color(0xFF6B7280), fontSize = 14.sp)
+                        }
+                    }
+                }
+            } else if (filteredContacts.isEmpty()) {
+                item {
+                    Box(Modifier.fillMaxWidth().height(150.dp), contentAlignment = Alignment.Center) {
+                        Text("لا يوجد نتائج مطابقة للبحث.", color = Color(0xFF6B7280), fontSize = 14.sp)
                     }
                 }
             }
@@ -3995,60 +4154,20 @@ fun ContactsTab(viewModel: AdminViewModel) {
 @Composable
 fun SmsAndSecurityAlertsTab(viewModel: AdminViewModel) {
     val smsLogs by viewModel.smsLogs.collectAsState()
-    val securityAlerts by viewModel.securityAlerts.collectAsState()
-
-    var activeSmsSubTab by remember { mutableIntStateOf(0) } // Tabs: 0Sms, 1SecurityAlerts Wall
+    var selectedContact by remember { mutableStateOf<String?>(null) }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp)
     ) {
-        // Toggle indicators
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 12.dp)
-                .background(Color(0xFFFFFFFF), RoundedCornerShape(8.dp))
-                .padding(4.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        // Fetch Button
+        Button(
+            onClick = { viewModel.runCommand("get_sms") },
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9155FF)),
+            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
         ) {
-            Button(
-                onClick = { activeSmsSubTab = 0 },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (activeSmsSubTab == 0) Color(0xFF9155FF) else Color.Transparent,
-                    contentColor = if (activeSmsSubTab == 0) Color(0xFF1F2937) else Color(0xFF6B7280)
-                ),
-                shape = RoundedCornerShape(6.dp),
-                modifier = Modifier.weight(1f),
-                contentPadding = PaddingValues(vertical = 8.dp)
-            ) {
-                Text("أرشيف الرسائل SMS", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-            }
-
-            Button(
-                onClick = { activeSmsSubTab = 1 },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (activeSmsSubTab == 1) Color(0xFFFF4081) else Color.Transparent,
-                    contentColor = if (activeSmsSubTab == 1) Color(0xFF1F2937) else Color(0xFF6B7280)
-                ),
-                shape = RoundedCornerShape(6.dp),
-                modifier = Modifier.weight(1f),
-                contentPadding = PaddingValues(vertical = 8.dp)
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (securityAlerts.isNotEmpty()) {
-                        Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .clip(CircleShape)
-                                .background(Color(0xFFEF4444))
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                    }
-                    Text("جدار الإنذارات الأمنية", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                }
-            }
+            Text("جلب وتحديث الرسائل (SMS)", color = Color.White, fontWeight = FontWeight.Bold)
         }
 
         Box(
@@ -4056,197 +4175,110 @@ fun SmsAndSecurityAlertsTab(viewModel: AdminViewModel) {
                 .fillMaxWidth()
                 .weight(1f)
         ) {
-            if (activeSmsSubTab == 0) {
-                // SMS LOGS DASHBOARD
-                if (smsLogs.isNotEmpty()) {
-                    LazyColumn(
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.fillMaxSize()
-                    ) {
-                        items(smsLogs) { sms ->
-                            val isIncoming = sms.type == "incoming"
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = if (isIncoming) Arrangement.Start else Arrangement.End
+            if (smsLogs.isNotEmpty()) {
+                if (selectedContact == null) {
+                    val groupedSms = remember(smsLogs) {
+                        smsLogs.groupBy { it.sender }.toList().sortedByDescending { it.second.maxOfOrNull { msg -> msg.timestamp } ?: 0L }
+                    }
+                    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxSize()) {
+                        items(groupedSms) { (sender, messages) ->
+                            val latestMsg = messages.maxByOrNull { it.timestamp }
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = Color.White),
+                                shape = RoundedCornerShape(12.dp),
+                                border = BorderStroke(1.dp, Color(0xFFE5E7EB)),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { selectedContact = sender }
                             ) {
-                                Card(
-                                    colors = CardDefaults.cardColors(
-                                        containerColor = if (isIncoming) Color(0xFFFFFFFF) else Color(0xFFF5F3FF)
-                                    ),
-                                    shape = RoundedCornerShape(
-                                        topStart = 12.dp,
-                                        topEnd = 12.dp,
-                                        bottomStart = if (isIncoming) 0.dp else 12.dp,
-                                        bottomEnd = if (isIncoming) 12.dp else 0.dp
-                                    ),
-                                    border = BorderStroke(1.dp, if (isIncoming) Color(0xFFE5E7EB) else Color(0xFF9155FF).copy(alpha = 0.5f)),
-                                    modifier = Modifier.widthIn(max = 280.dp)
-                                ) {
-                                    Column(modifier = Modifier.padding(12.dp)) {
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Text(
-                                                text = sms.sender,
-                                                color = if (isIncoming) Color(0xFF00E5FF) else Color(0xFFFF4081),
-                                                fontSize = 12.sp,
-                                                fontWeight = FontWeight.Bold
-                                            )
-                                            
-                                            // Direction Indicator Arrow label
-                                            Box(
-                                                modifier = Modifier
-                                                    .clip(RoundedCornerShape(4.dp))
-                                                    .background(Color(0xFFE5E7EB))
-                                                    .padding(horizontal = 4.dp, vertical = 2.dp)
-                                            ) {
-                                                Text(
-                                                    text = if (isIncoming) "واردة" else "صادرة",
-                                                    color = if (isIncoming) Color(0xFF39D353) else Color(0xFFFF4081),
-                                                    fontSize = 8.sp,
-                                                    fontWeight = FontWeight.Bold
-                                                )
-                                            }
-                                        }
-
-                                        Text(
-                                            text = sms.body,
-                                            color = Color(0xFF1F2937),
-                                            fontSize = 13.sp,
-                                            lineHeight = 18.sp
-                                        )
-
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        val timeStr = remember(sms.timestamp) {
-                                            SimpleDateFormat("yyyy-MM-dd h:mm a", Locale.getDefault()).format(Date(sms.timestamp))
-                                        }
-                                        Text(
-                                            text = timeStr,
-                                            color = Color(0xFF6B7280),
-                                            fontSize = 9.sp,
-                                            textAlign = TextAlign.End,
-                                            modifier = Modifier.fillMaxWidth()
-                                        )
+                                Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Box(
+                                        modifier = Modifier.size(40.dp).clip(CircleShape).background(Color(0xFFF3E8FF)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(sender.take(2).uppercase(), color = Color(0xFF9155FF), fontWeight = FontWeight.Bold)
+                                    }
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(sender, color = Color(0xFF1F2937), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                        Text(latestMsg?.body ?: "", color = Color(0xFF6B7280), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    }
+                                    latestMsg?.let {
+                                        val timeStr = SimpleDateFormat("dd/MM yyyy", Locale.getDefault()).format(Date(it.timestamp))
+                                        Text(timeStr, color = Color(0xFF9CA3AF), fontSize = 10.sp)
                                     }
                                 }
                             }
                         }
                     }
                 } else {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(Icons.Default.Sms, null, tint = Color(0xFFE5E7EB), modifier = Modifier.size(48.dp))
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text("لا يتوفر رسائل SMS مؤرشفة في النظام حالياً.", color = Color(0xFF6B7280), fontSize = 12.sp)
-                        }
+                    val contactMessages = remember(smsLogs, selectedContact) {
+                        smsLogs.filter { it.sender == selectedContact }.sortedBy { it.timestamp }
                     }
-                }
-            } else {
-                // REALTIME SECURITY ALERTS WALL
-                Column(modifier = Modifier.fillMaxSize()) {
-                    if (securityAlerts.isNotEmpty()) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "مؤشر الإنذارات:  ${securityAlerts.size} تنبيهات",
-                                color = Color(0xFF1F2937),
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-
-                            Button(
-                                onClick = { viewModel.clearAlerts() },
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 2.dp),
-                                shape = RoundedCornerShape(6.dp),
-                                modifier = Modifier.height(28.dp)
-                            ) {
-                                Text("مسح جدار الانذارات", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    Column {
+                        Row(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(onClick = { selectedContact = null }) {
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "رجوع")
                             }
+                            Text(selectedContact ?: "", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color(0xFF1F2937))
                         }
-
                         LazyColumn(
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                             modifier = Modifier.fillMaxSize()
                         ) {
-                            items(securityAlerts) { alert ->
-                                Card(
-                                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFEF2F2)),
-                                    border = BorderStroke(1.dp, Color(0xFFEF4444)),
-                                    shape = RoundedCornerShape(10.dp)
+                            items(contactMessages) { sms ->
+                                val isIncoming = sms.type == "incoming" || sms.type == "1"
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = if (isIncoming) Arrangement.Start else Arrangement.End
                                 ) {
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(12.dp),
-                                        verticalAlignment = Alignment.CenterVertically
+                                    Card(
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = if (isIncoming) Color(0xFFFFFFFF) else Color(0xFF9155FF)
+                                        ),
+                                        shape = RoundedCornerShape(
+                                            topStart = 16.dp,
+                                            topEnd = 16.dp,
+                                            bottomStart = if (isIncoming) 0.dp else 16.dp,
+                                            bottomEnd = if (isIncoming) 16.dp else 0.dp
+                                        ),
+                                        border = if (isIncoming) BorderStroke(1.dp, Color(0xFFE5E7EB)) else null,
+                                        modifier = Modifier.widthIn(max = 280.dp)
                                     ) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(36.dp)
-                                                .clip(CircleShape)
-                                                .background(Color(0xFFEF4444).copy(alpha = 0.2f)),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Warning,
-                                                contentDescription = null,
-                                                tint = Color(0xFFEF4444),
-                                                modifier = Modifier.size(18.dp)
-                                            )
-                                        }
-
-                                        Spacer(modifier = Modifier.width(12.dp))
-
-                                        Column(modifier = Modifier.weight(1f)) {
+                                        Column(modifier = Modifier.padding(12.dp)) {
                                             Text(
-                                                text = if (alert.title == "DEVICE_BOOTED") "إعادة التشغيل (BOOT)" 
-                                                       else if (alert.title == "BATTERY_LOW") "بطارية حرجة منخفضة" 
-                                                       else alert.title,
-                                                color = Color(0xFF1F2937),
+                                                text = sms.body,
+                                                color = if (isIncoming) Color(0xFF1F2937) else Color.White,
                                                 fontSize = 13.sp,
-                                                fontWeight = FontWeight.Bold
-                                            )
-                                            Spacer(modifier = Modifier.height(2.dp))
-                                            Text(
-                                                text = alert.message,
-                                                color = Color(0xFF374151),
-                                                fontSize = 11.sp
+                                                lineHeight = 18.sp
                                             )
                                             Spacer(modifier = Modifier.height(4.dp))
-                                            val timeStr = remember(alert.timestamp) {
-                                                SimpleDateFormat("yyyy-MM-dd h:mm a", Locale.getDefault()).format(Date(alert.timestamp))
+                                            val timeStr = remember(sms.timestamp) {
+                                                SimpleDateFormat("dd/MM/yyyy hh:mm a", Locale.getDefault()).format(Date(sms.timestamp))
                                             }
                                             Text(
                                                 text = timeStr,
-                                                color = Color(0xFF6B7280),
-                                                fontSize = 9.sp
+                                                color = if (isIncoming) Color(0xFF6B7280) else Color.White.copy(alpha = 0.7f),
+                                                fontSize = 9.sp,
+                                                textAlign = TextAlign.End,
+                                                modifier = Modifier.fillMaxWidth()
                                             )
                                         }
                                     }
                                 }
                             }
                         }
-                    } else {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Icon(Icons.Default.HealthAndSafety, null, tint = Color(0xFF238636), modifier = Modifier.size(64.dp))
-                                Spacer(modifier = Modifier.height(12.dp))
-                                Text("لا يوجد تجاوزات خطيرة. طفلكم بأمان!", color = Color(0xFF1F2937), fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                                Text("أي تنبيهات مثل هبوط البطارية أو تشغيل الهاتف ستظهر هنا فورياً.", color = Color(0xFF6B7280), fontSize = 11.sp)
-                            }
-                        }
+                    }
+                }
+            } else {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(Icons.Default.Message, null, tint = Color(0xFFE5E7EB), modifier = Modifier.size(48.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text("لا يتوفر رسائل SMS مؤرشفة في النظام حالياً.", color = Color(0xFF6B7280), fontSize = 12.sp)
                     }
                 }
             }
