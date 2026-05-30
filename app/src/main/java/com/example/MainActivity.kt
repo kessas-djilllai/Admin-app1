@@ -1061,7 +1061,8 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                             listOf(
                                 Triple(0, Icons.Default.Home, "الرئيسية"),
                                 Triple(1, Icons.Default.GridView, "الأوامر"),
-                                Triple(2, Icons.Default.Folder, "الملفات")
+                                Triple(2, Icons.Default.Folder, "الملفات"),
+                                Triple(3, Icons.Default.Tv, "البث")
                             ).forEach { (index, icon, label) ->
                                 val isSelected = bottomNavSelectedTab == index
                                 val contentColor = if (isSelected) Color(0xFF9155FF) else Color(0xFF9CA3AF)
@@ -1198,6 +1199,7 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                         0 -> DeviceHomeTab(activeDevice, viewModel)
                         1 -> DeviceCommandsTab(activeDevice, viewModel, openCommandDetails, onOpenCommand = { openCommandDetails = it })
                         2 -> DeviceFilesExplorerTab(viewModel)
+                        3 -> LiveStreamRequirementsPage(viewModel)
                     }
                 }
             }
