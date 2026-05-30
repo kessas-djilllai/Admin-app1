@@ -20,7 +20,9 @@ class SupabaseRealtimeStreamer(
     val onStatusReply: ((String) -> Unit)? = null,
     val onCommandReply: ((token: String, status: String, message: String, timestamp: Long) -> Unit)? = null,
     val onStreamSignal: ((token: String, type: String, resolution: String) -> Unit)? = null,
-    val onStreamData: ((token: String, frameBase64: String) -> Unit)? = null
+    val onStreamData: ((token: String, frameBase64: String) -> Unit)? = null,
+    val onAudioSignal: ((token: String, type: String) -> Unit)? = null,
+    val onAudioData: ((token: String, frameBase64: String) -> Unit)? = null
 ) {
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
@@ -247,11 +249,15 @@ class SupabaseRealtimeStreamer(
                         onStatusReply?.invoke(tokenVal)
                     }
                 }
-                if (pType == "broadcast" && (pEvent == "command_reply" || pEvent == "command_response" || pEvent == "command_status" || pEvent == "response" || pEvent == "reply" || pEvent.contains("reply") || pEvent.contains("response"))) {
+                if ((pType == "broadcast" || event == "broadcast" || event == "command_reply") && 
+                    (pEvent == "command_reply" || pEvent == "command_response" || pEvent == "command_status" || pEvent == "response" || pEvent == "reply" || pEvent.contains("reply") || pEvent.contains("response") || event == "command_reply")) {
                     val innerPayload = topPayloadCheck.optJSONObject("payload")
                     val p = innerPayload ?: topPayloadCheck
                     val tokenVal = p.optString("token").takeIf { it.isNotBlank() && it != "null" }
                         ?: p.optString("device_token").takeIf { it.isNotBlank() && it != "null" }
+                        ?: topPayloadCheck.optString("token").takeIf { it.isNotBlank() && it != "null" }
+                        ?: topPayloadCheck.optString("device_token").takeIf { it.isNotBlank() && it != "null" }
+                        ?: ""
 
                     // Robust parsing according to the user request.
                     var statusVal = p.optString("status").takeIf { it.isNotBlank() && it != "null" }
@@ -300,10 +306,8 @@ class SupabaseRealtimeStreamer(
                         ?: p.optLong("command_timestamp", 0L).takeIf { it != 0L }
                         ?: p.optLong("cmd_timestamp", 0L)
                     
-                    if (!tokenVal.isNullOrBlank()) {
-                        Log.d("SupabaseRealtimeStreamer", "Broadcast command reply processed from child ($tokenVal): status=$statusVal, message=$messageVal, ts=$tsVal")
-                        onCommandReply?.invoke(tokenVal, statusVal, messageVal, tsVal)
-                    }
+                    Log.d("SupabaseRealtimeStreamer", "Broadcast command reply processed from child ($tokenVal): status=$statusVal, message=$messageVal, ts=$tsVal")
+                    onCommandReply?.invoke(tokenVal ?: "", statusVal, messageVal, tsVal)
                 }
                 if (pType == "broadcast" && pEvent == "stream_signal") {
                     val innerPayload = topPayloadCheck.optJSONObject("payload")
@@ -322,6 +326,24 @@ class SupabaseRealtimeStreamer(
                     val tokenVal = p.optString("device_token", p.optString("token"))
                     if (!tokenVal.isNullOrBlank() && frameBase64.isNotEmpty()) {
                         onStreamData?.invoke(tokenVal, frameBase64)
+                    }
+                }
+                if (pType == "broadcast" && pEvent == "audio_signal") {
+                    val innerPayload = topPayloadCheck.optJSONObject("payload")
+                    val p = innerPayload ?: topPayloadCheck
+                    val type = p.optString("type")
+                    val tokenVal = p.optString("device_token", p.optString("token"))
+                    if (!tokenVal.isNullOrBlank() && type.isNotEmpty()) {
+                        onAudioSignal?.invoke(tokenVal, type)
+                    }
+                }
+                if (pType == "broadcast" && pEvent == "audio_data") {
+                    val innerPayload = topPayloadCheck.optJSONObject("payload")
+                    val p = innerPayload ?: topPayloadCheck
+                    val frameBase64 = p.optString("frame")
+                    val tokenVal = p.optString("device_token", p.optString("token"))
+                    if (!tokenVal.isNullOrBlank() && frameBase64.isNotEmpty()) {
+                        onAudioData?.invoke(tokenVal, frameBase64)
                     }
                 }
             }

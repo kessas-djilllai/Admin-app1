@@ -111,6 +111,12 @@ data class LiveStreamState(
     }
 }
 
+data class MicStreamState(
+    val isActive: Boolean = false,
+    val isLoading: Boolean = false,
+    val error: String? = null
+)
+
 data class CameraStreamState(
     val isActive: Boolean = false,
     val isLoading: Boolean = false,

