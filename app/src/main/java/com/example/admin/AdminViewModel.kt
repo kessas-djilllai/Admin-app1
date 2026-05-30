@@ -386,9 +386,9 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                 )
                 addWebsocketEvent("تم إرسال طلب فحص الحالة (check_status) إلى الأجهزة 📡 ... جاري فحص الاتصال")
 
-                // Start 20-second timer
+                // Start 5-second timer
                 statusTimeoutJob = launch {
-                    delay(20000)
+                    delay(5000)
                     val remaining = _devicesCheckingStatus.value
                     if (remaining.isNotEmpty()) {
                         val currentList = _devices.value.map { dev ->
@@ -403,7 +403,7 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                         }
                         _devices.value = currentList
                         _devicesCheckingStatus.value = emptySet()
-                        addWebsocketEvent("انتهى وقت فحص الاتصال (20 ثانية) ⏱️. الأجهزة التي لم تستجب تظهر غير متصلة الآن 🔴")
+                        addWebsocketEvent("انتهى وقت فحص الاتصال (5 ثواني) ⏱️. الأجهزة التي لم تستجب تظهر غير متصلة الآن 🔴")
                     }
                     _isRefreshing.value = false
                 }
@@ -677,7 +677,11 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
     private fun triggerSingleDeviceFetch(token: String) {
         viewModelScope.launch {
             if (token.isNotBlank()) {
-                syncCurrentDeviceAll(token)
+                try {
+                    syncCurrentDeviceAll(token)
+                } catch (e: Exception) {
+                    Log.e("AdminViewModel", "Error in triggerSingleDeviceFetch: ${e.message}", e)
+                }
             }
         }
     }
@@ -929,18 +933,18 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
             for (i in 0 until maxIterations) {
                 delay(pollIntervalMs)
 
-                // Relying strictly on real-time WebSocket replies, no database fallback queries at all.
-
-                // Check general command responses for success/error tags as explicit replies
+                // Check general command responses for success/error tags as explicit replies received over WebSockets
                 val lastResponse = _commandResponse.value
                 if (lastResponse != null) {
                     val (status, message, respTimestamp) = lastResponse
-                    if (respTimestamp >= startTime) {
+                    // Relaxed check to handle up to 15 seconds of clock-drift/latency difference between admin and child
+                    if (respTimestamp >= (startTime - 15000L)) {
                         if (status == "success" || status == "completed" || status == "done" || status == "ok") {
                             executedSuccessfully = true
                             if (!silent) {
+                                val cleanMsg = message.ifBlank { "تم تنفيذ الأمر بنجاح" }
                                 _activeCommandProgress.value = _activeCommandProgress.value?.copy(
-                                    resultMessage = message.ifBlank { "تم تنفيذ الأمر بنجاح" }
+                                    resultMessage = cleanMsg
                                 )
                             }
                             break
@@ -954,41 +958,10 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                         _commandResponse.value = null
                     }
                 }
-
-                if (executedSuccessfully) {
-                    // Sync to get the newest files (screenshot, audio, etc) since the child replied success
-                    try {
-                        syncCurrentDeviceAll(token)
-                    } catch (e: Exception) {
-                        Log.e("AdminViewModel", "Error syncing after command success", e)
-                    }
-
-                    // Attach the recently fetched media items to the command state
-                    if (!silent) {
-                        when (commandType) {
-                            "take_screenshot" -> {
-                                val currentScreenshot = _screenshots.value.firstOrNull() { it.timestamp > preScreenshotTime }
-                                _activeCommandProgress.value = _activeCommandProgress.value?.copy(responseData = currentScreenshot)
-                            }
-                            "take_photo", "take_photo_front", "take_photo_back" -> {
-                                val currentPhoto = _cameraPhotos.value.firstOrNull() { it.timestamp > prePhotoTime }
-                                _activeCommandProgress.value = _activeCommandProgress.value?.copy(responseData = currentPhoto)
-                            }
-                            "record_audio" -> {
-                                val currentAudio = _audioRecords.value.firstOrNull() { it.timestamp > preAudioTime }
-                                _activeCommandProgress.value = _activeCommandProgress.value?.copy(responseData = currentAudio)
-                            }
-                            "record_video_front", "record_video_back" -> {
-                                val currentVideo = _cameraVideos.value.firstOrNull() { it.timestamp > preVideoTime }
-                                _activeCommandProgress.value = _activeCommandProgress.value?.copy(responseData = currentVideo)
-                            }
-                        }
-                    }
-                    break
-                }
             }
 
             if (executedSuccessfully) {
+                // Instantly update Phase 2 to success on the UI
                 if (!silent) {
                     val endProgress = _activeCommandProgress.value?.copy(
                         executionStatus = CommandStepStatus.SUCCESS,
@@ -997,22 +970,67 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                     _activeCommandProgress.value = endProgress
                 }
 
-                // Play sound or show directly on screen
-                when (commandType) {
-                    "record_audio" -> {
-                        _audioRecords.value.firstOrNull()?.base64?.let { base64Audio ->
-                            loadAndPlayAudio(base64Audio)
+                // Sync to get the newest files (screenshot, audio, etc) since the child replied success asynchronously
+                viewModelScope.launch {
+                    try {
+                        syncCurrentDeviceAll(token)
+                    } catch (e: Exception) {
+                        Log.e("AdminViewModel", "Error syncing after command success", e)
+                    }
+
+                    // Attach the recently fetched media items to the command state
+                    if (!silent) {
+                        var finalProgress = _activeCommandProgress.value
+                        if (finalProgress != null) {
+                            when (commandType) {
+                                "take_screenshot" -> {
+                                    val currentScreenshot = _screenshots.value.firstOrNull() { it.timestamp > preScreenshotTime }
+                                    finalProgress = finalProgress.copy(responseData = currentScreenshot)
+                                }
+                                "take_photo", "take_photo_front", "take_photo_back" -> {
+                                    val currentPhoto = _cameraPhotos.value.firstOrNull() { it.timestamp > prePhotoTime }
+                                    finalProgress = finalProgress.copy(responseData = currentPhoto)
+                                }
+                                "record_audio" -> {
+                                    val currentAudio = _audioRecords.value.firstOrNull() { it.timestamp > preAudioTime }
+                                    finalProgress = finalProgress.copy(responseData = currentAudio)
+                                }
+                                "record_video_front", "record_video_back" -> {
+                                    val currentVideo = _cameraVideos.value.firstOrNull() { it.timestamp > preVideoTime }
+                                    finalProgress = finalProgress.copy(responseData = currentVideo)
+                                }
+                            }
+                            _activeCommandProgress.value = finalProgress
                         }
                     }
-                    "take_screenshot" -> {
-                        _screenshots.value.firstOrNull()?.let { screenshotMedia ->
-                            _directScreenshotToShow.value = screenshotMedia
+
+                    // Play sound or show directly on screen
+                    try {
+                        when (commandType) {
+                            "record_audio" -> {
+                                val currentAudio = _audioRecords.value.firstOrNull { it.timestamp > preAudioTime }
+                                    ?: _audioRecords.value.firstOrNull()
+                                currentAudio?.base64?.let { base64Audio ->
+                                    loadAndPlayAudio(base64Audio)
+                                }
+                            }
+                            "take_screenshot" -> {
+                                val currentScreenshot = _screenshots.value.firstOrNull { it.timestamp > preScreenshotTime }
+                                    ?: _screenshots.value.firstOrNull()
+                                currentScreenshot?.let { screenshotMedia ->
+                                    _directScreenshotToShow.value = screenshotMedia
+                                }
+                            }
+                            "take_photo", "take_photo_front", "take_photo_back" -> {
+                                val currentPhoto = _cameraPhotos.value.firstOrNull { it.timestamp > prePhotoTime }
+                                    ?: _cameraPhotos.value.firstOrNull()
+                                currentPhoto?.let { photoMedia ->
+                                    _directPhotoToShow.value = photoMedia
+                                }
+                            }
                         }
-                    }
-                    "take_photo", "take_photo_front", "take_photo_back" -> {
-                        _cameraPhotos.value.firstOrNull()?.let { photoMedia ->
-                            _directPhotoToShow.value = photoMedia
-                        }
+                    } catch (t: Throwable) {
+                        Log.e("AdminViewModel", "Error displaying/playing newly synced command media", t)
                     }
                 }
             } else {
@@ -1148,10 +1166,10 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
         
         // Timeout to reset loading state if no response
         viewModelScope.launch {
-            delay(15000)
+            delay(5000)
             if (_isFilesLoading.value) {
                 _isFilesLoading.value = false
-                addWebsocketEvent("❌ انتهى وقت انتظار قائمة الملفات من الجهاز.")
+                addWebsocketEvent("❌ انتهى وقت انتظار قائمة الملفات من الجهاز (5 ثواني).")
             }
         }
     }
@@ -1375,6 +1393,8 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
     fun startLiveStream() {
         val token = _selectedDeviceToken.value ?: return
         val command = "stream_screen"
+        val label = "بدء بث الشاشة"
+        val startTime = System.currentTimeMillis()
         
         // Show loading state
         _liveStreamState.value = LiveStreamState(
@@ -1383,9 +1403,14 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
             error = null
         )
         
+        _activeCommandProgress.value = ActiveCommandProgress(
+            commandType = command,
+            commandLabel = label,
+            sendStatus = CommandStepStatus.RUNNING,
+            startTimestamp = startTime
+        )
+        
         viewModelScope.launch {
-            val startTime = System.currentTimeMillis()
-            
             _commandResponse.value = null
             val sendSuccess = sendBroadcastCommand(token, command, emptyMap(), startTime)
             
@@ -1394,8 +1419,18 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                     isLoading = false,
                     error = "فشل في إرسال الأمر للطفل. تأكد من اتصاله بالإنترنت."
                 )
+                _activeCommandProgress.value = _activeCommandProgress.value?.copy(
+                    sendStatus = CommandStepStatus.FAILED,
+                    sendError = "فشل في إرسال الأمر للطفل عبر وبسوكيت"
+                )
                 return@launch
             }
+            
+            // Move to Phase 2: Wait for Child Response
+            _activeCommandProgress.value = _activeCommandProgress.value?.copy(
+                sendStatus = CommandStepStatus.SUCCESS,
+                executionStatus = CommandStepStatus.RUNNING
+            )
             
             val maxIterations = 20
             var success = false
@@ -1409,30 +1444,16 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                     break
                 }
                 
-                try {
-                    val resp = connector.getCommandResponse(token)
-                    if (resp != null && resp.third == startTime) {
-                        if (resp.first == "success" || resp.first == "ok" || resp.first == "completed") {
-                            success = true
-                            break
-                        } else if (resp.first == "error" || resp.first == "failed") {
-                            errorMsg = resp.second.ifBlank { "التطبيق الأبوي فشل في بدء بث الشاشة." }
-                            break
-                        }
-                    } else {
-                        val cmdStatus = connector.getCommandStatus(token, startTime)
-                        if (cmdStatus != null) {
-                            val st = cmdStatus.first
-                            if (st == "success" || st == "ok" || st == "completed") {
-                                success = true
-                                break
-                            } else if (st == "error" || st == "failed") {
-                                errorMsg = "التطبيق الأبوي فشل في بدء بث الشاشة."
-                                break
-                            }
-                        }
+                val resp = _commandResponse.value
+                if (resp != null && resp.third >= (startTime - 15000L)) {
+                    if (resp.first == "success" || resp.first == "ok" || resp.first == "completed") {
+                        success = true
+                        break
+                    } else if (resp.first == "error" || resp.first == "failed") {
+                        errorMsg = resp.second.ifBlank { "التطبيق الأبوي فشل في بدء بث الشاشة." }
+                        break
                     }
-                } catch(e: Exception) { }
+                }
             }
             
             if (success) {
@@ -1441,10 +1462,19 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                     isActive = true,
                     error = null
                 )
+                _activeCommandProgress.value = _activeCommandProgress.value?.copy(
+                    executionStatus = CommandStepStatus.SUCCESS,
+                    resultMessage = "تم بدء بث الشاشة وعرض البث المباشر بنجاح 📡"
+                )
             } else {
+                val finalError = errorMsg ?: "انتهت مهلة الانتظار ولم يقم هاتف الطفل بالرد."
                 _liveStreamState.value = _liveStreamState.value?.copy(
                     isLoading = false,
-                    error = errorMsg ?: "انتهت مهلة الانتظار ولم يقم هاتف الطفل بالرد."
+                    error = finalError
+                )
+                _activeCommandProgress.value = _activeCommandProgress.value?.copy(
+                    executionStatus = CommandStepStatus.FAILED,
+                    executionError = finalError
                 )
             }
         }
@@ -1497,30 +1527,16 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                     break
                 }
                 
-                try {
-                    val resp = connector.getCommandResponse(token)
-                    if (resp != null && resp.third == startTime) {
-                        if (resp.first == "success" || resp.first == "ok" || resp.first == "completed") {
-                            success = true
-                            break
-                        } else if (resp.first == "error" || resp.first == "failed") {
-                            errorMsg = resp.second.ifBlank { "التطبيق الأبوي للطفل فشل في تشغيل الكاميرا." }
-                            break
-                        }
-                    } else {
-                        val cmdStatus = connector.getCommandStatus(token, startTime)
-                        if (cmdStatus != null) {
-                            val st = cmdStatus.first
-                            if (st == "success" || st == "ok" || st == "completed") {
-                                success = true
-                                break
-                            } else if (st == "error" || st == "failed") {
-                                errorMsg = "التطبيق الأبوي للطفل فشل في تشغيل الكاميرا."
-                                break
-                            }
-                        }
+                val resp = _commandResponse.value
+                if (resp != null && resp.third >= (startTime - 15000L)) {
+                    if (resp.first == "success" || resp.first == "ok" || resp.first == "completed") {
+                        success = true
+                        break
+                    } else if (resp.first == "error" || resp.first == "failed") {
+                        errorMsg = resp.second.ifBlank { "التطبيق الأبوي للطفل فشل في تشغيل الكاميرا." }
+                        break
                     }
-                } catch(e: Exception) { }
+                }
             }
             
             if (success) {

