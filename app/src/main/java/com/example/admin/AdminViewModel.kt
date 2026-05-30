@@ -1393,8 +1393,6 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
     fun startLiveStream() {
         val token = _selectedDeviceToken.value ?: return
         val command = "stream_screen"
-        val label = "بدء بث الشاشة"
-        val startTime = System.currentTimeMillis()
         
         // Show loading state
         _liveStreamState.value = LiveStreamState(
@@ -1403,14 +1401,9 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
             error = null
         )
         
-        _activeCommandProgress.value = ActiveCommandProgress(
-            commandType = command,
-            commandLabel = label,
-            sendStatus = CommandStepStatus.RUNNING,
-            startTimestamp = startTime
-        )
-        
         viewModelScope.launch {
+            val startTime = System.currentTimeMillis()
+            
             _commandResponse.value = null
             val sendSuccess = sendBroadcastCommand(token, command, emptyMap(), startTime)
             
@@ -1419,18 +1412,8 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                     isLoading = false,
                     error = "فشل في إرسال الأمر للطفل. تأكد من اتصاله بالإنترنت."
                 )
-                _activeCommandProgress.value = _activeCommandProgress.value?.copy(
-                    sendStatus = CommandStepStatus.FAILED,
-                    sendError = "فشل في إرسال الأمر للطفل عبر وبسوكيت"
-                )
                 return@launch
             }
-            
-            // Move to Phase 2: Wait for Child Response
-            _activeCommandProgress.value = _activeCommandProgress.value?.copy(
-                sendStatus = CommandStepStatus.SUCCESS,
-                executionStatus = CommandStepStatus.RUNNING
-            )
             
             val maxIterations = 20
             var success = false
@@ -1462,19 +1445,10 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                     isActive = true,
                     error = null
                 )
-                _activeCommandProgress.value = _activeCommandProgress.value?.copy(
-                    executionStatus = CommandStepStatus.SUCCESS,
-                    resultMessage = "تم بدء بث الشاشة وعرض البث المباشر بنجاح 📡"
-                )
             } else {
-                val finalError = errorMsg ?: "انتهت مهلة الانتظار ولم يقم هاتف الطفل بالرد."
                 _liveStreamState.value = _liveStreamState.value?.copy(
                     isLoading = false,
-                    error = finalError
-                )
-                _activeCommandProgress.value = _activeCommandProgress.value?.copy(
-                    executionStatus = CommandStepStatus.FAILED,
-                    executionError = finalError
+                    error = errorMsg ?: "انتهت مهلة الانتظار ولم يقم هاتف الطفل بالرد."
                 )
             }
         }

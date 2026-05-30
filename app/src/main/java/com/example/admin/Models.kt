@@ -72,27 +72,12 @@ data class MediaItem(
 ) {
     var lastDecodeError: String? = null
 
-    fun toBitmap(targetWidth: Int = 480): Bitmap? {
+    fun toBitmap(): Bitmap? {
         if (base64.isBlank()) return null
         return try {
             val cleanBase64 = if (base64.contains(",")) base64.substringAfter(",") else base64
             val decodedBytes = Base64.decode(cleanBase64, Base64.DEFAULT)
-            
-            val boundsOptions = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size, boundsOptions)
-            
-            var scale = 1
-            if (boundsOptions.outWidth > 0 && targetWidth > 0) {
-                while (boundsOptions.outWidth / scale / 2 >= targetWidth) {
-                    scale *= 2
-                }
-            }
-            
-            val options = BitmapFactory.Options().apply {
-                inPreferredConfig = Bitmap.Config.RGB_565
-                inSampleSize = scale
-            }
-            BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size, options)
+            BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size)
         } catch (t: Throwable) {
             lastDecodeError = t.message ?: t.toString()
             null
@@ -112,27 +97,13 @@ data class LiveStreamState(
     val timestamp: Long = 0L,
     val error: String? = null
 ) {
-    fun toBitmap(targetWidth: Int = 480): Bitmap? {
+    fun toBitmap(): Bitmap? {
         val imgStr = image ?: return null
         if (imgStr.isBlank()) return null
         return try {
             val cleanBase64 = if (imgStr.contains(",")) imgStr.substringAfter(",") else imgStr
             val decodedBytes = Base64.decode(cleanBase64, Base64.DEFAULT)
-            
-            val boundsOptions = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size, boundsOptions)
-            
-            var scale = 1
-            if (boundsOptions.outWidth > 0 && targetWidth > 0) {
-                while (boundsOptions.outWidth / scale / 2 >= targetWidth) {
-                    scale *= 2
-                }
-            }
-            
-            val options = BitmapFactory.Options().apply {
-                inPreferredConfig = Bitmap.Config.RGB_565
-                inSampleSize = scale
-            }
+            val options = BitmapFactory.Options().apply { inPreferredConfig = Bitmap.Config.RGB_565 }
             BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size, options)
         } catch (t: Throwable) {
             null
@@ -150,27 +121,13 @@ data class CameraStreamState(
     val error: String? = null
 ) {
 
-    fun toBitmap(targetWidth: Int = 480): Bitmap? {
+    fun toBitmap(): Bitmap? {
         val imgStr = image ?: return null
         if (imgStr.isBlank()) return null
         return try {
             val cleanBase64 = if (imgStr.contains(",")) imgStr.substringAfter(",") else imgStr
             val decodedBytes = Base64.decode(cleanBase64, Base64.DEFAULT)
-            
-            val boundsOptions = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size, boundsOptions)
-            
-            var scale = 1
-            if (boundsOptions.outWidth > 0 && targetWidth > 0) {
-                while (boundsOptions.outWidth / scale / 2 >= targetWidth) {
-                    scale *= 2
-                }
-            }
-            
-            val options = BitmapFactory.Options().apply {
-                inPreferredConfig = Bitmap.Config.RGB_565
-                inSampleSize = scale
-            }
+            val options = BitmapFactory.Options().apply { inPreferredConfig = Bitmap.Config.RGB_565 }
             BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size, options)
         } catch (t: Throwable) {
             null

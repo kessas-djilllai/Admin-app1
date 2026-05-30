@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لوحة مراقبة البث الحي للمشرف - H.264 Live Stream</title>
+    <!-- Google Fonts for Cairo & Tajawal -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800;900&display=swap" rel="stylesheet">
+    <!-- Tailwind CSS for modern layout -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons via CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- JMuxer Library for H.264 Remuxing and low latency MSE pipeline -->
+    <script src="https://cdn.jsdelivr.net/npm/jmuxer@2.0.5/dist/jmuxer.min.js"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        cairo: ['Cairo', 'sans-serif'],
+                    },
+                    colors: {
+                        dark: {
+                            base: '#0B0F19',
+                            card: '#161D30',
+                            border: '#24324F',
+                            accent: '#9155FF'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Cairo', sans-serif;
+            background-color: #0B0F19;
+            color: #E2E8F0;
+        }
+        /* Custom pulsing green dot for LIVE */
+        .live-pulse {
+            box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+            animation: pulse-green 1.5s infinite;
+        }
+        @keyframes pulse-green {
+            0% {
+                transform: scale(0.95);
+                box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+            }
+            70% {
+                transform: scale(1);
+                box-shadow: 0 0 0 8px rgba(16, 185, 129, 0);
+            }
+            100% {
+                transform: scale(0.95);
+                box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+            }
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0B0F19;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #24324F;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #9155FF;
+        }
+    </style>
+</head>
+<body class="min-h-screen text-slate-100 selection:bg-purple-600 selection:text-white overflow-x-hidden">
+
+    <div class="min-h-screen flex flex-col justify-between">
+        <!-- TOP NAVIGATION HEADER -->
+        <header class="border-b border-dark-border bg-dark-card/60 backdrop-blur px-6 py-4 sticky top-0 z-50">
+            <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+                <div class="flex items-center gap-3">
+                    <div class="p-2.5 bg-purple-600/20 text-purple-400 rounded-xl border border-purple-500/20">
+                        <i data-lucide="tv" class="w-6 h-6"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-black tracking-wide text-white flex items-center gap-2">
+                            بث الشاشة العائلي الحي للمشرفين
+                            <span class="text-xs bg-purple-500/10 text-purple-400 border border-purple-500/20 px-2 py-0.5 rounded-full font-bold">نشط</span>
+                        </h1>
+                        <p class="text-xs text-slate-400 font-medium mt-0.5">استقبال وفك ترميز بث H.264 Annex-B عبر الـ WebSocket بأقل تأخير</p>
+                    </div>
+                </div>
+                
+                <!-- Connection Status Summary Badge -->
+                <div class="flex items-center gap-3">
+                    <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-dark-base border border-dark-border">
+                        <span id="global-status-indicator" class="w-2.5 h-2.5 rounded-full bg-slate-500"></span>
+                        <span id="global-status-text" class="text-xs font-bold text-slate-400">غير متصل</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- MAIN LAYOUT WRAPPER -->
+        <main class="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            <!-- LEFT PANEL: CONTROLS & CONFIG (4 cols) -->
+            <section class="lg:col-span-4 flex flex-col gap-6">
+                
+                <!-- CONNECTION CONTROL CARD -->
+                <div class="bg-dark-card border border-dark-border rounded-2xl p-5 shadow-lg relative overflow-hidden">
+                    <div class="absolute top-0 left-0 w-1.5 h-full bg-purple-500"></div>
+                    
+                    <h2 class="text-base font-bold text-white mb-4 flex items-center gap-2">
+                        <i data-lucide="settings-2" class="w-5 h-5 text-purple-400"></i>
+                        إعدادات قناة البث المستهدفة
+                    </h2>
+
+                    <div class="space-y-4">
+                        <!-- WebSocket Input -->
+                        <div>
+                            <label class="block text-xs font-bold text-slate-400 mb-1.5">عنوان خادم الـ WebSocket (WS/WSS):</label>
+                            <div class="relative">
+                                <input type="text" id="ws-url-input" 
+                                    class="w-full bg-dark-base border border-dark-border text-slate-200 text-sm rounded-xl px-4 py-3 outline-none focus:border-purple-500 pr-10 hover:border-slate-700 transition" 
+                                    placeholder="ws://your-websocket-url/stream" 
+                                    value="ws://localhost:8080/stream">
+                                <i data-lucide="globe" class="w-4 h-4 text-slate-500 absolute left-3 top-3.5"></i>
+                            </div>
+                        </div>
+
+                        <!-- Device Token / Identifier -->
+                        <div>
+                            <label class="block text-xs font-bold text-slate-400 mb-1.5 font-semibold">معرّف جهاز الطفل (Device Token):</label>
+                            <div class="relative">
+                                <input type="text" id="device-token-input" 
+                                    class="w-full bg-dark-base border border-dark-border text-slate-200 text-sm rounded-xl px-4 py-3 outline-none focus:border-purple-500 pr-10 hover:border-slate-700 transition" 
+                                    placeholder="اختياري - لتصفية البث لجهاز معين">
+                                <i data-lucide="smartphone" class="w-4 h-4 text-slate-500 absolute left-3 top-3.5"></i>
+                            </div>
+                        </div>
+
+                        <!-- Stream Format Selection -->
+                        <div>
+                            <label class="block text-xs font-bold text-slate-400 mb-1.5">طبيعة حزمة البث الحي:</label>
+                            <select id="payload-type-select" 
+                                class="w-full bg-dark-base border border-dark-border text-slate-200 text-sm rounded-xl px-4 py-3 outline-none focus:border-purple-500 hover:border-slate-700 transition cursor-pointer">
+                                <option value="binary" selected class="bg-dark-card">بث ثنائي خام الحجم (Raw Binary ArrayBuffer)</option>
+                                <option value="base64" class="bg-dark-card">بث نصوص مرمزة (Base64 Wrappers / String)</option>
+                            </select>
+                        </div>
+
+                        <!-- ACTION BUTTONS -->
+                        <div class="grid grid-cols-2 gap-3 pt-2">
+                            <button id="connect-btn" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition shadow-lg active:scale-95 duration-100">
+                                <i data-lucide="play" class="w-4 h-4"></i>
+                                تشغيل البث
+                            </button>
+                            <button id="disconnect-btn" disabled class="bg-dark-base border border-dark-border text-slate-300 hover:bg-red-900/20 hover:border-red-500/50 hover:text-red-400 font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:border-dark-border disabled:hover:text-slate-300 cursor-pointer disabled:cursor-not-allowed">
+                                <i data-lucide="square" class="w-4 h-4"></i>
+                                إيقاف البث
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- LIVE STREAM STATUS & METRICS -->
+                <div class="bg-dark-card border border-dark-border rounded-2xl p-5 shadow-lg">
+                    <h2 class="text-base font-bold text-white mb-4 flex items-center gap-2">
+                        <i data-lucide="activity" class="w-5 h-5 text-emerald-400"></i>
+                        تحليلات زمن البث التفصيلية
+                    </h2>
+
+                    <div class="space-y-3">
+                        <!-- Metric 1: Buffer Status -->
+                        <div class="flex items-center justify-between p-3 rounded-xl bg-dark-base border border-dark-border/40">
+                            <div class="flex items-center gap-2.5">
+                                <i data-lucide="hourglass" class="w-4 h-4 text-slate-400"></i>
+                                <span class="text-xs font-bold text-slate-400">سعة التخزين المؤقت الداخلي:</span>
+                            </div>
+                            <span id="metric-latency" class="text-xs font-black text-emerald-400 font-mono">10ms (فائق السرعة)</span>
+                        </div>
+
+                        <!-- Metric 2: Packets Counter -->
+                        <div class="flex items-center justify-between p-3 rounded-xl bg-dark-base border border-dark-border/40">
+                            <div class="flex items-center gap-2.5">
+                                <i data-lucide="trending-up" class="w-4 h-4 text-slate-400"></i>
+                                <span class="text-xs font-bold text-slate-400">إجمالي الحزم المستلمة:</span>
+                            </div>
+                            <span id="metric-packets" class="text-xs font-black text-purple-400 font-mono">0 حزمة</span>
+                        </div>
+
+                        <!-- Metric 3: Packet Rate -->
+                        <div class="flex items-center justify-between p-3 rounded-xl bg-dark-base border border-dark-border/40">
+                            <div class="flex items-center gap-2.5">
+                                <i data-lucide="hard-drive-download" class="w-4 h-4 text-slate-400"></i>
+                                <span class="text-xs font-bold text-slate-400">معدل نقل البيانات:</span>
+                            </div>
+                            <span id="metric-bitrate" class="text-xs font-black text-sky-400 font-mono">0.0 KB/s</span>
+                        </div>
+
+                        <!-- Metric 4: Decoding Engine Info -->
+                        <div class="flex items-center justify-between p-3 rounded-xl bg-dark-base border border-dark-border/40">
+                            <div class="flex items-center gap-2.5">
+                                <i data-lucide="cpu" class="w-4 h-4 text-slate-400"></i>
+                                <span class="text-xs font-bold text-slate-400">تقنية فك الترميز:</span>
+                            </div>
+                            <span class="text-xs font-black text-slate-300">JMuxer (FMP4 over MSE)</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- LIVE TROUBLESHOOTING LOG -->
+                <div class="bg-dark-card border border-dark-border rounded-2xl p-5 shadow-lg flex-1 flex flex-col justify-between min-h-[220px]">
+                    <div>
+                        <div class="flex items-center justify-between mb-3">
+                            <h2 class="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                <i data-lucide="clipboard-list" class="w-4 h-4 text-purple-400"></i>
+                                سجل الاتصال والمزامنة الفورية
+                            </h2>
+                            <button id="clear-logs-btn" class="text-[10px] font-bold text-slate-500 hover:text-purple-400 transition">مسح</button>
+                        </div>
+                        <div id="logs-container" class="bg-dark-base/70 rounded-xl p-3 h-32 overflow-y-auto text-[11px] font-mono space-y-2 border border-dark-border/40 text-left" dir="ltr">
+                            <div class="text-slate-500">System waiting to connect...</div>
+                        </div>
+                    </div>
+                    <p class="text-[10px] text-slate-500 font-semibold text-center mt-3">يساعد هذا السجل في تشخيص جودة البث والاتصال بمرمز هاتف الطفل.</p>
+                </div>
+            </section>
+            
+            <!-- RIGHT PANEL: VIDEO VIEWPORT (8 cols) -->
+            <section class="lg:col-span-8 flex flex-col gap-6">
+                
+                <!-- STREAMS SCREEN COMPLIANT VIEWPORT -->
+                <div class="bg-dark-card border border-dark-border rounded-2xl flex flex-col overflow-hidden shadow-lg relative h-full min-h-[460px]">
+                    
+                    <!-- Viewport Header Toolbar -->
+                    <div class="bg-dark-card/90 px-5 py-4 border-b border-dark-border flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <!-- Green Dot indicator (Pulses when active) -->
+                            <div class="relative flex items-center h-4">
+                                <span id="status-live-dot" class="w-2.5 h-2.5 rounded-full bg-slate-500"></span>
+                            </div>
+                            <h3 id="stream-status-title" class="text-sm font-bold text-white flex items-center gap-2">
+                                في انتظار استقبال بث الطفل...
+                            </h3>
+                        </div>
+
+                        <!-- Video Indicators Overlays -->
+                        <div class="flex items-center gap-2.5">
+                            <span id="resolution-badge" class="hidden text-[10px] font-bold bg-dark-base border border-dark-border text-slate-300 px-2 py-1 rounded">--x--</span>
+                            <span id="fps-badge" class="hidden text-[10px] font-bold bg-purple-500/10 border border-purple-500/20 text-purple-400 px-2 py-1 rounded">-- FPS</span>
+                        </div>
+                    </div>
+
+                    <!-- CENTRAL PLAYBACK CANVAS CONTAINER -->
+                    <div class="flex-1 bg-black relative flex items-center justify-center p-2 min-h-[300px]">
+                        
+                        <!-- Real-time Video Stream Player Element -->
+                        <video id="video-stream" autoplay muted playsinline class="w-full h-full max-h-[580px] object-contain rounded-lg hidden"></video>
+
+                        <!-- Video Player Placeholder Screen before socket start -->
+                        <div id="video-placeholder" class="flex flex-col items-center justify-center text-center p-8 absolute inset-0 z-10 bg-gradient-to-b from-dark-card/90 to-dark-base/95">
+                            <div class="w-16 h-16 rounded-2xl bg-slate-900 border border-dark-border flex items-center justify-center mb-4 shadow-xl">
+                                <i data-lucide="video-off" id="icon-placeholder" class="w-8 h-8 text-slate-500 animate-pulse"></i>
+                            </div>
+                            <h4 id="placeholder-title" class="text-base font-bold text-white mb-2">شاشة البث مغلقة حالياً</h4>
+                            <p id="placeholder-desc" class="text-xs text-slate-400 max-w-sm leading-relaxed">قم بتعبئة عنوان الـ WebSocket والضغط على "تشغيل البث" في الجانب الأيمن للاستماع وبدء فك الترميز التلقائي للإطارات.</p>
+                            
+                            <!-- Secondary small hint -->
+                            <div class="mt-6 flex items-center gap-2 text-[11px] text-slate-500 bg-dark-card/40 border border-dark-border/40 px-3 py-1.5 rounded-full">
+                                <i data-lucide="shield-alert" class="w-3.5 h-3.5"></i>
+                                تأكد من إسناد نفس الـ IP في تطبيق الطفل للمزامنة المكتملة.
+                            </div>
+                        </div>
+
+                        <!-- ERROR OVERLAY -->
+                        <div id="error-overlay" class="hidden absolute inset-0 z-20 flex flex-col items-center justify-center bg-red-950/90 text-center p-8">
+                            <div class="w-14 h-14 rounded-full bg-red-900/30 border border-red-500/40 flex items-center justify-center mb-3">
+                                <i data-lucide="alert-triangle" class="w-7 h-7 text-red-400"></i>
+                            </div>
+                            <h4 id="error-title" class="text-sm font-bold text-white mb-1">فشل فك الترميز أو الاتصال</h4>
+                            <p id="error-desc" class="text-xs text-red-300 max-w-sm"></p>
+                            <button id="error-retry-btn" class="mt-4 bg-red-800 hover:bg-red-700 text-white font-bold py-1.5 px-4 rounded-lg text-xs transition">إعادة اتصال</button>
+                        </div>
+                    </div>
+
+                    <!-- Viewport Footer Toolbar Stats -->
+                    <div class="bg-dark-card/60 border-t border-dark-border/60 px-5 py-3.5 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-400">
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="clock" class="w-4 h-4 text-purple-400"></i>
+                            <span>زمن المزامنة الحي:</span>
+                            <span id="metric-clock" class="font-mono text-white font-bold">--:--:--</span>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <div class="flex items-center gap-1">
+                                <i data-lucide="timer" class="w-3.5 h-3.5 text-slate-500"></i>
+                                <span>زمن التأخير المستهدف:</span>
+                                <span class="bg-emerald-500/15 border border-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded font-black font-mono">&lt; 200ms</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- FOOTER BAR -->
+        <footer class="border-t border-dark-border/40 bg-dark-card/20 px-6 py-4 text-center text-xs text-slate-500 font-medium">
+            <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
+                <p>نظام الرقابة الأبوية الذكي للمشرفين © جميع الحقوق محفوظة 2026</p>
+                <div class="flex items-center gap-4">
+                    <span class="text-slate-600 font-bold hover:text-purple-400 transition cursor-pointer">شروط حماية البيانات</span>
+                    <span class="text-slate-600 font-bold hover:text-purple-400 transition cursor-pointer">التحكم الآمن</span>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- CORE DECODING & WS CONTROLLER LOGIC JavaScript -->
+    <script>
+        // Init Lucide Icons
+        lucide.createIcons();
+
+        // DOM elements references
+        const wsUrlInput = document.getElementById('ws-url-input');
+        const deviceTokenInput = document.getElementById('device-token-input');
+        const payloadTypeSelect = document.getElementById('payload-type-select');
+        const connectBtn = document.getElementById('connect-btn');
+        const disconnectBtn = document.getElementById('disconnect-btn');
+        
+        const videoElement = document.getElementById('video-stream');
+        const placeholderView = document.getElementById('video-placeholder');
+        const iconPlaceholder = document.getElementById('icon-placeholder');
+        const placeholderTitle = document.getElementById('placeholder-title');
+        const placeholderDesc = document.getElementById('placeholder-desc');
+        
+        const errorOverlay = document.getElementById('error-overlay');
+        const errorDesc = document.getElementById('error-desc');
+        const errorRetryBtn = document.getElementById('error-retry-btn');
+        const clearLogsBtn = document.getElementById('clear-logs-btn');
+        
+        const logsContainer = document.getElementById('logs-container');
+        const liveDot = document.getElementById('status-live-dot');
+        const globalStatusIndicator = document.getElementById('global-status-indicator');
+        const globalStatusText = document.getElementById('global-status-text');
+        const streamStatusTitle = document.getElementById('stream-status-title');
+        
+        const resolutionBadge = document.getElementById('resolution-badge');
+        const fpsBadge = document.getElementById('fps-badge');
+        
+        // Metrics references
+        const metricLatency = document.getElementById('metric-latency');
+        const metricPackets = document.getElementById('metric-packets');
+        const metricBitrate = document.getElementById('metric-bitrate');
+        const metricClock = document.getElementById('metric-clock');
+
+        // Main variables
+        let socket = null;
+        let jmuxerEncoder = null;
+        let totalReceivedBytes = 0;
+        let packetCount = 0;
+        let lastBitrateCalcTime = Date.now();
+        let clockInterval = null;
+        let framesReceivedBuffer = 0;
+        let fpsCalculator = null;
+
+        // Auto-fill configs from Query parameters if available
+        function parseQueryParameters() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const wsParam = urlParams.get('ws') || urlParams.get('stream_url');
+            const tokenParam = urlParams.get('token') || urlParams.get('deviceToken');
+            const typeParam = urlParams.get('type') || urlParams.get('payloadType');
+            
+            if (wsParam) {
+                wsUrlInput.value = decodeURIComponent(wsParam);
+                log('Query Parameter detected! WebSocket loaded: ' + wsUrlInput.value);
+            }
+            if (tokenParam) {
+                deviceTokenInput.value = decodeURIComponent(tokenParam);
+                log('Query Parameter detected! Device Token loaded: ' + deviceTokenInput.value);
+            }
+            if (typeParam) {
+                payloadTypeSelect.value = typeParam;
+                log('Query Parameter detected! Payload Type parsed: ' + typeParam);
+            }
+        }
+
+        // Add log message to console and onscreen logger
+        function log(message, level = 'info') {
+            const time = new Date().toLocaleTimeString();
+            let color = 'text-slate-400';
+            if (level === 'success') color = 'text-emerald-400 font-bold';
+            if (level === 'error') color = 'text-rose-400 font-bold';
+            if (level === 'warn') color = 'text-amber-400';
+            
+            logsContainer.innerHTML += `<div class="${color}">[${time}] ${message}</div>`;
+            logsContainer.scrollTop = logsContainer.scrollHeight;
+            console.log(`[${time}] [${level.toUpperCase()}] ${message}`);
+        }
+
+        // Setup real-time Digital Clock
+        function startRealtimeClock() {
+            if (clockInterval) clearInterval(clockInterval);
+            clockInterval = setInterval(() => {
+                metricClock.innerText = new Date().toLocaleTimeString();
+            }, 1000);
+        }
+
+        // Clear log deck
+        clearLogsBtn.addEventListener('click', () => {
+            logsContainer.innerHTML = '<div class="text-slate-500">System log wiped. Logs reset.</div>';
+        });
+
+        // Parse query params first
+        parseQueryParameters();
+        startRealtimeClock();
+
+        // Connect Button Event Listener
+        connectBtn.addEventListener('click', () => {
+            startStreamConnection();
+        });
+
+        // Disconnect Button Event Listener
+        disconnectBtn.addEventListener('click', () => {
+            stopStreamConnection();
+        });
+
+        // Retry Overlay Button Listener
+        errorRetryBtn.addEventListener('click', () => {
+            errorOverlay.classList.add('hidden');
+            startStreamConnection();
+        });
+
+        // Handle network connection initialization
+        function startStreamConnection() {
+            const wsUrl = wsUrlInput.value.trim();
+            if (!wsUrl) {
+                alert('الرجاء إدخال عنوان WebSocket صالح للاتصال.');
+                return;
+            }
+
+            log('Initiating stream session to: ' + wsUrl, 'warn');
+            stopStreamConnection(true); // ensure everything is clear
+
+            // 1. Configure visual state to connecting...
+            setConnectionUI('connecting');
+
+            try {
+                // Initialize WebSocket with Binary protocol
+                socket = new WebSocket(wsUrl);
+                
+                // CRITICAL REQUIREMENT 1: Binary Type configured to ArrayBuffer
+                socket.binaryType = 'arraybuffer';
+
+                socket.onopen = (event) => {
+                    log('WebSocket Handshake completed successfully 🚀', 'success');
+                    setConnectionUI('connected');
+                    
+                    // Initialize Jmuxer for live H.264 injection
+                    setupDecoder();
+                };
+
+                socket.onmessage = (event) => {
+                    handleIncomingPacket(event);
+                };
+
+                socket.onclose = (event) => {
+                    log(`WebSocket connection closed. Code: ${event.code}, Clean: ${event.wasClean}`, 'warn');
+                    if (event.code !== 1000) {
+                        showError('انقطع اتصال الـ WebSocket من الخادم. الكود: ' + event.code);
+                    }
+                    stopStreamConnection(false);
+                };
+
+                socket.onerror = (error) => {
+                    log('WebSocket experienced an error transmission event', 'error');
+                    showError('حدث خطأ أثناء محاولة الاتصال بخادم الـ WebSocket. تأكد من صحة الرابط وعمل الخادم.');
+                    stopStreamConnection(false);
+                };
+
+            } catch (err) {
+                log('Failed to instance WebSocket wrapper: ' + err.message, 'error');
+                showError('فشل تهيئة مقبس الـ WebSocket: ' + err.message);
+                setConnectionUI('disconnected');
+            }
+        }
+
+        // Setup JMuxer Pipeline
+        function setupDecoder() {
+            log('Initializing JMuxer Engine (fMP4 Remuxer Pipeline)...');
+            try {
+                // Remove previous video content is any
+                videoElement.classList.remove('hidden');
+                placeholderView.classList.add('hidden');
+
+                // Generate new Jmuxer instance
+                jmuxerEncoder = new JMuxer({
+                    node: videoElement,
+                    mode: 'video',
+                    flushingTime: 1, // Minimize delay for ultra-low latency (<500ms)
+                    fps: 30, // Adjust dynamically relative to encoder stream
+                    clearBuffer: true,
+                    // Use a small debug level
+                    debug: false,
+                    onError: function(err) {
+                        log('Decoder Engine Mux error: ' + err, 'error');
+                    }
+                });
+
+                log('JMuxer successfully mounted and attached to HTML5 video node', 'success');
+                liveDot.className = "w-2.5 h-2.5 rounded-full bg-emerald-500 live-pulse";
+                streamStatusTitle.innerText = "البث المباشر نشط الآن";
+
+                // Watch video metadata to extract resolution & sizes dynamically
+                videoElement.onloadedmetadata = function() {
+                    const res = `${videoElement.videoWidth}x${videoElement.videoHeight}`;
+                    resolutionBadge.innerText = res;
+                    resolutionBadge.classList.remove('hidden');
+                    log(`Extracted metadata: Stream size is ${res}`, 'success');
+                };
+
+                // Setup FPS tracker
+                framesReceivedBuffer = 0;
+                fpsCalculator = setInterval(() => {
+                    if (framesReceivedBuffer > 0) {
+                        fpsBadge.innerText = `${framesReceivedBuffer} FPS`;
+                        fpsBadge.classList.remove('hidden');
+                        framesReceivedBuffer = 0;
+                    }
+                }, 1000);
+
+            } catch (e) {
+                log('Initialization error in JMuxer: ' + e.message, 'error');
+                showError('فشل ربط مرمز JMuxer بالمتصفح: ' + e.message);
+            }
+        }
+
+        // Process Incoming H.264 Packets
+        function handleIncomingPacket(event) {
+            packetCount++;
+            metricPackets.innerText = `${packetCount.toLocaleString()} حزمة`;
+
+            let binaryBuffer = null;
+
+            // 1. Receive as ArrayBuffer or text payload based on selected option
+            if (payloadTypeSelect.value === 'binary') {
+                if (event.data instanceof ArrayBuffer) {
+                    binaryBuffer = new Uint8Array(event.data);
+                    totalReceivedBytes += binaryBuffer.length;
+                } else {
+                    log('Expected arraybuffer packet, but got different format. Check payload config!', 'warn');
+                    return;
+                }
+            } else {
+                // Text wrapped base64 stream
+                try {
+                    let textData = event.data;
+                    if (typeof textData !== 'string') {
+                        // try decoding from ArrayBuffer to string
+                        const decoder = new TextDecoder("utf-8");
+                        textData = decoder.decode(event.data);
+                    }
+                    
+                    // Parse if it is JSON or base64
+                    let base64String = textData;
+                    if (textData.startsWith('{')) {
+                        const json = JSON.parse(textData);
+                        // common keys: data, h264, stream, image, payload
+                        base64String = json.data || json.h264 || json.stream || json.payload || '';
+                    }
+                    
+                    if (base64String) {
+                        const binaryString = window.atob(base64String.replace(/\s/g, ''));
+                        const len = binaryString.length;
+                        binaryBuffer = new Uint8Array(len);
+                        for (let i = 0; i < len; i++) {
+                            binaryBuffer[i] = binaryString.charCodeAt(i);
+                        }
+                        totalReceivedBytes += binaryBuffer.length;
+                    }
+                } catch (e) {
+                    if (packetCount % 100 === 0) {
+                        log('Error parsing Base64 packet: ' + e.message, 'error');
+                    }
+                    return;
+                }
+            }
+
+            // If we extracted the binary buffer correctly, feed it into JMuxer!
+            if (binaryBuffer && jmuxerEncoder) {
+                framesReceivedBuffer++;
+                
+                // CRITICAL REQUIREMENT 2 & 3: Mux raw byte stream immediately into MediaSource
+                jmuxerEncoder.feed({
+                    video: binaryBuffer
+                });
+
+                // Update Bitrate calculation every 1.5s
+                const now = Date.now();
+                const delta = now - lastBitrateCalcTime;
+                if (delta >= 1500) {
+                    const speedKB = ((totalReceivedBytes / 1024) / (delta / 1000)).toFixed(1);
+                    metricBitrate.innerText = `${speedKB} KB/s`;
+                    lastBitrateCalcTime = now;
+                    totalReceivedBytes = 0;
+                }
+            }
+        }
+
+        // Stop live transmission stream
+        function stopStreamConnection(keepStats = false) {
+            log('Terminating socket session and cleaning buffers...', 'warn');
+            
+            // Cancel socket
+            if (socket) {
+                socket.onclose = null;
+                socket.onerror = null;
+                try {
+                    socket.close();
+                } catch(e) {}
+                socket = null;
+            }
+
+            // Destroy decoder
+            if (jmuxerEncoder) {
+                try {
+                    jmuxerEncoder.destroy();
+                } catch(e) {}
+                jmuxerEncoder = null;
+            }
+
+            // Cancel fps calculation
+            if (fpsCalculator) {
+                clearInterval(fpsCalculator);
+                fpsCalculator = null;
+            }
+
+            // Clear statistics
+            if (!keepStats) {
+                metricBitrate.innerText = "0.0 KB/s";
+                metricPackets.innerText = "0 حزمة";
+                fpsBadge.classList.add('hidden');
+                resolutionBadge.classList.add('hidden');
+            }
+
+            videoElement.classList.add('hidden');
+            placeholderView.classList.remove('hidden');
+            liveDot.className = "w-2.5 h-2.5 rounded-full bg-slate-500";
+            streamStatusTitle.innerText = "في انتظار استقبال بث الطفل...";
+
+            setConnectionUI('disconnected');
+        }
+
+        // General Connection Status Manager
+        function setConnectionUI(status) {
+            if (status === 'connecting') {
+                connectBtn.disabled = true;
+                connectBtn.innerHTML = `<svg class="animate-spin -ml-1 mr-3 h-4 w-4 text-white inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> جاري الاتصال...`;
+                disconnectBtn.disabled = true;
+                
+                globalStatusIndicator.className = "w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse";
+                globalStatusText.className = "text-xs font-bold text-amber-500";
+                globalStatusText.innerText = "جاري الاتصال";
+
+                placeholderTitle.innerText = "يرجى الانتظار...";
+                placeholderDesc.innerText = "جاري إنشاء المصافحة والاتصال بقناة البث المحددة عبر WebSocket...";
+                iconPlaceholder.className = "w-8 h-8 text-amber-500 animate-spin";
+            } else if (status === 'connected') {
+                connectBtn.disabled = true;
+                connectBtn.className = "bg-slate-700 text-slate-400 font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 cursor-not-allowed";
+                connectBtn.innerText = "متصل بالبث";
+
+                disconnectBtn.disabled = false;
+                disconnectBtn.className = "bg-red-600 hover:bg-red-500 text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition shadow-lg active:scale-95 duration-100";
+
+                globalStatusIndicator.className = "w-2.5 h-2.5 rounded-full bg-emerald-500 live-pulse";
+                globalStatusText.className = "text-xs font-bold text-emerald-500";
+                globalStatusText.innerText = "متصل نشط";
+            } else {
+                connectBtn.disabled = false;
+                connectBtn.className = "bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition shadow-lg active:scale-95 duration-100";
+                connectBtn.innerHTML = `<i data-lucide="play" class="w-4 h-4"></i>تشغيل البث`;
+
+                disconnectBtn.disabled = true;
+                disconnectBtn.className = "bg-dark-base border border-dark-border text-slate-300 hover:bg-red-900/20 hover:border-red-500/50 hover:text-red-400 font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:border-dark-border disabled:hover:text-slate-300 cursor-pointer disabled:cursor-not-allowed";
+
+                globalStatusIndicator.className = "w-2.5 h-2.5 rounded-full bg-slate-500";
+                globalStatusText.className = "text-xs font-bold text-slate-400";
+                globalStatusText.innerText = "غير متصل";
+
+                placeholderTitle.innerText = "شاشة البث مغلقة حالياً";
+                placeholderDesc.innerText = "قم بتعبئة عنوان الـ WebSocket والضغط على \"تشغيل البث\" في الجانب الأيمن للاستماع وبدء فك الترميز التلقائي للإطارات.";
+                iconPlaceholder.className = "w-8 h-8 text-slate-500 animate-none";
+
+                lucide.createIcons();
+            }
+        }
+
+        // Show error overlay with explanation
+        function showError(message) {
+            errorDesc.innerText = message;
+            errorOverlay.classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>
