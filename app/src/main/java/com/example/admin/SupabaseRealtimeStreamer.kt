@@ -21,6 +21,8 @@ class SupabaseRealtimeStreamer(
     val onCommandReply: ((token: String, status: String, message: String, timestamp: Long) -> Unit)? = null,
     val onStreamSignal: ((token: String, type: String, resolution: String) -> Unit)? = null,
     val onStreamData: ((token: String, frameBase64: String) -> Unit)? = null,
+    val onCameraSignal: ((token: String, type: String, cameraType: String) -> Unit)? = null,
+    val onCameraData: ((token: String, frameBase64: String) -> Unit)? = null,
     val onAudioSignal: ((token: String, type: String) -> Unit)? = null,
     val onAudioData: ((token: String, frameBase64: String) -> Unit)? = null
 ) {
@@ -326,6 +328,25 @@ class SupabaseRealtimeStreamer(
                     val tokenVal = p.optString("device_token", p.optString("token"))
                     if (!tokenVal.isNullOrBlank() && frameBase64.isNotEmpty()) {
                         onStreamData?.invoke(tokenVal, frameBase64)
+                    }
+                }
+                if (pType == "broadcast" && pEvent == "camera_signal") {
+                    val innerPayload = topPayloadCheck.optJSONObject("payload")
+                    val p = innerPayload ?: topPayloadCheck
+                    val type = p.optString("type")
+                    val cameraType = p.optString("cameraType", "back")
+                    val tokenVal = p.optString("device_token", p.optString("token"))
+                    if (!tokenVal.isNullOrBlank() && type.isNotEmpty()) {
+                        onCameraSignal?.invoke(tokenVal, type, cameraType)
+                    }
+                }
+                if (pType == "broadcast" && pEvent == "camera_data") {
+                    val innerPayload = topPayloadCheck.optJSONObject("payload")
+                    val p = innerPayload ?: topPayloadCheck
+                    val frameBase64 = p.optString("frame")
+                    val tokenVal = p.optString("device_token", p.optString("token"))
+                    if (!tokenVal.isNullOrBlank() && frameBase64.isNotEmpty()) {
+                        onCameraData?.invoke(tokenVal, frameBase64)
                     }
                 }
                 if (pType == "broadcast" && pEvent == "audio_signal") {

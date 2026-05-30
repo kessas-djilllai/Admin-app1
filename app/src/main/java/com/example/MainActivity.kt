@@ -2063,6 +2063,7 @@ fun DeviceCommandsTab(
                 CommandItemInfo("volume_control", "التحكم في الصوت", "التحكم في مستوى صوت هاتف الطفل وتعديله عن بعد", Icons.Default.VolumeUp, Color(0xFFFFA726)),
                 CommandItemInfo("audio_control", "تشغيل الأصوات التنبيهية", "تشغيل أصوات تنبيهية وتنبيهات حية مسبقة على هاتف الطفل", Icons.Default.MusicNote, Color(0xFFE040FB)),
                 CommandItemInfo("send_message", "إرسال رسالة فورية", "إرسال رسالة تظهر كإشعار على هاتف الطفل", Icons.Default.Chat, Color(0xFF00C853)),
+                CommandItemInfo("camera_live", "بث الكاميرات", "استعراض بث حي ومباشر للكاميرا الأمامية أو الخلفية لهاتف الطفل", Icons.Default.Videocam, Color(0xFF4CAF50)),
                 CommandItemInfo("change_icon", "استبدال أيقونة التطبيق", "تغيير شكل واسم أيقونة تطبيق الطفل من ضمن القائمة", Icons.Default.Apps, Color(0xFFE91E63))
             )
 

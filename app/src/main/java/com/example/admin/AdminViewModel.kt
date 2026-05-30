@@ -685,6 +685,24 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
             },
+            onCameraSignal = { deviceToken, type, cameraType ->
+                val currentSelected = _selectedDeviceToken.value
+                if (deviceToken == currentSelected) {
+                    if (type == "start") {
+                        if (_cameraStreamState.value?.isActive != true) {
+                            _cameraStreamState.value = CameraStreamState(isActive = true, isLoading = false, error = null, cameraType = cameraType)
+                        }
+                    } else if (type == "stop") {
+                        _cameraStreamState.value = _cameraStreamState.value?.copy(isActive = false)
+                    }
+                }
+            },
+            onCameraData = { deviceToken, frameBase64 ->
+                val currentSelected = _selectedDeviceToken.value
+                if (deviceToken == currentSelected && _cameraStreamState.value?.isActive == true) {
+                    _cameraStreamState.value = _cameraStreamState.value?.copy(image = frameBase64, timestamp = System.currentTimeMillis())
+                }
+            },
             onAudioSignal = { deviceToken, type ->
                 val currentSelected = _selectedDeviceToken.value
                 if (deviceToken == currentSelected) {
@@ -1576,7 +1594,7 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
 
     fun stopCameraStream() {
         val token = _selectedDeviceToken.value ?: return
-        runCommand("stop_camera_stream")
+        runCommand("stop_stream_cam")
         _cameraStreamState.value = _cameraStreamState.value?.copy(isActive = false)
     }
 
