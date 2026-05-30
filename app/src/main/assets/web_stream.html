@@ -14,6 +14,7 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     <!-- JMuxer Library for H.264 Remuxing and low latency MSE pipeline -->
     <script src="https://cdn.jsdelivr.net/npm/jmuxer@2.0.5/dist/jmuxer.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     
     <script>
         tailwind.config = {
@@ -91,7 +92,7 @@
                             بث الشاشة العائلي الحي للمشرفين
                             <span class="text-xs bg-purple-500/10 text-purple-400 border border-purple-500/20 px-2 py-0.5 rounded-full font-bold">نشط</span>
                         </h1>
-                        <p class="text-xs text-slate-400 font-medium mt-0.5">استقبال وفك ترميز بث H.264 Annex-B عبر الـ WebSocket بأقل تأخير</p>
+                        <p class="text-xs text-slate-400 font-medium mt-0.5">استقبال وفك ترميز بث H.264 Annex-B عبر Supabase Realtime بأقل تأخير</p>
                     </div>
                 </div>
                 
@@ -121,15 +122,27 @@
                     </h2>
 
                     <div class="space-y-4">
-                        <!-- WebSocket Input -->
+                        <!-- Supabase URL -->
                         <div>
-                            <label class="block text-xs font-bold text-slate-400 mb-1.5">عنوان خادم الـ WebSocket (WS/WSS):</label>
+                            <label class="block text-xs font-bold text-slate-400 mb-1.5">رابط خادم Supabase (URL):</label>
                             <div class="relative">
-                                <input type="text" id="ws-url-input" 
+                                <input type="text" id="supabase-url-input" 
                                     class="w-full bg-dark-base border border-dark-border text-slate-200 text-sm rounded-xl px-4 py-3 outline-none focus:border-purple-500 pr-10 hover:border-slate-700 transition" 
-                                    placeholder="ws://your-websocket-url/stream" 
-                                    value="ws://localhost:8080/stream">
+                                    placeholder="https://xyz.supabase.co" 
+                                    value="https://qwtkuzuuskevtptetnvb.supabase.co">
                                 <i data-lucide="globe" class="w-4 h-4 text-slate-500 absolute left-3 top-3.5"></i>
+                            </div>
+                        </div>
+
+                        <!-- Supabase Anon Key -->
+                        <div>
+                            <label class="block text-xs font-bold text-slate-400 mb-1.5">مفتاح Supabase (Anon Key):</label>
+                            <div class="relative">
+                                <input type="password" id="supabase-key-input" 
+                                    class="w-full bg-dark-base border border-dark-border text-slate-200 text-sm rounded-xl px-4 py-3 outline-none focus:border-purple-500 pr-10 hover:border-slate-700 transition" 
+                                    placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                                    value="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF3dGt1enV1c2tldnRwdGV0bnZiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3MDU2NzUsImV4cCI6MjA5NTI4MTY3NX0.FtkcRTFxSIMgZEY0FoJ4nOwAYc0O84zeAT7vji-FHFs">
+                                <i data-lucide="key" class="w-4 h-4 text-slate-500 absolute left-3 top-3.5"></i>
                             </div>
                         </div>
 
@@ -144,15 +157,7 @@
                             </div>
                         </div>
 
-                        <!-- Stream Format Selection -->
-                        <div>
-                            <label class="block text-xs font-bold text-slate-400 mb-1.5">طبيعة حزمة البث الحي:</label>
-                            <select id="payload-type-select" 
-                                class="w-full bg-dark-base border border-dark-border text-slate-200 text-sm rounded-xl px-4 py-3 outline-none focus:border-purple-500 hover:border-slate-700 transition cursor-pointer">
-                                <option value="binary" selected class="bg-dark-card">بث ثنائي خام الحجم (Raw Binary ArrayBuffer)</option>
-                                <option value="base64" class="bg-dark-card">بث نصوص مرمزة (Base64 Wrappers / String)</option>
-                            </select>
-                        </div>
+
 
                         <!-- ACTION BUTTONS -->
                         <div class="grid grid-cols-2 gap-3 pt-2">
@@ -326,9 +331,9 @@
         lucide.createIcons();
 
         // DOM elements references
-        const wsUrlInput = document.getElementById('ws-url-input');
+        const supabaseUrlInput = document.getElementById('supabase-url-input');
+        const supabaseKeyInput = document.getElementById('supabase-key-input');
         const deviceTokenInput = document.getElementById('device-token-input');
-        const payloadTypeSelect = document.getElementById('payload-type-select');
         const connectBtn = document.getElementById('connect-btn');
         const disconnectBtn = document.getElementById('disconnect-btn');
         
@@ -359,7 +364,8 @@
         const metricClock = document.getElementById('metric-clock');
 
         // Main variables
-        let socket = null;
+        let supabaseClient = null;
+        let supabaseChannel = null;
         let jmuxerEncoder = null;
         let totalReceivedBytes = 0;
         let packetCount = 0;
@@ -371,21 +377,11 @@
         // Auto-fill configs from Query parameters if available
         function parseQueryParameters() {
             const urlParams = new URLSearchParams(window.location.search);
-            const wsParam = urlParams.get('ws') || urlParams.get('stream_url');
             const tokenParam = urlParams.get('token') || urlParams.get('deviceToken');
-            const typeParam = urlParams.get('type') || urlParams.get('payloadType');
             
-            if (wsParam) {
-                wsUrlInput.value = decodeURIComponent(wsParam);
-                log('Query Parameter detected! WebSocket loaded: ' + wsUrlInput.value);
-            }
             if (tokenParam) {
                 deviceTokenInput.value = decodeURIComponent(tokenParam);
                 log('Query Parameter detected! Device Token loaded: ' + deviceTokenInput.value);
-            }
-            if (typeParam) {
-                payloadTypeSelect.value = typeParam;
-                log('Query Parameter detected! Payload Type parsed: ' + typeParam);
             }
         }
 
@@ -437,60 +433,83 @@
 
         // Handle network connection initialization
         function startStreamConnection() {
-            const wsUrl = wsUrlInput.value.trim();
-            if (!wsUrl) {
-                alert('الرجاء إدخال عنوان WebSocket صالح للاتصال.');
+            const supabaseUrl = supabaseUrlInput.value.trim();
+            const supabaseKey = supabaseKeyInput.value.trim();
+            const deviceToken = deviceTokenInput.value.trim();
+            
+            if (!supabaseUrl || !supabaseKey) {
+                alert('الرجاء إدخال بيانات اتصال Supabase صالحة.');
                 return;
             }
 
-            log('Initiating stream session to: ' + wsUrl, 'warn');
+            log('Initiating Supabase Realtime session to: ' + supabaseUrl, 'warn');
             stopStreamConnection(true); // ensure everything is clear
 
             // 1. Configure visual state to connecting...
             setConnectionUI('connecting');
 
             try {
-                // Initialize WebSocket with Binary protocol
-                socket = new WebSocket(wsUrl);
+                // Initialize Supabase Client
+                supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
                 
-                // CRITICAL REQUIREMENT 1: Binary Type configured to ArrayBuffer
-                socket.binaryType = 'arraybuffer';
+                // Subscribe to the presence channel or a device-specific topic if preferred
+                // The provided Kotlin code uses `realtime:device_presence`
+                supabaseChannel = supabaseClient.channel('realtime:device_presence');
 
-                socket.onopen = (event) => {
-                    log('WebSocket Handshake completed successfully 🚀', 'success');
-                    setConnectionUI('connected');
-                    
-                    // Initialize Jmuxer for live H.264 injection
-                    setupDecoder();
-                };
-
-                socket.onmessage = (event) => {
-                    handleIncomingPacket(event);
-                };
-
-                socket.onclose = (event) => {
-                    log(`WebSocket connection closed. Code: ${event.code}, Clean: ${event.wasClean}`, 'warn');
-                    if (event.code !== 1000) {
-                        showError('انقطع اتصال الـ WebSocket من الخادم. الكود: ' + event.code);
+                // Listen for start/stop broadcast event signals
+                supabaseChannel.on('broadcast', { event: 'stream_signal' }, (payload) => {
+                    const data = payload.payload;
+                    if (data.type === 'start') {
+                        log('Stream start signal received from device. Resolution: ' + (data.resolution || 'unknown'), 'success');
+                        setupDecoder();
+                    } else if (data.type === 'stop') {
+                        log('Stream stop signal received from device', 'warn');
+                        // stopStreamConnection(false); // Maybe don't kill the socket entirely, just stop decoder
+                        if (jmuxerEncoder) {
+                            jmuxerEncoder.destroy();
+                            jmuxerEncoder = null;
+                            videoElement.classList.add('hidden');
+                            placeholderView.classList.remove('hidden');
+                            streamStatusTitle.innerText = "البث متوقف من قبل جهاز الطفل";
+                        }
                     }
-                    stopStreamConnection(false);
-                };
+                });
 
-                socket.onerror = (error) => {
-                    log('WebSocket experienced an error transmission event', 'error');
-                    showError('حدث خطأ أثناء محاولة الاتصال بخادم الـ WebSocket. تأكد من صحة الرابط وعمل الخادم.');
-                    stopStreamConnection(false);
-                };
+                // Listen for video frames broadcast events
+                supabaseChannel.on('broadcast', { event: 'stream_data' }, (payload) => {
+                    // Filter by device token if specified
+                    if (deviceToken && payload.payload.device_token && payload.payload.device_token !== deviceToken) {
+                        return; // Ignore frames from other devices
+                    }
+                    handleIncomingPacket(payload);
+                });
+
+                supabaseChannel.subscribe((status) => {
+                    if (status === 'SUBSCRIBED') {
+                        log('Successfully joined Supabase Broadcast channel 🚀', 'success');
+                        setConnectionUI('connected');
+                        // Setup decoder immediately to be ready for incoming frames
+                        setupDecoder();
+                    } else if (status === 'CLOSED') {
+                        log('Channel connection closed.', 'warn');
+                        stopStreamConnection(false);
+                    } else if (status === 'CHANNEL_ERROR') {
+                        log('Channel experienced an error connecting', 'error');
+                        showError('حدث خطأ أثناء محاولة الاتصال بقناة Supabase Realtime.');
+                        stopStreamConnection(false);
+                    }
+                });
 
             } catch (err) {
-                log('Failed to instance WebSocket wrapper: ' + err.message, 'error');
-                showError('فشل تهيئة مقبس الـ WebSocket: ' + err.message);
+                log('Failed to initialize Supabase wrapper: ' + err.message, 'error');
+                showError('فشل تهيئة اتصال Supabase: ' + err.message);
                 setConnectionUI('disconnected');
             }
         }
 
         // Setup JMuxer Pipeline
         function setupDecoder() {
+            if (jmuxerEncoder) return; // already initialized
             log('Initializing JMuxer Engine (fMP4 Remuxer Pipeline)...');
             try {
                 // Remove previous video content is any
@@ -525,13 +544,15 @@
 
                 // Setup FPS tracker
                 framesReceivedBuffer = 0;
-                fpsCalculator = setInterval(() => {
-                    if (framesReceivedBuffer > 0) {
-                        fpsBadge.innerText = `${framesReceivedBuffer} FPS`;
-                        fpsBadge.classList.remove('hidden');
-                        framesReceivedBuffer = 0;
-                    }
-                }, 1000);
+                if (!fpsCalculator) {
+                    fpsCalculator = setInterval(() => {
+                        if (framesReceivedBuffer > 0) {
+                            fpsBadge.innerText = `${framesReceivedBuffer} FPS`;
+                            fpsBadge.classList.remove('hidden');
+                            framesReceivedBuffer = 0;
+                        }
+                    }, 1000);
+                }
 
             } catch (e) {
                 log('Initialization error in JMuxer: ' + e.message, 'error');
@@ -539,55 +560,29 @@
             }
         }
 
-        // Process Incoming H.264 Packets
+        // Process Incoming H.264 Packets from Supabase Broadcast
         function handleIncomingPacket(event) {
             packetCount++;
             metricPackets.innerText = `${packetCount.toLocaleString()} حزمة`;
 
             let binaryBuffer = null;
 
-            // 1. Receive as ArrayBuffer or text payload based on selected option
-            if (payloadTypeSelect.value === 'binary') {
-                if (event.data instanceof ArrayBuffer) {
-                    binaryBuffer = new Uint8Array(event.data);
+            try {
+                const base64Frame = event.payload.frame;
+                if (base64Frame) {
+                    const binaryString = window.atob(base64Frame.replace(/\s/g, ''));
+                    const len = binaryString.length;
+                    binaryBuffer = new Uint8Array(len);
+                    for (let i = 0; i < len; i++) {
+                        binaryBuffer[i] = binaryString.charCodeAt(i);
+                    }
                     totalReceivedBytes += binaryBuffer.length;
-                } else {
-                    log('Expected arraybuffer packet, but got different format. Check payload config!', 'warn');
-                    return;
                 }
-            } else {
-                // Text wrapped base64 stream
-                try {
-                    let textData = event.data;
-                    if (typeof textData !== 'string') {
-                        // try decoding from ArrayBuffer to string
-                        const decoder = new TextDecoder("utf-8");
-                        textData = decoder.decode(event.data);
-                    }
-                    
-                    // Parse if it is JSON or base64
-                    let base64String = textData;
-                    if (textData.startsWith('{')) {
-                        const json = JSON.parse(textData);
-                        // common keys: data, h264, stream, image, payload
-                        base64String = json.data || json.h264 || json.stream || json.payload || '';
-                    }
-                    
-                    if (base64String) {
-                        const binaryString = window.atob(base64String.replace(/\s/g, ''));
-                        const len = binaryString.length;
-                        binaryBuffer = new Uint8Array(len);
-                        for (let i = 0; i < len; i++) {
-                            binaryBuffer[i] = binaryString.charCodeAt(i);
-                        }
-                        totalReceivedBytes += binaryBuffer.length;
-                    }
-                } catch (e) {
-                    if (packetCount % 100 === 0) {
-                        log('Error parsing Base64 packet: ' + e.message, 'error');
-                    }
-                    return;
+            } catch (e) {
+                if (packetCount % 100 === 0) {
+                    log('Error parsing Base64 packet: ' + e.message, 'error');
                 }
+                return;
             }
 
             // If we extracted the binary buffer correctly, feed it into JMuxer!
@@ -613,16 +608,15 @@
 
         // Stop live transmission stream
         function stopStreamConnection(keepStats = false) {
-            log('Terminating socket session and cleaning buffers...', 'warn');
+            log('Terminating Supabase session and cleaning buffers...', 'warn');
             
-            // Cancel socket
-            if (socket) {
-                socket.onclose = null;
-                socket.onerror = null;
+            // Cancel socket/channel
+            if (supabaseChannel) {
                 try {
-                    socket.close();
+                    supabaseClient.removeChannel(supabaseChannel);
                 } catch(e) {}
-                socket = null;
+                supabaseChannel = null;
+                supabaseClient = null;
             }
 
             // Destroy decoder
@@ -667,7 +661,7 @@
                 globalStatusText.innerText = "جاري الاتصال";
 
                 placeholderTitle.innerText = "يرجى الانتظار...";
-                placeholderDesc.innerText = "جاري إنشاء المصافحة والاتصال بقناة البث المحددة عبر WebSocket...";
+                placeholderDesc.innerText = "جاري إنشاء المصافحة والاتصال بقناة البث المحددة عبر Supabase Realtime...";
                 iconPlaceholder.className = "w-8 h-8 text-amber-500 animate-spin";
             } else if (status === 'connected') {
                 connectBtn.disabled = true;
@@ -693,7 +687,7 @@
                 globalStatusText.innerText = "غير متصل";
 
                 placeholderTitle.innerText = "شاشة البث مغلقة حالياً";
-                placeholderDesc.innerText = "قم بتعبئة عنوان الـ WebSocket والضغط على \"تشغيل البث\" في الجانب الأيمن للاستماع وبدء فك الترميز التلقائي للإطارات.";
+                placeholderDesc.innerText = "قم بتعبئة عنوان خادم Supabase والضغط على \"تشغيل البث\" في الجانب الأيمن للاستماع وبدء فك الترميز التلقائي للإطارات.";
                 iconPlaceholder.className = "w-8 h-8 text-slate-500 animate-none";
 
                 lucide.createIcons();

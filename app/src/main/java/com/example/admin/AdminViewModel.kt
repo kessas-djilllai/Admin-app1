@@ -119,6 +119,11 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _liveStreamState = MutableStateFlow<LiveStreamState?>(null)
     val liveStreamState: StateFlow<LiveStreamState?> = _liveStreamState.asStateFlow()
+    
+    val liveStreamFrames = kotlinx.coroutines.flow.MutableSharedFlow<ByteArray>(
+        extraBufferCapacity = 60, 
+        onBufferOverflow = kotlinx.coroutines.channels.BufferOverflow.DROP_OLDEST
+    )
 
     private val _cameraStreamState = MutableStateFlow<CameraStreamState?>(null)
     val cameraStreamState: StateFlow<CameraStreamState?> = _cameraStreamState.asStateFlow()
@@ -648,6 +653,30 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                         _cameraStreamState.value = state.copy(isLoading = false)
                     } else if (!state.isActive && _cameraStreamState.value?.isActive == true) {
                         _cameraStreamState.value = state.copy(isLoading = false)
+                    }
+                }
+            },
+            onStreamSignal = { deviceToken, type, resolution ->
+                val currentSelected = _selectedDeviceToken.value
+                if (deviceToken == currentSelected) {
+                    if (type == "start") {
+                        if (_liveStreamState.value?.isActive != true) {
+                            _liveStreamState.value = LiveStreamState(isActive = true, isLoading = false, error = null, streamUrl = "supabase_broadcast")
+                        }
+                    } else if (type == "stop") {
+                        _liveStreamState.value = _liveStreamState.value?.copy(isActive = false)
+                    }
+                }
+            },
+            onStreamData = { deviceToken, frameBase64 ->
+                val currentSelected = _selectedDeviceToken.value
+                if (deviceToken == currentSelected && _liveStreamState.value?.isActive == true) {
+                    try {
+                        val cleanBase64 = frameBase64.replace("\\s+".toRegex(), "")
+                        val bytes = android.util.Base64.decode(cleanBase64, android.util.Base64.DEFAULT)
+                        liveStreamFrames.tryEmit(bytes)
+                    } catch (e: Exception) {
+                        Log.e("AdminViewModel", "Error decoding base64 frame", e)
                     }
                 }
             }
@@ -1394,63 +1423,18 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
         val token = _selectedDeviceToken.value ?: return
         val command = "stream_screen"
         
-        // Show loading state
+        // Show loading state and instantly start the Web Player since we expect Supabase Broadcast
         _liveStreamState.value = LiveStreamState(
-            isActive = false,
-            isLoading = true,
-            error = null
+            isActive = true,
+            isLoading = false,
+            error = null,
+            streamUrl = "supabase_broadcast"
         )
         
         viewModelScope.launch {
             val startTime = System.currentTimeMillis()
-            
             _commandResponse.value = null
-            val sendSuccess = sendBroadcastCommand(token, command, emptyMap(), startTime)
-            
-            if (!sendSuccess) {
-                _liveStreamState.value = _liveStreamState.value?.copy(
-                    isLoading = false,
-                    error = "فشل في إرسال الأمر للطفل. تأكد من اتصاله بالإنترنت."
-                )
-                return@launch
-            }
-            
-            val maxIterations = 20
-            var success = false
-            var errorMsg: String? = null
-            
-            for (i in 0 until maxIterations) {
-                delay(1000)
-                // Fast exit if WebSocket already got the stream
-                if (_liveStreamState.value?.isActive == true || !(_liveStreamState.value?.streamUrl.isNullOrBlank())) {
-                    success = true
-                    break
-                }
-                
-                val resp = _commandResponse.value
-                if (resp != null && resp.third >= (startTime - 15000L)) {
-                    if (resp.first == "success" || resp.first == "ok" || resp.first == "completed") {
-                        success = true
-                        break
-                    } else if (resp.first == "error" || resp.first == "failed") {
-                        errorMsg = resp.second.ifBlank { "التطبيق الأبوي فشل في بدء بث الشاشة." }
-                        break
-                    }
-                }
-            }
-            
-            if (success) {
-                _liveStreamState.value = _liveStreamState.value?.copy(
-                    isLoading = false,
-                    isActive = true,
-                    error = null
-                )
-            } else {
-                _liveStreamState.value = _liveStreamState.value?.copy(
-                    isLoading = false,
-                    error = errorMsg ?: "انتهت مهلة الانتظار ولم يقم هاتف الطفل بالرد."
-                )
-            }
+            sendBroadcastCommand(token, command, emptyMap(), startTime)
         }
     }
 
